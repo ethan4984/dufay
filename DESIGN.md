@@ -66,19 +66,11 @@ Often certain portal classifications are only accessible by special categories o
 - **Cow**: A set of frames and references to be fulfilled in accordance with the principles of CoW (Copy on Write).
 - **Special**: A special mapping for whose contents must be inferred from a specified chain of servers once written to or read from.
 
-To resolve a page fault pertaining to a special page, the running thread must be blocked, and upon the response, the server is unblocked.
-
-These are all special operations that require special permissions to invoke.
-
 ### Portal link over shared memory 
 
-Shared memory for object passing can be very powerful when paired with the right protocols and interfaces to reduce complexity.
+- It is both the clients and servers responsibility to understand the nature of the data passed over shared memory. FAYT will provide macros and wrappers for data access to ensure safety.
 
-Certain applications require less safety and assurance than others. For example, a unidirectional queue from user-space to kernel-space requires minimal safe-guard. Another common application is shared metadata between multiple instances of the same server, requiring only locking. These basic applications are all that is required for the multi-server scheduling interface to function.
-
-- In these scenarios, it is both the client’s and server’s responsibility to understand the nature of the data passed over shared memory. FAYT will provide macros and wrappers for data access to ensure locking.
-
-- There will exist a table of shared memory portals, maintained in kernel space, each with an identifier, a list of the captured threads, and a pointer to the physical memory of the shared object. Each thread, in effect, manages its own virtual address space, so it will decide where it wants the share-point to be established.
+- Maintained within the kernel will exist a table describing all shared memory portals. Each with an identifier, a list of the captured threads, and a pointer to the physical memory of the shared object. Each thread, in effect, manages its own virtual address space, so it will decide where it wants the share-point to be established.
 
 - To create a share-point, you will call the portal system call, passing both the ANON (or DIRECT) and SHARE flags. You will provide a name identifying the share-point and pass a proper morphology. Then the caller will populate it with the share objects. Among any share-point, the first bytes will always be a meta-structure understood by all parties to be a governing object used for synchronization, defined as:
 
