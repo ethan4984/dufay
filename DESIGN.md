@@ -1,10 +1,33 @@
 # Scheduling
 
-There exists a pre-processor scheduling server that utilises a circular queue within shared memory for object passing between the kernel and the user-space scheduler. The kernel manages brute context switching, while the user-space scheduler handles scheduling among various contexts with differing priorities. When the kernel depletes this queue, it shall reschedule to the pre-processor scheduling server which will then refill this queue and yield.
+There exists a pre-processor scheduling server that utilises a circular queue within shared memory for object passing between the kernel and the user-space scheduler. The kernel manages brute context switching, while the user-space scheduler handles scheduling among various contexts with differing priorities. When the kernel depletes this queue, it shall reschedule to the pre-processor scheduling server which will then refill this queue and yield. The scheduler implements a Completely Fair paradigm, where each thread enqueued is the next left-most node within a Red-Black tree with respect to virtual runtime. 
 
 ![image](schedule.png)
 
-The approach for exchanging information between scheduling servers and allocating contexts for governance by a specific core has yet to be decided. Likely the final scheme will involve a combination of notifications for required RPC and direct shared memory for data exchange.
+To allow for efficent load-balancing and communication between schedulers, information and metadata are exchanged between servers via a protal link. Where the servers `processor_id` acts as an index into shared memory which points to its respective metadata structure. 
+
+The notifications `NOTIFY_ENQUEUE_THREAD` and `NOTIFY_DEQUEUE_THREAD` allow for the enqueuing and dequeuing of threads within a scheduler server. When a `NOTIFY_ENQUEUE_THREAD` notification is invoked, it can trigger an additional notification to off-load the thread to another server to ensure balanced load between processors.
+
+# Notifications
+
+To send a burst of infomration that requires mutual processing between different contexts, this can be done with a notification. Each notification has an associated weight, which describes the priority in which it should be delivered. Each context has a possible 64 distinct notificaitons and it is understood that each party involved in the notification understands how the notification is defined.
+
+- **NOTIFY_WEIGHT_SCHEDULED**: Delivered when it would have otherwise been scheduled to
+- **NOTIFY_WEIGHT_TICK**: Delivered upon the next tick of the APIC-timer (which mediates the frequency of context-switches)
+- **NOTIFY_WEIGHT_INSTANTANEOUS**: Delivered instantaneously in a single continuous chain of execution
+
+We support nested notifications, allowing for the handling of a notification while within a notifiaction. Each context implements a queue of `ucontext` objects that represent various saved states within the same address space. Which enables each context to maintain a tree of different `ucontext` instances, allowing for traversal between different states across different levels within the chain of execution. 
+
+Each notification works with respect to its own stack. But since the kernel has minimal authority of the address-space of a user-space server, for a server to support notifications it must pre-allocate a set of notification stacks. When nested notifications occour, the kernel will pull from this set and when exhausted it will invokve a notification `NOTIFY_USTACK_REFILL`. 
+
+A notification handler will exist like this. Where NotificationInfo provides information about the sender and the nature of the call, the data parameter is a region allocated in shared memory for object passing. Notifications provide granular input over-shared memory, and granular output over-shared memory, intended such that a caller will supply the notification invocation with some set of objects, and the notification shall return its own set of objects.
+
+```c
+void notification(fayt::NotificationInfo *info, void *data, int not) {
+  ...
+  fayt::syscall(NOTIFICATION_RETURN);
+}
+```
 
 # Memory Portals
 
@@ -88,34 +111,4 @@ Certain applications require less safety and assurance than others. For example,
 
 - The share-point begins at the next 16-byte aligned address following this meta-structure. All access to the share-point will be understood to only be accessed by a set of wrappers that ensure all locking, protection, and boundary conditions are respected.
 
-- More advanced applications, such as bidirectional queues between servers, will require validation akin to that of Unix domain sockets. A rigorous connection between client and server must be established and maintained. For something like this, which would involve frequent blocking, a capability that can only be provided by an advanced set of schedulers. So, I will dive deeper into this design later.
-
-### Advanced Share-Point
-
-TBD
-
-# Notifications
-
-Sending quick bursts of information between servers, or between a server and kernel-space, can be done via a notification. Which can be invoked with a flag that provides immediate rescheduling. And another flag often used in conjunction with the previous flag, that upon the return of the notifcation handler the system shall immediately reschedule back to the calling context. While this protocol has minimal-overhead, it should be used conservatively. Mostly intended for applications where objects passed between servers occour at a low to moderate frequency and are of high-impact. For applications that require high-frequency object passing it is recommended to use a more robust interface.
-
-Each context contains a possible 64 notificaiton handlers, each with a circumstantially defined use-case. I do not prescribe any pre-defined use-case for any given notification index, as it is understood that each party involved in the notification, understands how that server defines its notification-set. We provide a system call available to core servers that allows the server to provide handlers for any given notification index.
-
-```c
-struct [[gnu::packed]] NotificationAction {
-    void (*handler)(void*,int,int);
-};
-```
-
-Notifications will be distributed onto a context by the `notification_dispatch(struct context*)` function. Within `struct context` exists a set of field pertaining to notifcations, such as the a set of actions array and a queue, and most importantly `ucontext`. When a notification is dispatched, the state of context will be saved to `ucontext`, with the state of the current thread being overridden with a fresh notification state. When a notification is complete, the handler will invoke the `notification_ret` syscall. Which restores the previous state of the context in conjunction with `ucontext`.
-
-Each notification receives a fresh stack, but since the kernel has minimal authority over a threads address space, a problem arises when you wish to handle n-number of nested notifcations. A solution would be to provide user-space a syscall to allocate a notification stack, as well as a syscall to provide a notification action that shall be invoked by the kernel whenever it requires a stack to handle an additional nested notification. This is a fringe use-case, but one that should be handled nonetheless. 
-
-A notification handler will exist like this. Where NotificationInfo provides information about the sender and the nature of the call, the data parameter is a region allocated in shared memory for object passing. Notifications provide granular input over-shared memory, and granular output over-shared memory, intended such that a caller will supply the notification invocation with some set of objects, and the notification shall return a set of objects as well.  
-
-```c
-void notification(fayt::NotificationInfo *info, void *data, int not) {
-  fayt::syscall(NOTIFICATION_RETURN);
-}
-```
-
-it must exist over shared memory because this has to be generic, it can not be limited to what can only be passed over registers, because potentially a notification will return a large set of objects such as a device enumeration server returning all known devices on the system
+- Perhaps more advanced applications, such as bidirectional queues between servers, will require validation akin to that of Unix domain sockets. A rigorous connection between client and server must be established and maintained. For something like this, which would involve frequent blocking, a capability that can only be provided by an advanced set of schedulers. So, I will dive deeper into this design later.
