@@ -112,21 +112,33 @@ int launch_servers(void) {
 			strcmp(modules[i]->cmdline, "block") != 0 && 
 			strcmp(modules[i]->cmdline, "ext") != 0) continue;
 
-		struct server *server = alloc(sizeof(struct server));
-		server->file = modules[i];
+		print("dufay: launching server {%s}\n", modules[i]->cmdline);
 
 		char *server_name = alloc(SERVER_MAX_NAME_LENGTH);
 		sprint(server_name, "%s", modules[i]->cmdline);
 
+		struct server *server = alloc(sizeof(struct server));
+
 		ret = create_server("IO", server_name, server);
-		if(ret == -1) return -1;
+		if(ret == -1) { 
+			print("dufay: failed to initiate server meta {%s}\n", modules[i]->cmdline);
+			return -1;
+		}
+
+		server->file = modules[i];
 	
 		ret = launch_server(server, NULL, 0);
-		if(ret == -1) return -1;
+		if(ret == -1) {
+			print("dufay: failed to launch server {%s}\n", modules[i]->cmdline);
+			return -1;
+		}
 
-		ret = notification_send(master_scheduler->context, server->context,
+		ret = notification_send(server->context, master_scheduler->context,
 			SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK);
-		if(ret == -1) return -1;
+		if(ret == -1) {
+			print("dufay: failed to send scheduling notification on {%s}\n", modules[i]->cmdline);
+			return -1;
+		}
 	}
 
 	return 0;
@@ -151,22 +163,41 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	ret = create_blank_context(context); 
 	if(ret == -1) return -1;
 
+	struct ustack *ustack = alloc(sizeof(struct ustack));
+
+	ustack->kernel_stack.sp = pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE), 1)
+		+ CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
+	ustack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
+	ustack->user_stack.sp = SERVER_DEFAULT_STACK_LOCATION + SERVER_DEFAULT_STACK_SIZE;
+	ustack->user_stack.size = SERVER_DEFAULT_STACK_SIZE;
+	ustack->active = 1;
+
+	ret = USTACK_PUSH(context, ustack);
+	if(ret == -1) { print("dufay: unable to push ustack\n"); return -1; }
+
+	struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+
+	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
+	ucontext->stack = ustack;
+
+	ret = UCONTEXT_PUSH(context, ucontext);
+	if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+	
+	context->ucontext_top = ucontext;
+
 	elf->page_table = context->page_table;
 
 	ret = elf64_file_load(elf);
 	if(ret == -1) return -1;
 
-	context->regs.rip = elf->aux.at_entry;
-	context->regs.cs = 0x43;
-	context->regs.rflags = 0x202;
-	context->regs.ss = 0x3b;
+	ucontext->regs.rip = elf->aux.at_entry;
+	ucontext->regs.cs = 0x43;
+	ucontext->regs.rflags = 0x202;
+	ucontext->regs.ss = 0x3b;
 
-	context->user_stack.sp = SERVER_DEFAULT_STACK_LOCATION + SERVER_DEFAULT_STACK_SIZE;
-	context->user_stack.size = SERVER_DEFAULT_STACK_SIZE;
-
-	uintptr_t stack_physical = pmm_alloc(context->user_stack.sp / PAGE_SIZE, 1) + 
+	uintptr_t stack_physical = pmm_alloc(ucontext->stack->user_stack.sp / PAGE_SIZE, 1) + 
 		SERVER_DEFAULT_STACK_SIZE; 
-	uintptr_t stack_virtual = context->user_stack.sp;
+	uintptr_t stack_virtual = ucontext->stack->user_stack.sp;
 
 	for(size_t i = 0; i < SERVER_DEFAULT_STACK_SIZE / PAGE_SIZE; i++) {
 		context->page_table->map_page(context->page_table, stack_virtual - PAGE_SIZE * i,
@@ -179,11 +210,11 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	if(arg) {
 		location -= arg_length;
 		memcpy(location, arg, arg_length);
-		context->regs.rdi = stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
+		ucontext->regs.rdi = stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
 	}
 
 	location = (void*)((uint64_t)location & -16ll);
-	context->regs.rsp = stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
+	ucontext->regs.rsp = stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
 
 	server->context = context;
 

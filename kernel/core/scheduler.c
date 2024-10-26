@@ -23,19 +23,35 @@ int create_blank_context(struct context *context) {
 	context->page_table = alloc(sizeof(struct page_table));
 	vmm_default_table(context->page_table);
 
-	context->sysperm = 0;
-
-	context->kernel_stack.sp = pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE), 1)
-		+ CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
-	context->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
-
+	context->comms.sysperm = 0;
+	
 	context->notification.actions = alloc(sizeof(struct notification_action) * NOTIFICATION_MAX);
 	context->notification.queue = alloc(sizeof(struct notification_queue));
 
-	context->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
-
 	int ret = NEW_CONTEXT(context);
 	if(ret == -1) return -1;
+
+	return 0;
+}
+
+int destroy_ucontext(struct ucontext *ucontext) {
+	if(ucontext == NULL) return -1;
+
+	if(ucontext->last) {
+		ucontext->last->next = ucontext->next;
+		if(ucontext->next) ucontext->next->last = ucontext->last;
+	}
+
+	pmm_free(ucontext->stack->kernel_stack.sp - HIGH_VMA - ucontext->stack->kernel_stack.size,
+		DIV_ROUNDUP(ucontext->stack->kernel_stack.size, PAGE_SIZE));
+
+	if(ucontext->stack->last) {
+		ucontext->stack->last->next = ucontext->stack->next;
+		if(ucontext->stack->next) ucontext->stack->next->last = ucontext->stack->last;
+	}
+
+	free(ucontext->stack);
+	free(ucontext);
 
 	return 0;
 }
@@ -80,10 +96,16 @@ void reschedule(struct registers *regs, void*) {
 
 	struct context *next_context;
 
-	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
-	if(ret != -1) goto finish;	
+	if(CORE_LOCAL->current_context) {
+		if(CORE_LOCAL->current_context->notification.queue) {
+			if(CORE_LOCAL->current_context->notification.queue->active) {
+				int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
+				if(ret != -1) goto finish;
+			}
+		}
+	}
 
-	ret = VECTOR_POP(CORE_LOCAL->thread_queue, next_context);
+	int ret = VECTOR_POP(CORE_LOCAL->thread_queue, next_context);
 	if(ret == -1) {
 		struct server *scheduling_server = CORE_LOCAL->scheduling_server;
 		if(scheduling_server == NULL) {
@@ -99,17 +121,17 @@ void reschedule(struct registers *regs, void*) {
 		}
 	}
 finish:
-	notification_dispatch(next_context);
 	struct context *current_context = CORE_LOCAL->current_context;
+	notification_dispatch(next_context);
 
 	void **fpu_context;
 	struct registers *r;
 
-	if(likely(current_context)) {
-		fpu_context = (current_context->notification.ucontext == NULL) ? 
-				&current_context->fpu_context : &current_context->notification.ucontext->fpu_context;
-		r = (current_context->notification.ucontext) ?
-				&current_context->notification.ucontext->regs : &current_context->regs;
+	if(likely(current_context && current_context->ucontext_active)) {
+		struct ucontext *ucontext = current_context->ucontext_active;
+
+		fpu_context = &ucontext->fpu_context;
+		r = &ucontext->regs;
 
 		CORE_LOCAL->fpu_save(*fpu_context);
 
@@ -118,10 +140,29 @@ finish:
 		current_context->user_gs_base = get_user_gs();
 	}
 
-	fpu_context = (next_context->notification.ucontext == NULL) ? 
-			&next_context->fpu_context : &next_context->notification.ucontext->fpu_context;
-	r = (next_context->notification.ucontext) ?
-			&next_context->notification.ucontext->regs : &next_context->regs;
+	struct ucontext *ucontext = ({
+		struct ucontext *ucontext = next_context->ucontext_top;
+
+		struct notification_queue *nqueue = next_context->notification.queue;
+		if(nqueue == NULL) goto end;
+		if(nqueue->active == 0) {
+			for(; ucontext;) {
+				if(ucontext->notification == NULL) break;
+				ucontext = ucontext->last;
+			}
+
+			if(ucontext == NULL) { panic("dufay: ucontext null\n"); }
+			else goto end;
+		}
+end:
+		ucontext;
+	});
+
+	next_context->ucontext_active = ucontext;
+	CORE_LOCAL->kernel_stack = ucontext->stack->kernel_stack.sp;
+
+	fpu_context = &ucontext->fpu_context;
+	r = &ucontext->regs;
 
 	x86_swap_tables(next_context->page_table);
 
@@ -132,10 +173,12 @@ finish:
 
 	CORE_LOCAL->current_context = next_context;
 
+	if(ucontext->notification) ucontext->delivered = 1;
+
 	xapic_write(XAPIC_EOI_OFF, 0);
 	spinrelease(&reschedule_lock);
 
-	SWAP_TLS(&next_context->regs); 
+	SWAP_TLS(r); 
 
 	__asm__ volatile (
 		"mov %0, %%rsp\n\t"

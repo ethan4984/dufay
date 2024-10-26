@@ -60,7 +60,7 @@ finish: \
 	ret; \
 })
 
-struct notification_queue {
+struct notification_queue { 
 	struct notification *queue[NOTIFICATION_MAX]; 
 	int mask;
 

@@ -12,7 +12,7 @@
 #include <fayt/compiler.h>
 
 static inline int notification_is_valid(int not) {
-	if(not < 1 || not > NOTIFICATION_MAX) return -1;
+	if(not < 0 || not > NOTIFICATION_MAX) return -1;
 	else return 0;
 }
 
@@ -20,26 +20,38 @@ static inline int notification_check_perms(struct context*, struct context*, int
 	return 0;
 }
 
-static int get_ucontext(struct context *context, struct ucontext **ucontext) {
-	if(context == NULL || ucontext == NULL) return -1;
-	*ucontext = NULL;
+static int notification_ucontext_instance(struct context *context, struct ucontext *ucontext,
+	struct notification *notification) {
+	if(context == NULL || ucontext == NULL || notification == NULL) return -1;
+	struct notification_action *action = &context->notification.actions[notification->notnum];
 
-	for(int i = 0; i < context->notification.ucontexts.length; i++) {
-		if(!context->notification.ucontexts.data[i]->active) {
-			*ucontext = context->notification.ucontexts.data[i];
-			return i;
-		}
-	}
+	struct ustack *ustack;
+	int ret = USTACK_CLAIM(context, ustack);
+	if(ret == -1) return -1;
+	if(ustack == NULL) {
+		print("dufay: no available ucontext stacks\n");
+		return -1;
+	}	
 
-	*ucontext = alloc(sizeof(struct ucontext));
-	VECTOR_PUSH(context->notification.ucontexts, *ucontext);
+	ucontext->stack = ustack;
+	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
 
-	return context->notification.ucontexts.length - 1;
+	ucontext->regs.ss = 0x3b;
+	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
+	ucontext->regs.rflags = 0x202;
+	ucontext->regs.cs = 0x43;
+	ucontext->regs.rip = (uintptr_t)action->handler;
+
+	ucontext->regs.rdi = (uint64_t)notification->info;
+	ucontext->regs.rsi = (uint64_t)notification->share_region.vaddr;
+	ucontext->regs.rdx = notification->notnum;
+
+	return 0;
 }
 
 int notification_send(struct context *sender, struct context *target, int not, int weight) {
-	if(sender == NULL || target == NULL || !notification_is_valid(not) ||
-		notification_check_perms(sender, target, not) == -1) return -1;
+	if(target == NULL || notification_is_valid(not) == -1) return -1;
+	if(sender && notification_check_perms(sender, target, not) == -1) return -1;
 
 	struct notification_queue *queue = target->notification.queue;
 	struct notification *notification = alloc(sizeof(struct notification));
@@ -52,8 +64,18 @@ int notification_send(struct context *sender, struct context *target, int not, i
 	int ret = NOTIFICATION_PUSH(queue, notification);
 	if(ret == -1) return -1;
 
-	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS ||
-		weight & NOTIFY_WEIGHT_TICK) VECTOR_PUSH(CORE_LOCAL->delivery_stack, target);
+	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
+		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+
+		ucontext->notification = notification;
+		ucontext->ready = 1;
+
+		int ret = UCONTEXT_PUSH(target, ucontext);
+		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+
+		target->ucontext_top = ucontext;
+		VECTOR_PUSH(CORE_LOCAL->delivery_stack, target);
+	}
 	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS) yield();
 
 	return 0;
@@ -73,11 +95,17 @@ int notification_dispatch(struct context *context) {
 		return -1;
 	}
 
-	struct ucontext *ucontext;
-	context->notification.ucontext_idx = get_ucontext(context, &ucontext); 
-	if(context->notification.ucontext_idx == -1 || ucontext == NULL) {
-		spinlock(&queue->lock);
-		return -1;
+	struct ucontext *top = context->ucontext_top;
+
+	if(top->notification && top->ready && !top->delivered) {
+		int ret = notification_ucontext_instance(context, context->ucontext_top,
+			context->ucontext_top->notification);	
+		if(ret == -1) {
+			print("dufay: failed to initialise ucontext\n");
+			spinrelease(&queue->lock); return -1;
+		}
+
+		spinrelease(&queue->lock); return 0;
 	}
 
 	for(int i = 1; i <= NOTIFICATION_MAX; i++) {
@@ -86,19 +114,23 @@ int notification_dispatch(struct context *context) {
 
 		struct notification_action *action = &context->notification.actions[i - 1];
 		struct notification *notification;
+
 		int ret = NOTIFICATION_POP(queue, notification, i);
-		if(ret == -1) return -1;
-
-		if(notification == NULL || action == NULL) continue;
-
-		struct ustack *ustack = context->notification.stacks;
-		for(; ustack;) {
-			if(!ustack->active) break;
-			else ustack = ustack->next;
+		if(ret == -1) {
+			print("dufay: failed to pop notification from stack\n");
+			spinrelease(&queue->lock); return -1;
 		}
-		if(ustack == NULL) return 0;
+		if(notification == NULL || action == NULL) continue;
+	
+		struct ustack *ustack;
+		ret = USTACK_CLAIM(context, ustack);
+		if(ret == -1) return -1;
+		if(ustack == NULL) return -1;
+
+		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
 		ucontext->stack = ustack;
+		ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
 
 		ucontext->regs.ss = 0x3b;
 		ucontext->regs.rsp = ucontext->stack->user_stack.sp;
@@ -108,10 +140,12 @@ int notification_dispatch(struct context *context) {
 
 		ucontext->regs.rdi = (uint64_t)notification->info;
 		ucontext->regs.rsi = (uint64_t)notification->share_region.vaddr;
-		ucontext->regs.rdx = i + 1;
-	
-		ucontext->active = 1;
-		context->notification.ucontext = ucontext;
+		ucontext->regs.rdx = notification->notnum;
+
+		ret = UCONTEXT_PUSH(context, ucontext);
+		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+
+		context->ucontext_top = ucontext;
 
 		return 0;
 	}
@@ -174,9 +208,9 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, size, {
 		PAGE_SIZE), 1) + CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
 	new_stack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
 	new_stack->active = 0;
-	new_stack->next = context->notification.stacks;
 
-	context->notification.stacks = new_stack;
+	int ret = USTACK_PUSH(context, new_stack);
+	if(ret == -1) return -1;
 })
 
 SYSCALL_DEFINE0(notification_return, {
@@ -184,13 +218,30 @@ SYSCALL_DEFINE0(notification_return, {
 	if(context == NULL) return -1;
 
 	struct notification_queue *queue = context->notification.queue;
-	if(queue == NULL) return -1;
+	if(queue == NULL) panic("dufay: nqueue is null\n");
 
-	if(context->notification.ucontext) context->notification.ucontext->active = 0;
-	context->notification.ucontext = NULL;
+	struct ucontext *rcontext = ({
+		struct ucontext *rcontext = context->ucontext_active->last;
+	
+		for(; rcontext;) {
+			if(rcontext->notification && !rcontext->delivered) {
+				rcontext = rcontext->last;
+				continue;
+			}
+			break;
+		}
+		
+		rcontext;
+	});
+	if(rcontext == NULL) panic("dufay: rcontext is null\n");
 
-	CORE_LOCAL->fpu_rstor(&context->fpu_context);
-	SWAP_TLS(&context->regs);
+	int ret = destroy_ucontext(context->ucontext_active);
+	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
+
+	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
+	CORE_LOCAL->fpu_rstor(rcontext->fpu_context);
+
+	SWAP_TLS(&rcontext->regs);
 
 	__asm__ volatile (
 		"mov %0, %%rsp\n\t"
@@ -211,7 +262,7 @@ SYSCALL_DEFINE0(notification_return, {
 		"pop %%rax\n\t"
 		"addq $16, %%rsp\n\t"
 		"iretq\n\t"
-		:: "r" (&context->regs)
+		:: "r" (&rcontext->regs)
 	);
 })
 

@@ -26,16 +26,16 @@ extern int syscall_notification_return(struct registers*);
 extern int syscall_notification_unmute(struct registers*);
 extern int syscall_notification_mute(struct registers*);
 
-
 static struct syscall_handle syscall_handles[] = {
-	{ .handler = syscall_log },
-	{ .handler = syscall_portal },
-	{ .handler = syscall_yield },
-	{ .handler = syscall_notification_action },
-	{ .handler = syscall_notification_define_stack },
-	{ .handler = syscall_notification_return },
-	{ .handler = syscall_notification_unmute },
-	{ .handler = syscall_notification_mute }
+	{ .handler = syscall_log }, // 0
+	{ .handler = syscall_portal }, // 1
+	{ .handler = syscall_yield }, // 2
+	{ .handler = syscall_notification_action }, // 3
+	{ .handler = syscall_notification_define_stack }, // 4
+	{ .handler = syscall_notification_return }, // 5
+	{ .handler = syscall_notification_mute }, // 6
+	{ .handler = syscall_notification_unmute }, // 7
+	{ .handler = syscall_notification_mute } // 8
 };
 
 uint64_t syscall_handler(struct registers *regs) {
@@ -47,7 +47,7 @@ uint64_t syscall_handler(struct registers *regs) {
 	}
 
 	if(unlikely(CORE_LOCAL->current_context == NULL)) panic("dufay: critical error\n");
-	else if(CORE_LOCAL->current_context->sysperm & (1 << syscall_index))
+	else if(CORE_LOCAL->current_context->comms.sysperm & (1 << syscall_index))
 	return SYSRET(-1, 0);
 
 	int error;

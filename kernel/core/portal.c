@@ -229,7 +229,17 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req) {
 			circular_queue_init(queue, (void*)req->morphology.addr + sizeof(struct portal_link)
 				+ sizeof(struct circular_queue), queue_length, 4);
 		} else if((req->share.type & LINK_RAW) == LINK_RAW) {
-			
+			struct portal_link *link = (void*)req->morphology.addr;
+
+			*link = (struct portal_link) {
+				.lock = 0,
+				.length = req->morphology.length,
+				.header_offset = 0,
+				.header_limit = 0, 
+				.data_offset = sizeof(struct portal_link),
+				.data_limit = req->morphology.length - sizeof(struct portal_link),
+				.magic = LINK_RAW_MAGIC
+			};
 		}
 	}
 
