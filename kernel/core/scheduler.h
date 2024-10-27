@@ -8,6 +8,10 @@
 #define CONTEXT_DEFAULT_STACK_SIZE 0x10000
 #define SCHEDULER_DEFAULT_QUEUE_SIZE 0x10000
 
+// When a notification is created, we allocate a region in physical memory, and this
+// region can be aquired by user-space (specifying a location withinn its address space)
+// to populate arguments. 
+
 struct stack {
 	uintptr_t sp;
 	size_t size;
@@ -75,10 +79,6 @@ struct ucontext {
 finish: \
 	ret; \
 })
-
-// push onto ucontext_queue, set ucontext_top accordingly,
-// when a ucontext finishes its business, it shall be popped from ucontext_queue,
-// and ucontext_top shall be set to the top most ucontext on the queue
 
 struct context {
 	struct spinlock lock;

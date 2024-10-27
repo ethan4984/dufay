@@ -43,7 +43,7 @@ static int notification_ucontext_instance(struct context *context, struct uconte
 	ucontext->regs.rip = (uintptr_t)action->handler;
 
 	ucontext->regs.rdi = (uint64_t)notification->info;
-	ucontext->regs.rsi = (uint64_t)notification->share_region.vaddr;
+	ucontext->regs.rsi = (uint64_t)notification->nshare.vaddr;
 	ucontext->regs.rdx = notification->notnum;
 
 	return 0;
@@ -139,7 +139,7 @@ int notification_dispatch(struct context *context) {
 		ucontext->regs.rip = (uintptr_t)action->handler;
 
 		ucontext->regs.rdi = (uint64_t)notification->info;
-		ucontext->regs.rsi = (uint64_t)notification->share_region.vaddr;
+		ucontext->regs.rsi = (uint64_t)notification->nshare.vaddr;
 		ucontext->regs.rdx = notification->notnum;
 
 		ret = UCONTEXT_PUSH(context, ucontext);
@@ -219,6 +219,8 @@ SYSCALL_DEFINE0(notification_return, {
 
 	struct notification_queue *queue = context->notification.queue;
 	if(queue == NULL) panic("dufay: nqueue is null\n");
+
+	// chain immediately to another notification if possible and if available
 
 	struct ucontext *rcontext = ({
 		struct ucontext *rcontext = context->ucontext_active->last;

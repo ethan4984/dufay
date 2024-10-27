@@ -18,10 +18,10 @@ struct notification {
 	int notnum;
 
 	struct {
-		void *vaddr;
+		uintptr_t vaddr;
 		uintptr_t paddr;
 		int page_cnt;
-	} share_region;
+	} nshare;
 
 	struct notification_info *info;
 	struct notification_queue *queue;
