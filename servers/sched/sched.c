@@ -53,7 +53,7 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 				.ptr = &config, 
 				.length = sizeof(struct sched_queue_config)
 			},
-			.weight = NOTIFY_INSTANTANEOUS,
+			.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 			.namespace = NULL,
 			.destination = NULL
 		};
