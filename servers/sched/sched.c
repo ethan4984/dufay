@@ -7,6 +7,7 @@
 #include <fayt/address_space.h>
 #include <fayt/slab.h>
 #include <fayt/hash.h>
+#include <fayt/string.h> 
 
 #include <sched.h>
 
@@ -21,7 +22,7 @@ constexpr int NICE_VALUE_MAX = 19;
 
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 	struct sched_queue_config *config = data;
-	if(config == NULL) { print("DUFAY: SCHEDULER: \n"); goto finish; }
+	if(config == NULL) { print("DUFAY: SCHEDULER: config does not exist\n"); goto finish; }
 
 	if(config->offload) {
 		struct sched_descriptor *optimal_sched = sched_desc;
@@ -45,22 +46,36 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 
 		if(optimal_sched == sched_desc) goto exit;
 
-		config->offload = 0;
 		struct comm_bridge bridge = {
 			.not = SCHED_NOTIFY_ENQUEUE,
 			.cid = optimal_sched->cid,
-			.data = {
-				.ptr = &config, 
-				.length = sizeof(struct sched_queue_config)
-			},
 			.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 			.namespace = NULL,
 			.destination = NULL
 		};
 
-		struct syscall_response response = SYSCALL1(SYSCALL_NOTIFY, &bridge); 
+		bridge.data.length = sizeof(struct sched_queue_config);
+		uintptr_t vaddr;
+		ret = as_allocate(&address_space, &vaddr,
+			DIV_ROUNDUP(bridge.data.length, PAGE_SIZE));
+		bridge.data.ptr = (void*)vaddr;
+		if(ret == -1) {
+			print("DUFAY: SCHEDULER: failed address allocation unable to offload thread to other core\n");
+			goto finish;
+		} else goto finish;
+
+		struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
 		if(response.ret == -1) {
-			print("DUFAY: SCHEDULER: unable to offload thread to other core\n");
+			print("DUFAY: SCHEDULER: NOTIFICAITON BUILD FAILURE: unable to offload thread to other core\n");
+			goto finish;
+		} else goto finish;
+
+		config->offload = 0;
+		memcpy(bridge.data.ptr, config, bridge.data.length);
+
+		response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
+		if(response.ret == -1) {
+			print("DUFAY: SCHEDULER: NOTIFICATION BROADCAST FAILURE: unable to offload thread to other core\n");
 			goto finish;
 		} else goto finish;
 	}
@@ -161,6 +176,8 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }
+
+	print("DUFAY: SCHEDULER: Enabled notifiactions\n");
 
 	for(;;) {
 		for(int i = 0; i < desc->queue_default_refill; i++) {
