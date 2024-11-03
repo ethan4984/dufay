@@ -1,4 +1,5 @@
 #include <arch/x86/smp.h>
+#include <arch/x86/paging.h>
 
 #include <core/notification.h>
 #include <core/syscall.h>
@@ -20,18 +21,34 @@ static inline int notification_check_perms(struct context*, struct context*, int
 	return 0;
 }
 
+static int bridge_to_destination(struct comm_bridge *bridge, struct context **dest) {
+	if(bridge == NULL || dest == NULL) return -1;
+	struct context *context = CORE_LOCAL->current_context;
+
+	if(bridge->destination) {
+		const char *namespace = context->comms.namespace;
+		if(bridge->namespace) namespace = bridge->namespace;
+
+		struct server *server = find_server(namespace, bridge->destination);
+		if(server == NULL || server->context == NULL) return -1;
+	
+		*dest = server->context;
+	} else {
+		int ret = SEARCH_CONTEXT(bridge->cid, dest);
+		if(ret == -1 || *dest == NULL) return -1;
+	}
+
+	return 0;
+}
+
 static int notification_ucontext_instance(struct context *context, struct ucontext *ucontext,
-	struct notification *notification) {
-	if(context == NULL || ucontext == NULL || notification == NULL) return -1;
-	struct notification_action *action = &context->notification.actions[notification->notnum];
+	struct notification *notification, struct notification_action *action) {
+	if(context == NULL || ucontext == NULL || notification == NULL || action == NULL) return -1; 
 
 	struct ustack *ustack;
 	int ret = USTACK_CLAIM(context, ustack);
 	if(ret == -1) return -1;
-	if(ustack == NULL) {
-		print("dufay: no available ucontext stacks\n");
-		return -1;
-	}	
+	if(ustack == NULL) return -1;
 
 	ucontext->stack = ustack;
 	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
@@ -43,13 +60,49 @@ static int notification_ucontext_instance(struct context *context, struct uconte
 	ucontext->regs.rip = (uintptr_t)action->handler;
 
 	ucontext->regs.rdi = (uint64_t)notification->info;
-	ucontext->regs.rsi = (uint64_t)notification->nshare.vaddr;
+	ucontext->regs.rsi = 0;
 	ucontext->regs.rdx = notification->notnum;
+
+	int parameter_length = notification->parameter.page_cnt * PAGE_SIZE;
+	if(parameter_length) {
+		uintptr_t vaddr = ucontext->regs.rsp -= parameter_length; 
+		x86_map_page(context->page_table, vaddr, notification->parameter.paddr, 
+			X86_FLAGS_P | X86_FLAGS_US | X86_FLAGS_NX);
+		ucontext->regs.rsi = ucontext->regs.rsp;
+	}
+
+	struct portal_resp resp;
+	struct portal_req req = {
+		.type = PORTAL_REQ_ANON,
+		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+		.length = sizeof(struct portal_req),
+		.share = {
+			.identifier = NULL,
+			.type = 0,
+			.create = 0
+		},
+		.morphology = {
+			.addr = ucontext->regs.rsp,
+			.length = ucontext->stack->user_stack.size - parameter_length
+		}
+	};
+
+	ret = portal(&req, &resp);
+	if(ret == -1 || resp.base != ucontext->regs.rsp) {
+		print("dufay: unable to anonymously map notification stack\n");
+		return -1;
+	}
+
+	ret = UCONTEXT_PUSH(context, ucontext);
+	if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+
+	context->ucontext_top = ucontext;
 
 	return 0;
 }
 
-int notification_send(struct context *sender, struct context *target, int not, int weight) {
+int notification_queue(struct context *sender, struct context *target, int not,
+	int weight, int ready, uintptr_t vaddr, uint64_t paddr, int page_cnt) {
 	if(target == NULL || notification_is_valid(not) == -1) return -1;
 	if(sender && notification_check_perms(sender, target, not) == -1) return -1;
 
@@ -61,6 +114,15 @@ int notification_send(struct context *sender, struct context *target, int not, i
 	notification->info = alloc(sizeof(struct notification_info));
 	notification->queue = queue;
 
+	if(page_cnt && paddr) {
+		if(vaddr) notification->parameter.vaddr = vaddr;
+		notification->parameter.paddr = paddr;
+		notification->parameter.page_cnt = page_cnt;
+
+		if(vaddr) x86_map_page(sender->page_table, vaddr, paddr,
+			X86_FLAGS_PS | X86_FLAGS_US | X86_FLAGS_NX);
+	}
+
 	int ret = NOTIFICATION_PUSH(queue, notification);
 	if(ret == -1) return -1;
 
@@ -68,7 +130,7 @@ int notification_send(struct context *sender, struct context *target, int not, i
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
 		ucontext->notification = notification;
-		ucontext->ready = 1;
+		ucontext->ready = ready;
 
 		int ret = UCONTEXT_PUSH(target, ucontext);
 		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
@@ -79,7 +141,23 @@ int notification_send(struct context *sender, struct context *target, int not, i
 	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS) yield();
 
 	return 0;
+
 }
+
+SYSCALL_DEFINE1(notification_build, struct comm_bridge*, bridge, {
+	struct context *context = CORE_LOCAL->current_context;
+	struct context *destination;
+
+	int ret = bridge_to_destination(bridge, &destination);
+	if(ret == -1) return -1;
+
+	return notification_queue(context, destination, bridge->not, bridge->weight, 0,
+		(uintptr_t)bridge->data.ptr, 0, DIV_ROUNDUP(bridge->data.length, PAGE_SIZE));
+})
+
+SYSCALL_DEFINE1(notifcation_broadcast, struct comm_bridge*, bridge, {
+
+})
 
 int notification_dispatch(struct context *context) {
 	if(context == NULL) return -1;
@@ -98,8 +176,9 @@ int notification_dispatch(struct context *context) {
 	struct ucontext *top = context->ucontext_top;
 
 	if(top->notification && top->ready && !top->delivered) {
+		struct notification_action *action = &context->notification.actions[context->ucontext_top->notification->notnum];
 		int ret = notification_ucontext_instance(context, context->ucontext_top,
-			context->ucontext_top->notification);	
+			context->ucontext_top->notification, action);	
 		if(ret == -1) {
 			print("dufay: failed to initialise ucontext\n");
 			spinrelease(&queue->lock); return -1;
@@ -122,30 +201,10 @@ int notification_dispatch(struct context *context) {
 		}
 		if(notification == NULL || action == NULL) continue;
 	
-		struct ustack *ustack;
-		ret = USTACK_CLAIM(context, ustack);
-		if(ret == -1) return -1;
-		if(ustack == NULL) return -1;
-
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
-		ucontext->stack = ustack;
-		ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
-
-		ucontext->regs.ss = 0x3b;
-		ucontext->regs.rsp = ucontext->stack->user_stack.sp;
-		ucontext->regs.rflags = 0x202;
-		ucontext->regs.cs = 0x43;
-		ucontext->regs.rip = (uintptr_t)action->handler;
-
-		ucontext->regs.rdi = (uint64_t)notification->info;
-		ucontext->regs.rsi = (uint64_t)notification->nshare.vaddr;
-		ucontext->regs.rdx = notification->notnum;
-
-		ret = UCONTEXT_PUSH(context, ucontext);
-		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
-
-		context->ucontext_top = ucontext;
+		ret = notification_ucontext_instance(context, ucontext, notification, action);
+		if(ret == -1) return -1;
 
 		return 0;
 	}
@@ -155,23 +214,12 @@ int notification_dispatch(struct context *context) {
 
 SYSCALL_DEFINE1(notify, struct comm_bridge*, bridge, {
 	if(bridge == NULL) return -1;
+
 	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination; 
+	struct context *destination;
 
-	if(bridge->destination) {
-		const char *namespace = context->comms.namespace;
-		if(bridge->namespace) namespace = bridge->namespace;
-
-		struct server *server = find_server(namespace, bridge->destination);
-		if(server == NULL || server->context == NULL) return -1;
-	
-		destination = server->context;
-	} else {
-		int ret = SEARCH_CONTEXT(bridge->cid, &destination);
-		if(ret == -1 || destination == NULL) return -1;
-	}
-
-	return notification_send(context, destination, bridge->not, bridge->weight);
+	int ret = bridge_to_destination(bridge, &destination);
+	if(ret == -1) return -1;
 })
 
 SYSCALL_DEFINE3(notification_action, int, not, struct notification_action *, action,

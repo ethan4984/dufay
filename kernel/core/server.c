@@ -133,8 +133,15 @@ int launch_servers(void) {
 			return -1;
 		}
 
-		ret = notification_send(server->context, master_scheduler->context,
-			SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK);
+		struct sched_queue_config *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+
+		config->cid = 0;
+		config->cgroup = 0;
+		config->nice = 0;
+		config->offload = 0;
+
+		ret = notification_queue(server->context, master_scheduler->context,
+			SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
 		if(ret == -1) {
 			print("dufay: failed to send scheduling notification on {%s}\n", modules[i]->cmdline);
 			return -1;

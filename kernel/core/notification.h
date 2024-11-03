@@ -11,17 +11,19 @@
 #define NOTIFICATION_MAX 64
 #define NOTIFICATION_MASK(NOT) (1ull << ((NOT) - 1))
 
-struct notification_queue;
+struct notification_parameter {
+	uintptr_t vaddr;
+	uint64_t paddr;
+	int page_cnt;
+	int share;
+};
 
+struct notification_queue;
 struct notification {
 	int refcnt;
 	int notnum;
 
-	struct {
-		uintptr_t vaddr;
-		uintptr_t paddr;
-		int page_cnt;
-	} nshare;
+	struct notification_parameter parameter;
 
 	struct notification_info *info;
 	struct notification_queue *queue;
@@ -71,7 +73,7 @@ struct notification_queue {
 	struct spinlock lock;
 };
 
-int notification_send(struct context*, struct context*, int, int);
+int notification_queue(struct context*, struct context*, int, int, int, uintptr_t, uint64_t, int);
 int notification_dispatch(struct context*);
 
 #endif
