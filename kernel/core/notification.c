@@ -41,7 +41,7 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 	return 0;
 }
 
-static int notification_ucontext_instance(struct context *context, struct ucontext *ucontext,
+static int notification_ucontext_instantiate(struct context *context, struct ucontext *ucontext,
 	struct notification *notification, struct notification_action *action) {
 	if(context == NULL || ucontext == NULL || notification == NULL || action == NULL) return -1; 
 
@@ -93,11 +93,6 @@ static int notification_ucontext_instance(struct context *context, struct uconte
 		return -1;
 	}
 
-	ret = UCONTEXT_PUSH(context, ucontext);
-	if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
-
-	context->ucontext_top = ucontext;
-
 	return 0;
 }
 
@@ -111,6 +106,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 
 	notification->refcnt = 1;
 	notification->notnum = not;
+	notification->weight = weight;
 	notification->info = alloc(sizeof(struct notification_info));
 	notification->queue = queue;
 
@@ -176,8 +172,9 @@ int notification_dispatch(struct context *context) {
 	struct ucontext *top = context->ucontext_top;
 
 	if(top->notification && top->ready && !top->delivered) {
-		struct notification_action *action = &context->notification.actions[context->ucontext_top->notification->notnum];
-		int ret = notification_ucontext_instance(context, context->ucontext_top,
+		struct notification_action *action =
+			&context->notification.actions[context->ucontext_top->notification->notnum];
+		int ret = notification_ucontext_instantiate(context, context->ucontext_top,
 			context->ucontext_top->notification, action);	
 		if(ret == -1) {
 			print("dufay: failed to initialise ucontext\n");
@@ -203,8 +200,13 @@ int notification_dispatch(struct context *context) {
 	
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
-		ret = notification_ucontext_instance(context, ucontext, notification, action);
+		ret = notification_ucontext_instantiate(context, ucontext, notification, action);
 		if(ret == -1) return -1;
+
+		ret = UCONTEXT_PUSH(context, ucontext);
+		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+
+		context->ucontext_top = ucontext;
 
 		return 0;
 	}
@@ -268,25 +270,37 @@ SYSCALL_DEFINE0(notification_return, {
 	struct notification_queue *queue = context->notification.queue;
 	if(queue == NULL) panic("dufay: nqueue is null\n");
 
-	// chain immediately to another notification if possible and if available
+	int ret = destroy_ucontext(context, context->ucontext_active);
+	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
 
 	struct ucontext *rcontext = ({
+		__label__ finish;
 		struct ucontext *rcontext = context->ucontext_active->last;
 	
 		for(; rcontext;) {
 			if(rcontext->notification && !rcontext->delivered) {
+				if(rcontext->notification->weight == NOTIFY_WEIGHT_INSTANTANEOUS) goto finish;
 				rcontext = rcontext->last;
 				continue;
 			}
-			break;
+			goto finish;
 		}
-		
+		rcontext = NULL;	
+finish:
 		rcontext;
 	});
 	if(rcontext == NULL) panic("dufay: rcontext is null\n");
 
-	int ret = destroy_ucontext(context->ucontext_active);
-	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
+	if(rcontext->notification) {
+		struct notification_action *action = &context->notification.actions[rcontext->notification->notnum];
+		int ret = notification_ucontext_instantiate(context, rcontext,
+			rcontext->notification, action);	
+		if(ret == -1) panic("dufay: cant instantiate ucontetx");
+
+		rcontext->delivered = 1;
+	}
+
+	context->ucontext_active = rcontext;
 
 	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
 	CORE_LOCAL->fpu_rstor(rcontext->fpu_context);

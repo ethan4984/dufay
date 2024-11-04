@@ -71,7 +71,7 @@ struct ucontext {
 	(UCONTEXT)->next = NULL; \
 	(UCONTEXT)->last = (CONTEXT)->ucontext_top; \
 	if((CONTEXT)->ucontext_top) (CONTEXT)->ucontext_top->next = (UCONTEXT); \
-	else (CONTEXT)->ucontext_top = (UCONTEXT); \
+	(CONTEXT)->ucontext_top = (UCONTEXT); \
 finish: \
 	ret; \
 })
@@ -112,7 +112,7 @@ struct context {
 void reschedule(struct registers*, void*);
 
 int create_blank_context(struct context*);
-int destroy_ucontext(struct ucontext*);
+int destroy_ucontext(struct context*, struct ucontext*);
 int sched_establish_shared_link(struct context*, const char*);
 
 #endif

@@ -34,13 +34,14 @@ int create_blank_context(struct context *context) {
 	return 0;
 }
 
-int destroy_ucontext(struct ucontext *ucontext) {
-	if(ucontext == NULL) return -1;
+int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
+	if(context == NULL || ucontext == NULL) return -1;
 
-	if(ucontext->last) {
-		ucontext->last->next = ucontext->next;
-		if(ucontext->next) ucontext->next->last = ucontext->last;
-	}
+	if(context->ucontext_top == ucontext) context->ucontext_top = ucontext->last;
+	if(context->ucontext_queue == ucontext) context->ucontext_queue = ucontext->next;
+
+	if(ucontext->last) ucontext->last->next = ucontext->next;
+	if(ucontext->next) ucontext->next->last = ucontext->last;
 
 	pmm_free(ucontext->stack->kernel_stack.sp - HIGH_VMA - ucontext->stack->kernel_stack.size,
 		DIV_ROUNDUP(ucontext->stack->kernel_stack.size, PAGE_SIZE));
@@ -56,7 +57,7 @@ int destroy_ucontext(struct ucontext *ucontext) {
 	return 0;
 }
 
-int sched_establish_shared_link(struct context *scheduler_context, const char *identifier)  {
+int sched_establish_shared_link(struct context *scheduler_context, const char *identifier) {
 	size_t page_cnt = DIV_ROUNDUP(SCHEDULER_DEFAULT_QUEUE_SIZE, PAGE_SIZE);
 	uint64_t physical_base = pmm_alloc(page_cnt, 1);
 	uint64_t virtual_base = physical_base + HIGH_VMA;

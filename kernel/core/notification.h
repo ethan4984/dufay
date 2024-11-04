@@ -22,6 +22,7 @@ struct notification_queue;
 struct notification {
 	int refcnt;
 	int notnum;
+	int weight;
 
 	struct notification_parameter parameter;
 
