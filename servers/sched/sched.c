@@ -17,9 +17,6 @@ static struct hash_table thread_table;
 static struct sched_descriptor *sched_desc;
 static struct portal_link *sched_meta;
 
-constexpr int DEFAULT_TIME_SLICE = 10;
-constexpr int NICE_VALUE_MAX = 19;
-
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 	struct sched_queue_config *config = data;
 	if(config == NULL) { print("DUFAY: SCHEDULER: config does not exist\n"); goto finish; }
@@ -62,13 +59,13 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 		if(ret == -1) {
 			print("DUFAY: SCHEDULER: failed address allocation unable to offload thread to other core\n");
 			goto finish;
-		} else goto finish;
+		} 
 
 		struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
 		if(response.ret == -1) {
 			print("DUFAY: SCHEDULER: NOTIFICAITON BUILD FAILURE: unable to offload thread to other core\n");
 			goto finish;
-		} else goto finish;
+		}
 
 		config->offload = 0;
 		memcpy(bridge.data.ptr, config, bridge.data.length);
@@ -85,9 +82,8 @@ exit:
 
 	thread->cid = config->cid;
 	thread->cgroup = config->cgroup;
-	thread->weight = 1024 * (1 << (19 - config->nice));
-	thread->vruntime = 0;
-	thread->runtime = 0;
+	thread->weight = WEIGHT(config->nice);
+	thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
 
 	int ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 	if(ret == -1) {
@@ -132,7 +128,7 @@ static int traverse_and_queue(struct thread **thread) {
 }
 
 int sched(struct portal_link *link, struct sched_descriptor *desc) {
-	if(link == NULL) return -1;
+	if(link == NULL || desc == NULL) return -1;
 
 	struct notification_action enqueue_action =
 		{ .handler = notify_enqueue_thread };
@@ -180,12 +176,33 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	print("DUFAY: SCHEDULER: Enabled notifiactions\n");
 
 	for(;;) {
+		struct thread *thread_top = NULL;
+		struct thread *thread = NULL;
+
+		int ret = traverse_and_queue(&thread_top);
+		if(ret == -1) return -1;
+		if(thread_top == NULL) goto end;
+
+		thread = thread_top; 
+
 		for(int i = 0; i < desc->queue_default_refill; i++) {
 			int ret = OPERATE_LINK(link, LINK_CIRCULAR,
 				({
-					struct thread *thread;
-					int ret = traverse_and_queue(&thread);
-					if(ret != -1) ret = circular_queue_push((void*)link->data, thread);
+					__label__ skip;
+					thread->vruntime += VRUNTIME(thread->weight, DEFAULT_TIME_SLICE);
+
+					struct thread *grandparent = (thread->parent) ? thread->parent->parent : NULL;
+					if(grandparent == NULL) grandparent = thread_top->parent;
+					if(grandparent == NULL) goto skip;
+
+					if(grandparent->left && grandparent->right) {
+						if(grandparent->left->vruntime >
+							grandparent->right->vruntime) thread = grandparent->right;
+						else thread = grandparent->left;
+					} else if(grandparent->left) thread = grandparent->left;
+					else if(grandparent->right) thread = grandparent->right;
+skip:
+					ret = circular_queue_push((void*)link->data, thread);
 					ret;
 				})
 			);
@@ -195,7 +212,7 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 				return -1;
 			}
 		}
-
+end:
 		SYSCALL0(SYSCALL_YIELD);
 	}
 }
