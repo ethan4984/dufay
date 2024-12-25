@@ -139,12 +139,7 @@ int launch_servers(void) {
 
 		config->cid = server->context->comms.cid;
 		config->cgroup = 0;
-
 		config->nice = 0;
-		if(strcmp(modules[i]->cmdline, "pci") == 0) config->nice = 0;
-		if(strcmp(modules[i]->cmdline, "nvme") == 0) config->nice = 7;
-		if(strcmp(modules[i]->cmdline, "vfs") == 0) config->nice = 11;
-
 		config->offload = 0;
 
 		ret = notification_queue(server->context, master_scheduler->context,
