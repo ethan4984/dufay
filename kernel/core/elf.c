@@ -10,6 +10,7 @@
 #include <fayt/slab.h>
 #include <fayt/compiler.h>
 #include <fayt/string.h>
+#include <fayt/debug.h>
 
 static int elf64_read(struct elf64_file*, void*, int, size_t);
 static int elf64_validate(struct elf64_hdr *hdr);
@@ -17,13 +18,13 @@ static int elf64_validate(struct elf64_hdr *hdr);
 static int elf64_validate(struct elf64_hdr *hdr) {
 	uint32_t signature = *(uint32_t*)hdr;
 	if(signature != ELF_SIGNATURE) {
-		return -1;
+		RETURN_ERROR;
 	}
 
-	if(hdr->ident[ELF_EI_OSABI] != ELF_EI_SYSTEM_V && hdr->ident[ELF_EI_OSABI] != ELF_EI_LINUX) return -1;
-	if(hdr->ident[ELF_EI_DATA] != ELF_LITTLE_ENDIAN) return -1;
-	if(hdr->ident[ELF_EI_CLASS] != ELF_ELF64) return -1;
-	if(hdr->machine != ELF_MACH_X86_64 && hdr->machine != 0) return -1;
+	if(hdr->ident[ELF_EI_OSABI] != ELF_EI_SYSTEM_V && hdr->ident[ELF_EI_OSABI] != ELF_EI_LINUX) RETURN_ERROR;
+	if(hdr->ident[ELF_EI_DATA] != ELF_LITTLE_ENDIAN) RETURN_ERROR;
+	if(hdr->ident[ELF_EI_CLASS] != ELF_ELF64) RETURN_ERROR;
+	if(hdr->machine != ELF_MACH_X86_64 && hdr->machine != 0) RETURN_ERROR;
 
 	return 0;
 }
@@ -34,7 +35,7 @@ int elf64_file_init(struct elf64_file *file) {
 	int ret = elf64_read(file, file->hdr, 0, sizeof(struct elf64_hdr));
 
 	if(unlikely(ret != sizeof(struct elf64_hdr))) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	file->phdr = alloc(sizeof(struct elf64_phdr) * file->hdr->ph_num);
@@ -42,17 +43,17 @@ int elf64_file_init(struct elf64_file *file) {
 
 	ret = elf64_read(file, file->shdr, file->hdr->shoff, sizeof(struct elf64_shdr) * file->hdr->sh_num);
 	if(unlikely(ret != sizeof(struct elf64_shdr) * file->hdr->sh_num)) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	ret = elf64_validate(file->hdr);
 	if(unlikely(ret == -1)) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	ret = elf64_read(file, file->phdr, file->hdr->phoff, sizeof(struct elf64_phdr) * file->hdr->ph_num);
 	if(unlikely(ret != sizeof(struct elf64_phdr) * file->hdr->ph_num)) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	file->strtab_hdr = &file->shdr[file->hdr->shstrndx];
@@ -60,14 +61,14 @@ int elf64_file_init(struct elf64_file *file) {
 
 	ret = elf64_read(file, (char*)file->strtab, file->strtab_hdr->sh_offset, file->strtab_hdr->sh_size);
 	if(unlikely(ret != file->strtab_hdr->sh_size)) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	return 0;
 }
 
 int elf64_load_section(struct elf64_file *file, const char *name) {
-	if(file == NULL) return -1;
+	if(file == NULL) RETURN_ERROR;
 
     for(int i = 0; i < file->hdr->sh_num; i++) {
         struct elf64_shdr *shdr = &file->shdr[i];
@@ -162,7 +163,7 @@ int elf64_file_aux(struct elf64_file *file, struct aux *aux) {
 
 static int elf64_read(struct elf64_file *file, void *buffer, int offset, size_t cnt) {
 	if(unlikely(file->data.buffer == NULL)) {
-		return -1;
+		RETURN_ERROR;
 	}
 
 	if(unlikely(file->data.length < offset)) {

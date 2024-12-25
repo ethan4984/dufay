@@ -14,11 +14,11 @@
 #include <fayt/lock.h>
 #include <fayt/string.h>
 #include <fayt/compiler.h>
-
-static struct spinlock reschedule_lock;
+#include <fayt/portal.h>
+#include <fayt/debug.h>
 
 int create_blank_context(struct context *context) { 
-	if(unlikely(context == NULL)) return -1;
+	if(unlikely(context == NULL)) RETURN_ERROR;
 
 	context->page_table = alloc(sizeof(struct page_table));
 	vmm_default_table(context->page_table);
@@ -29,13 +29,13 @@ int create_blank_context(struct context *context) {
 	context->notification.queue = alloc(sizeof(struct notification_queue));
 
 	int ret = NEW_CONTEXT(context);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
 
 	return 0;
 }
 
 int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
-	if(context == NULL || ucontext == NULL) return -1;
+	if(context == NULL || ucontext == NULL) RETURN_ERROR;
 
 	if(context->ucontext_top == ucontext) context->ucontext_top = ucontext->last;
 	if(context->ucontext_queue == ucontext) context->ucontext_queue = ucontext->next;
@@ -57,8 +57,10 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 	return 0;
 }
 
-int sched_establish_shared_link(struct context *scheduler_context, const char *identifier) {
+int sched_establish_shared_link(struct context *scheduler_context,
+	struct cpu_local *cpu_local, const char *identifier) {
 	size_t page_cnt = DIV_ROUNDUP(SCHEDULER_DEFAULT_QUEUE_SIZE, PAGE_SIZE);
+
 	uint64_t physical_base = pmm_alloc(page_cnt, 1);
 	uint64_t virtual_base = physical_base + HIGH_VMA;
 
@@ -71,17 +73,20 @@ int sched_establish_shared_link(struct context *scheduler_context, const char *i
 		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
 		.share = {
 			.identifier = identifier,
+			.length = sizeof(void*),
+			.create = 1,
 			.type = LINK_CIRCULAR, 
-			.create = 1
 		}
 	};
 
 	req->morphology.addr = virtual_base;
 	req->morphology.length = page_cnt * PAGE_SIZE;
-	for(int i = 0; i < page_cnt; i++, physical_base += PAGE_SIZE) req->morphology.paddr[i] = physical_base;
+	for(int i = 0; i < page_cnt; i++) req->morphology.paddr[i] = physical_base + i * PAGE_SIZE;
 
 	int ret = portal(req, &resp);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
+
+	cpu_local->thread_queue_link = (void*)(physical_base + HIGH_VMA);
 
 	free(req);
 
@@ -92,8 +97,16 @@ SYSCALL_DEFINE0(yield, {
 	__asm__ volatile ("int $32");
 })
 
+SYSCALL_DEFINE0(sched_acquire, {
+	spinlock(&CORE_LOCAL->sched_lock);
+})
+
+SYSCALL_DEFINE0(sched_release, {
+	spinrelease(&CORE_LOCAL->sched_lock);
+})
+
 void reschedule(struct registers *regs, void*) {
-	spinlock(&reschedule_lock);
+	if(__atomic_test_and_set(&CORE_LOCAL->sched_lock.lock, __ATOMIC_ACQUIRE)) return; 
 
 	struct context *next_context;
 
@@ -106,21 +119,28 @@ void reschedule(struct registers *regs, void*) {
 		}
 	}
 
-	int ret = VECTOR_POP(CORE_LOCAL->thread_queue, next_context);
-	if(ret == -1) {
+	bool found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
+		({
+			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
+				CORE_LOCAL->thread_queue_link->data_offset, &next_context);
+		})
+	);
+
+	if(found == false) {
 		struct server *scheduling_server = CORE_LOCAL->scheduling_server;
 		if(scheduling_server == NULL) {
-			spinrelease(&reschedule_lock);
+			spinrelease(&CORE_LOCAL->sched_lock);
 			return;
 		}
 
 		next_context = scheduling_server->context;
 
 		if(next_context == NULL) {
-			spinrelease(&reschedule_lock);
+			spinrelease(&CORE_LOCAL->sched_lock);
 			return;
 		}
 	}
+
 finish:
 	struct context *current_context = CORE_LOCAL->current_context;
 	notification_dispatch(next_context);
@@ -177,7 +197,8 @@ end:
 	if(ucontext->notification) ucontext->delivered = 1;
 
 	xapic_write(XAPIC_EOI_OFF, 0);
-	spinrelease(&reschedule_lock);
+
+	spinrelease(&CORE_LOCAL->sched_lock);
 
 	SWAP_TLS(r); 
 

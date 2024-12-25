@@ -79,11 +79,19 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 exit:
 	struct thread *thread = alloc(sizeof(struct thread));
 	if(thread == NULL) { }
+	
+	void *private;
+	struct syscall_response response = SYSCALL2(SYSCALL_CONTEXT, config->cid, &private);
+	if(response.ret == -1) {
+		print("DUFAY: SCHEDULER: Unable to get context private address\n");
+		goto finish; 
+	}
 
 	thread->cid = config->cid;
 	thread->cgroup = config->cgroup;
 	thread->weight = WEIGHT(config->nice);
 	thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
+	thread->private = private;
 
 	int ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 	if(ret == -1) {
@@ -110,16 +118,10 @@ finish:
 
 static int traverse_and_queue(struct thread **thread) {
 	if(thread == NULL) return -1;
-	
-	struct thread *root = thread_tree;
-	struct thread *enqueue;
-	for(enqueue = root; root; enqueue = root) {
-		if(root->left && root->right) {
-			if(root->left->vruntime > root->right->vruntime) root = root->right;
-			else root = root->left;
-		} else if(root->left) root = root->left;
-		else if(root->right) root = root->right;
-		else break;
+
+	struct thread *enqueue = thread_tree;
+	while(enqueue && enqueue->left) {
+		enqueue = enqueue->left;
 	}
 
 	*thread = enqueue;
@@ -176,34 +178,21 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	print("DUFAY: SCHEDULER: Enabled notifiactions\n");
 
 	for(;;) {
-		struct thread *thread_top = NULL;
-		struct thread *thread = NULL;
+		SYSCALL0(SYSCALL_SCHED_ACQUIRE);
 
-		int ret = traverse_and_queue(&thread_top);
-		if(ret == -1) return -1;
-		if(thread_top == NULL) goto end;
+		for(int i = 0; i < sched_desc->queue_default_refill; i++) {
+			struct thread *thread = NULL;
+			int ret = traverse_and_queue(&thread);
+			if(ret == -1) return -1;
+			if(thread == NULL) goto end;
 
-		thread = thread_top; 
-
-		for(int i = 0; i < desc->queue_default_refill; i++) {
-			int ret = OPERATE_LINK(link, LINK_CIRCULAR,
+			ret = OPERATE_LINK(link, LINK_CIRCULAR,
 				({
-					__label__ skip;
 					thread->vruntime += VRUNTIME(thread->weight, DEFAULT_TIME_SLICE);
-
-					struct thread *grandparent = (thread->parent) ? thread->parent->parent : NULL;
-					if(grandparent == NULL) grandparent = thread_top->parent;
-					if(grandparent == NULL) goto skip;
-
-					if(grandparent->left && grandparent->right) {
-						if(grandparent->left->vruntime >
-							grandparent->right->vruntime) thread = grandparent->right;
-						else thread = grandparent->left;
-					} else if(grandparent->left) thread = grandparent->left;
-					else if(grandparent->right) thread = grandparent->right;
-skip:
-					ret = circular_queue_push((void*)link->data, thread);
-					ret;
+					RB_GENERIC_DELETE(thread_tree, vruntime, thread);
+					RB_GENERIC_INSERT(thread_tree, vruntime, thread);
+					//print("scheduler: cid=%x vruntime=%x\n", thread->cid, thread->vruntime);
+					ret = circular_queue_push((void*)link + link->data_offset, &thread->private);
 				})
 			);
 
@@ -213,6 +202,7 @@ skip:
 			}
 		}
 end:
+		SYSCALL0(SYSCALL_SCHED_RELEASE);
 		SYSCALL0(SYSCALL_YIELD);
 	}
 }

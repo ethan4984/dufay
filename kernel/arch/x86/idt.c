@@ -4,9 +4,10 @@
 
 #include <core/scheduler.h>
 #include <core/portal.h>
-
 #include <core/debug.h>
+
 #include <fayt/lock.h>
+#include <fayt/debug.h>
 
 struct idt_descriptor {
 	uint16_t offset_low;
@@ -47,7 +48,7 @@ int idt_alloc_vector(void (*handler)(struct registers*, void*), void *ptr) {
 			return i;
 		}
 	}
-	return -1;
+	RETURN_ERROR;
 }
 
 const char *exception_messages[] = {
@@ -89,7 +90,7 @@ const char *exception_messages[] = {
 };
 
 extern void isr_handler_main(struct registers *regs) {
-	if(regs->cs & 0x3) swapgs();
+	if((regs->cs & 0x3) == 0x3) swapgs();
 
 	if(regs->isr_number < 32) {
 		static struct spinlock exception_lock;
@@ -131,7 +132,7 @@ extern void isr_handler_main(struct registers *regs) {
 	}
 done:
 
-	if(regs->cs & 0x3) {
+	if((regs->cs & 0x3) == 0x3) {
 		swapgs();
 	}
 

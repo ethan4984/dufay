@@ -2,7 +2,8 @@
 #define X86_SMP_H_
 
 #include <core/scheduler.h>
-#include <fayt/vector.h>
+#include <core/portal.h>
+#include <fayt/circular_queue.h>
 
 #include <stddef.h>
 #include <stdint.h>
@@ -14,8 +15,9 @@ struct cpu_local {
 // EVERYTHING ABOVE MUST REMAIN IN ORDER
 
 	struct server *scheduling_server;
-	VECTOR(struct context*) thread_queue;
+	struct portal_link *thread_queue_link;
 	VECTOR(struct context*) delivery_stack;
+	struct spinlock sched_lock;
 
 	struct context *current_context;
 

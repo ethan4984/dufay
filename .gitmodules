@@ -14,3 +14,12 @@
 [submodule "servers/io/nvme/fayt"]
 	path = servers/io/nvme/fayt
 	url = https://github.com/ethan4984/fayt
+[submodule "fayt"]
+	path = fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "servers/io/fayt"]
+	path = servers/io/fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "servers/io/pci/fayt"]
+	path = servers/io/pci/fayt
+	url = https://github.com/ethan4984/fayt

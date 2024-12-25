@@ -37,11 +37,11 @@ struct notification {
 	__label__ finish; \
 	int ret = 0; \
 	if((NOTIFICATION) == NULL || (QUEUE) == NULL) { ret = -1; goto finish; } \
-	if((QUEUE)->queue[(NOTIFICATION)->notnum - 1]) { \
-		(QUEUE)->queue[(NOTIFICATION)->notnum - 1]->last = (NOTIFICATION); \
+	if((QUEUE)->queue[(NOTIFICATION)->notnum]) { \
+		(QUEUE)->queue[(NOTIFICATION)->notnum]->last = (NOTIFICATION); \
 		(NOTIFICATION)->next = (QUEUE)->queue[(NOTIFICATION)->notnum - 1]; \
 	} \
-	(QUEUE)->queue[(NOTIFICATION)->notnum - 1] = (NOTIFICATION); \
+	(QUEUE)->queue[(NOTIFICATION)->notnum] = (NOTIFICATION); \
 	(QUEUE)->pending |= NOTIFICATION_MASK((NOTIFICATION)->notnum); \
 finish: \
 	ret; \
@@ -56,9 +56,10 @@ finish: \
 		if(root->next == NULL) break; \
 		root->next; \
 	} \
-	if(root->last == NULL) (QUEUE)->pending &= ~NOTIFICATION_MASK(NOT - 1); \
-	if(root->last) root->last->next = NULL; \
 	(NOTIFICATION) = root; \
+	if(root == NULL) goto finish; \
+	if(root->last == NULL) (QUEUE)->pending &= ~NOTIFICATION_MASK(NOT); \
+	if(root->last) root->last->next = NULL; \
 finish: \
 	ret; \
 })

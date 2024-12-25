@@ -15,6 +15,7 @@ struct frame {
 
 struct page {
 	uint64_t vaddr;
+	uint64_t paddr;
 	struct frame *frame;
 };
 

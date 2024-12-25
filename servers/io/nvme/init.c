@@ -12,7 +12,7 @@ static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
 int main(void) {
-	print("DUFAY: NVME: booting server\n");
+	print("DUFAY: NVME: booting nvme server\n");
 
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
@@ -43,11 +43,7 @@ int main(void) {
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	uintptr_t addr;
-	int ret = as_allocate(&address_space, &addr, 0x10000);
-	if(ret == -1) { print("DUFAY: NVME: Failed to allocate address\n"); goto failure; }
-
-	ret = nvme();
+	int ret = nvme(NULL);
 	if(ret == -1) { print("DUFAY: NVME: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

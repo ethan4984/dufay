@@ -6,13 +6,13 @@
 #include <fayt/slab.h>
 #include <fayt/rb_tree.h>
 
-#include <sched.h>
+#include <pci.h>
 
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(struct sched_descriptor *desc) {
-	print("DUFAY: SCHEDULER: booting server {processor_id=%x}\n", desc->processor_id);
+int main(void) {
+	print("DUFAY: PCI: booting PCI server\n");
 
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
@@ -27,51 +27,24 @@ int main(struct sched_descriptor *desc) {
 	slab_cache_create(&pool, "CACHE512", 512);
 	slab_cache_create(&pool, "CACHE1024", 1024);
 
-	print("DUFAY: SCHEDULER: Slab cache directory initialised\n");
+	print("DUFAY: PCI: Slab cache directory initialised\n");
 
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for(int i = 0; i < 4; i++) {
 		uintptr_t addr;
 		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
-		if(ret == -1) { print("DUFAY: SCHEDULER: Failed to allocate address for stack\n"); goto failure; }
+		if(ret == -1) { print("DUFAY: PCI: Failed to allocate address for stack\n"); goto failure; }
 
 		struct syscall_response response = SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
 			addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
 
-		if(response.ret == -1) print("DUFAY: SCHEDULER: failed to allocate notification stack\n");
-		else print("DUFAY: SCHEDULER: Allocated notificaton stack #%d [%x:%x]\n",
+		if(response.ret == -1) print("DUFAY: PCI: failed to allocate notification stack\n");
+		else print("DUFAY: PCI: Allocated notificaton stack #%d [%x:%x]\n",
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	uintptr_t addr;
-	int ret = as_allocate(&address_space, &addr, 0x10000);
-	if(ret == -1) { print("DUFAY: SCHEDULER: Failed to allocate address\n"); goto failure; }
-
-	struct portal_resp portal_resp;
-	struct portal_req portal_req = {
-		.type = PORTAL_REQ_SHARE,
-		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.length = sizeof(struct portal_req),
-		.share = {
-			.identifier = "SCHEDULER CORE0",
-			.length = sizeof(void*),
-			.create = 0,
-			.type = LINK_CIRCULAR
-		},
-		.morphology = {
-			.addr = addr,
-			.length = 0x10000 
-		}
-	};
-
-	struct syscall_response response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to estabilish link with kernel\n"); goto failure; }
-
-	struct portal_link *link = (void*)portal_resp.base;
-	print("DUFAY: SCHEDULER: Has established link with kernel {%x}\n", link);
-
-	ret = sched(link, desc);
-	if(ret == -1) { print("DUFAY: SCHEDULER: Internal critical failure\n"); goto failure; }
+	int ret = pci();
+	if(ret == -1) { print("DUFAY: PCI: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);
 }
@@ -95,7 +68,7 @@ void print(const char *str, ...) {
 }
 
 void panic(const char *str, ...) {
-	print("DUFAY: SCHEDULER: PANIC < ");
+	print("DUFAY: PCI: PANIC < ");
 
 	va_list arg; 
 	va_start(arg, str);

@@ -1,10 +1,11 @@
 #include <arch/x86/cpu.h>
 
 #include <core/physical.h>
-
 #include <core/debug.h>
+
 #include <fayt/string.h>
 #include <fayt/lock.h>
+#include <fayt/debug.h>
 
 struct pmm_module {
 	struct limine_memmap_entry *mmap_entry;
@@ -49,7 +50,7 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt, uint64
 	for(size_t i = bit_base; i < module->bitmap_entry_cnt; i += align) {
 		if(module->bitmap_entry_cnt < (i + cnt)) {
 			spinrelease(&module->lock);
-			return -1;
+			RETURN_ERROR;
 		}
 
 		for(size_t j = i, count = 0; j < (i + cnt); j++) {
@@ -81,7 +82,7 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt, uint64
 
 	spinrelease(&module->lock);
 
-	return -1;
+	RETURN_ERROR;
 }
 
 static void pmm_module_free(struct pmm_module *module, uint64_t base, uint64_t cnt) {
@@ -177,7 +178,7 @@ uint64_t pmm_alloc(uint64_t cnt, uint64_t align) {
 		return alloc;
 	} while(module);
 
-	return -1;
+	RETURN_ERROR;
 }
 
 void pmm_free(uint64_t base, uint64_t cnt) {

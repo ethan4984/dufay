@@ -2,21 +2,28 @@
 #define SCHEDULE_H_
 
 #include <fayt/rb_tree.h>
+#include <fayt/lock.h>
 
 #include <portal.h>
 
-constexpr int DEFAULT_TIME_SLICE = 10;
-constexpr int NICE_VALUE_MAX = 19;
+constexpr int DEFAULT_TIME_SLICE = 10000000;
 
-#define VRUNTIME(WEIGHT, SLICE) ((SLICE) * (1024 / (WEIGHT)));
-#define WEIGHT(NICE) (1024 * (1 << (19 - (NICE))));
+#define NICE_MIN (-20)
+#define NICE_MAX (19)
+#define WEIGHT_MAX (1024)
+#define WEIGHT_MIN (1)
+
+#define WEIGHT(N) (WEIGHT_MAX - ((N) - NICE_MIN) * (WEIGHT_MAX - WEIGHT_MIN) / (NICE_MAX - NICE_MIN))
+#define VRUNTIME(W, S) ((S) * (WEIGHT_MAX / (W)))
 
 struct thread {
 	int cid;
 	int cgroup;
 
 	int weight;
-	int vruntime;
+	uint64_t vruntime;
+
+	void *private;
 
 	RB_META(struct thread);
 };

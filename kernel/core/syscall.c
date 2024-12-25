@@ -25,6 +25,11 @@ extern int syscall_notification_define_stack(struct registers*);
 extern int syscall_notification_return(struct registers*);
 extern int syscall_notification_unmute(struct registers*);
 extern int syscall_notification_mute(struct registers*);
+extern int syscall_notification_build(struct registers*);
+extern int syscall_notification_broadcast(struct registers*);
+extern int syscall_context(struct registers*);
+extern int syscall_sched_acquire(struct registers*);
+extern int syscall_sched_release(struct registers*);
 
 static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_log }, // 0
@@ -35,7 +40,11 @@ static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_notification_return }, // 5
 	{ .handler = syscall_notification_mute }, // 6
 	{ .handler = syscall_notification_unmute }, // 7
-	{ .handler = syscall_notification_mute } // 8
+	{ .handler = syscall_notification_build }, // 8
+	{ .handler = syscall_notification_broadcast }, // 9
+	{ .handler = syscall_context }, // 10
+	{ .handler = syscall_sched_acquire }, // 11
+	{ .handler = syscall_sched_release } // 12
 };
 
 uint64_t syscall_handler(struct registers *regs) {

@@ -5,7 +5,7 @@
 #include <fayt/vector.h>
 #include <fayt/lock.h>
 
-#define CONTEXT_DEFAULT_STACK_SIZE 0x10000
+#define CONTEXT_DEFAULT_STACK_SIZE 0x200000
 #define SCHEDULER_DEFAULT_QUEUE_SIZE 0x10000
 
 struct stack {
@@ -113,6 +113,6 @@ void reschedule(struct registers*, void*);
 
 int create_blank_context(struct context*);
 int destroy_ucontext(struct context*, struct ucontext*);
-int sched_establish_shared_link(struct context*, const char*);
+int sched_establish_shared_link(struct context*, struct cpu_local*, const char*);
 
 #endif

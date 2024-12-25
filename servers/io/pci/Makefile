@@ -1,4 +1,4 @@
-SERVER := sched
+SERVER := pci
 
 C ?= gcc
 LD ?= ld

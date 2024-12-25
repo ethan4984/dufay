@@ -11,9 +11,10 @@
 #include <fayt/lock.h>
 #include <fayt/string.h>
 #include <fayt/compiler.h>
+#include <fayt/debug.h>
 
 static inline int notification_is_valid(int not) {
-	if(not < 0 || not > NOTIFICATION_MAX) return -1;
+	if(not < 0 || not > NOTIFICATION_MAX) RETURN_ERROR;
 	else return 0;
 }
 
@@ -22,7 +23,7 @@ static inline int notification_check_perms(struct context*, struct context*, int
 }
 
 static int bridge_to_destination(struct comm_bridge *bridge, struct context **dest) {
-	if(bridge == NULL || dest == NULL) return -1;
+	if(bridge == NULL || dest == NULL) RETURN_ERROR;
 	struct context *context = CORE_LOCAL->current_context;
 
 	if(bridge->destination) {
@@ -30,12 +31,12 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 		if(bridge->namespace) namespace = bridge->namespace;
 
 		struct server *server = find_server(namespace, bridge->destination);
-		if(server == NULL || server->context == NULL) return -1;
+		if(server == NULL || server->context == NULL) RETURN_ERROR;
 	
 		*dest = server->context;
 	} else {
 		int ret = SEARCH_CONTEXT(bridge->cid, dest);
-		if(ret == -1 || *dest == NULL) return -1;
+		if(ret == -1 || *dest == NULL) RETURN_ERROR;
 	}
 
 	return 0;
@@ -43,12 +44,12 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 
 static int notification_ucontext_instantiate(struct context *context, struct ucontext *ucontext,
 	struct notification *notification, struct notification_action *action) {
-	if(context == NULL || ucontext == NULL || notification == NULL || action == NULL) return -1; 
+	if(context == NULL || ucontext == NULL || notification == NULL || action == NULL) RETURN_ERROR; 
 
 	struct ustack *ustack;
 	int ret = USTACK_CLAIM(context, ustack);
-	if(ret == -1) return -1;
-	if(ustack == NULL) return -1;
+	if(ret == -1) RETURN_ERROR;
+	if(ustack == NULL) RETURN_ERROR;
 
 	ucontext->stack = ustack;
 	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
@@ -90,7 +91,7 @@ static int notification_ucontext_instantiate(struct context *context, struct uco
 	ret = portal(&req, &resp);
 	if(ret == -1 || resp.base != ucontext->regs.rsp) {
 		print("dufay: unable to anonymously map notification stack\n");
-		return -1;
+		RETURN_ERROR;
 	}
 
 	return 0;
@@ -98,8 +99,8 @@ static int notification_ucontext_instantiate(struct context *context, struct uco
 
 int notification_queue(struct context *sender, struct context *target, int not,
 	int weight, int ready, uintptr_t vaddr, uint64_t paddr, int page_cnt) {
-	if(target == NULL || notification_is_valid(not) == -1) return -1;
-	if(sender && notification_check_perms(sender, target, not) == -1) return -1;
+	if(target == NULL || notification_is_valid(not) == -1) RETURN_ERROR;
+	if(sender && notification_check_perms(sender, target, not) == -1) RETURN_ERROR;
 
 	struct notification_queue *queue = target->notification.queue;
 	struct notification *notification = alloc(sizeof(struct notification));
@@ -120,7 +121,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 	}
 
 	int ret = NOTIFICATION_PUSH(queue, notification);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
 
 	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
@@ -129,7 +130,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		ucontext->ready = ready;
 
 		int ret = UCONTEXT_PUSH(target, ucontext);
-		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }
 
 		target->ucontext_top = ucontext;
 		VECTOR_PUSH(CORE_LOCAL->delivery_stack, target);
@@ -145,28 +146,28 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge*, bridge, {
 	struct context *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
 
 	return notification_queue(context, destination, bridge->not, bridge->weight, 0,
 		(uintptr_t)bridge->data.ptr, 0, DIV_ROUNDUP(bridge->data.length, PAGE_SIZE));
 })
 
-SYSCALL_DEFINE1(notifcation_broadcast, struct comm_bridge*, bridge, {
+SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge*, bridge, {
 
 })
 
 int notification_dispatch(struct context *context) {
-	if(context == NULL) return -1;
+	if(context == NULL) RETURN_ERROR;
 
 	struct notification_queue *queue = context->notification.queue;
-	if(unlikely(queue == NULL)) return -1; 
-	if(unlikely(queue->active == 0)) return -1;
+	if(unlikely(queue == NULL)) RETURN_ERROR;
+	if(unlikely(queue->active == 0)) return 0; 
 
 	spinlock(&queue->lock);
 
 	if(!queue->active || !queue->pending) {
 		spinrelease(&queue->lock);
-		return -1;
+		RETURN_ERROR;
 	}
 
 	struct ucontext *top = context->ucontext_top;
@@ -178,7 +179,7 @@ int notification_dispatch(struct context *context) {
 			context->ucontext_top->notification, action);	
 		if(ret == -1) {
 			print("dufay: failed to initialise ucontext\n");
-			spinrelease(&queue->lock); return -1;
+			spinrelease(&queue->lock); RETURN_ERROR;
 		}
 
 		spinrelease(&queue->lock); return 0;
@@ -194,42 +195,42 @@ int notification_dispatch(struct context *context) {
 		int ret = NOTIFICATION_POP(queue, notification, i);
 		if(ret == -1) {
 			print("dufay: failed to pop notification from stack\n");
-			spinrelease(&queue->lock); return -1;
+			spinrelease(&queue->lock); RETURN_ERROR;
 		}
 		if(notification == NULL || action == NULL) continue;
 	
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
 		ret = notification_ucontext_instantiate(context, ucontext, notification, action);
-		if(ret == -1) return -1;
+		if(ret == -1) { spinrelease(&queue->lock); RETURN_ERROR; }
 
 		ret = UCONTEXT_PUSH(context, ucontext);
-		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); return -1; }
+		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }
 
 		context->ucontext_top = ucontext;
 
-		return 0;
+		spinrelease(&queue->lock); return 0;
 	}
 
-	return 0;
+	spinrelease(&queue->lock); return 0;
 }
 
 SYSCALL_DEFINE1(notify, struct comm_bridge*, bridge, {
-	if(bridge == NULL) return -1;
+	if(bridge == NULL) RETURN_ERROR;
 
 	struct context *context = CORE_LOCAL->current_context;
 	struct context *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
 })
 
 SYSCALL_DEFINE3(notification_action, int, not, struct notification_action *, action,
 	struct notification_action *, old, {
 	struct context *context = CORE_LOCAL->current_context; 
 
-	if(unlikely(context == NULL)) return -1;
-	if(unlikely(notification_is_valid(not) == -1)) return -1;
+	if(unlikely(context == NULL)) RETURN_ERROR;
+	if(unlikely(notification_is_valid(not) == -1)) RETURN_ERROR;
 
 	spinlock(&context->notification.lock);
 
@@ -248,7 +249,7 @@ SYSCALL_DEFINE3(notification_action, int, not, struct notification_action *, act
 
 SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, size, {
 	struct context *context = CORE_LOCAL->current_context;
-	if(unlikely(context == NULL)) return -1;
+	if(unlikely(context == NULL)) RETURN_ERROR;
 
 	struct ustack *new_stack = alloc(sizeof(struct ustack));
 
@@ -260,12 +261,12 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, size, {
 	new_stack->active = 0;
 
 	int ret = USTACK_PUSH(context, new_stack);
-	if(ret == -1) return -1;
+	if(ret == -1) RETURN_ERROR;
 })
 
 SYSCALL_DEFINE0(notification_return, {
 	struct context *context = CORE_LOCAL->current_context; 
-	if(context == NULL) return -1;
+	if(context == NULL) RETURN_ERROR;
 
 	struct notification_queue *queue = context->notification.queue;
 	if(queue == NULL) panic("dufay: nqueue is null\n");
@@ -332,20 +333,20 @@ finish:
 
 SYSCALL_DEFINE0(notification_unmute, {
 	struct context *current_context = CORE_LOCAL->current_context; 
-	if(current_context == NULL) return -1;
+	if(current_context == NULL) RETURN_ERROR;
 
 	struct notification_queue *queue = current_context->notification.queue;
-	if(queue == NULL) return -1;
+	if(queue == NULL) RETURN_ERROR;
 
 	queue->active = 1;
 })
 
 SYSCALL_DEFINE0(notification_mute, {
 	struct context *current_context = CORE_LOCAL->current_context; 
-	if(current_context == NULL) return -1;
+	if(current_context == NULL) RETURN_ERROR;
 
 	struct notification_queue *queue = current_context->notification.queue;
-	if(queue == NULL) return -1;
+	if(queue == NULL) RETURN_ERROR;
 
 	queue->active = 0;
 })
