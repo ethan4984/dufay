@@ -1,6 +1,8 @@
 #ifndef NVME_H_
 #define NVME_H_
 
+#include <fayt/pci.h>
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -230,6 +232,6 @@ struct [[gnu::packed]] nvme_ns_id {
     uint8_t vs[3712];
 };
 
-int nvme(struct nvme_regs*);
+int nvme(struct pci_descriptor*);
 
 #endif

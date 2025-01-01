@@ -191,7 +191,7 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 					thread->vruntime += VRUNTIME(thread->weight, DEFAULT_TIME_SLICE);
 					RB_GENERIC_DELETE(thread_tree, vruntime, thread);
 					RB_GENERIC_INSERT(thread_tree, vruntime, thread);
-					print("scheduler: cid=%x vruntime=%x\n", thread->cid, thread->vruntime);
+					//print("scheduler: cid=%x vruntime=%x\n", thread->cid, thread->vruntime);
 					ret = circular_queue_push((void*)link + link->data_offset, &thread->private);
 				})
 			);

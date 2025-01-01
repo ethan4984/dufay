@@ -173,15 +173,17 @@ static int portal_fault_cow(struct page_table *page_table, uintptr_t addr) {
 static int portal_handle_direct(struct portal *portal, struct portal_req *req) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
 
-	int page_cnt = DIV_ROUNDUP(req->morphology.length, PAGE_SIZE);
+	int page_cnt = req->morphology.pcnt;
+	uintptr_t paddr = req->morphology.paddr;
 	uintptr_t vaddr = req->morphology.addr;
-		
+
 	for(size_t i = 0; i < page_cnt; i++) {
-		uintptr_t paddr = req->morphology.paddr[i];
 		uint64_t permissions = portal_translate_protections(req->prot);
 
 		portal->page_table->map_page(portal->page_table, vaddr, paddr, permissions);
+
 		vaddr += PAGE_SIZE;
+		paddr += PAGE_SIZE;
 	}
 
 	portal->type |= PORTAL_REQ_DIRECT;
@@ -217,12 +219,16 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req) {
 		if(ret == -1) RETURN_ERROR;
 
 		if((req->type & PORTAL_REQ_DIRECT) == PORTAL_REQ_DIRECT) {
+			uint64_t paddr = req->morphology.paddr;
+			
 			for(int i = 0; i < orb->page_cnt; i++) {
 				struct page *page = orb->pages + i;
 
 				page->vaddr = req->morphology.addr + i * PAGE_SIZE;
-				page->paddr = req->morphology.paddr[i];
+				page->paddr = paddr;
 				page->frame = NULL;
+
+				paddr += PAGE_SIZE;
 			}
 
 			if(unlikely((portal->type & PORTAL_REQ_DIRECT) != PORTAL_REQ_DIRECT))

@@ -15,11 +15,11 @@ QEMUFLAGS = -m 4G \
 
 QEMUFLAGS_ISO = -m 4G \
 				-smp 1 \
-				-drive id=disk,file=$(ISO_IMAGE),if=none \
-				-device ahci,id=ahci \
-				-device ide-hd,drive=disk,bus=ahci.0 \
-				-device intel-iommu,aw-bits=48 \
-				-machine type=q35
+				-cdrom $(ISO_IMAGE) \
+				-drive file=disk.img,if=none,id=nvm \
+				-device nvme,serial=deadbeef,drive=nvm \
+				-machine type=q35 \
+				-boot d
 
 .PHONY: run
 run: $(DISK_IMAGE)
@@ -65,7 +65,7 @@ $(ISO_IMAGE): $(INITRAMFS) limine kernel
 	cp kernel/dufay.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
 	./limine/limine bios-install dufay.iso
-	rm -rf disk_image
+	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
 
 $(DISK_IMAGE): limine kernel
 	rm -f dufay.img 

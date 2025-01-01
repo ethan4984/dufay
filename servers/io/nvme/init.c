@@ -5,14 +5,15 @@
 #include <fayt/stream.h>
 #include <fayt/slab.h>
 #include <fayt/rb_tree.h>
+#include <fayt/pci.h>
 
 #include <nvme.h>
 
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(void) {
-	print("DUFAY: NVME: booting nvme server\n");
+int main(struct pci_descriptor *pci_descriptor) {
+	print("DUFAY: NVME: booting nvme server\n"); // TODO launch distinct server for each discrete controller
 
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
@@ -43,7 +44,7 @@ int main(void) {
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	int ret = nvme(NULL);
+	int ret = nvme(pci_descriptor);
 	if(ret == -1) { print("DUFAY: NVME: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

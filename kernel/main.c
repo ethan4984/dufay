@@ -15,7 +15,8 @@
 #include <limine.h>
 
 //	TODO
-//	More rigorous panic messages (most important thing is a register dump along with the function and line number) also shove them everywhere
+//		begin the process of pci enumeration and figure a very fast and logic
+//		method for receiving and responding to commands
 
 struct limine_hhdm_request limine_hhdm_request = {
 	.id = LIMINE_HHDM_REQUEST,

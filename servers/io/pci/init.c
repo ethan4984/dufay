@@ -11,7 +11,7 @@
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(void) {
+int main(struct mcfg *mcfg) {
 	print("DUFAY: PCI: booting PCI server\n");
 
 	struct slab_pool pool = {
@@ -26,6 +26,8 @@ int main(void) {
 	slab_cache_create(&pool, "CACHE256", 256);
 	slab_cache_create(&pool, "CACHE512", 512);
 	slab_cache_create(&pool, "CACHE1024", 1024);
+	slab_cache_create(&pool, "CACHE2048", 2048);
+	slab_cache_create(&pool, "CACHE4096", 4096);
 
 	print("DUFAY: PCI: Slab cache directory initialised\n");
 
@@ -43,7 +45,7 @@ int main(void) {
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	int ret = pci();
+	int ret = pci(mcfg);
 	if(ret == -1) { print("DUFAY: PCI: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

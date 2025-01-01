@@ -10,6 +10,8 @@
 #include <core/notification.h>
 #include <core/syscall.h>
 
+#include <acpi/rsdp.h>
+
 #include <fayt/slab.h>
 #include <fayt/hash.h>
 #include <fayt/bitmap.h>
@@ -34,7 +36,7 @@ static int launch_server(struct server*, void*, int);
 struct server *master_scheduler;
 
 int create_server(const char *namespace_name, const char *name, struct server *server) {
-	struct namespace *namespace;
+	struct namespace *namespace = NULL;
 	int ret = hash_table_search(&namespace_table, (void*)namespace_name,
 		strlen(namespace_name), (void**)&namespace);
 	if(ret == -1 || namespace == NULL) {
@@ -74,20 +76,57 @@ int create_namespace(const char *name) {
 }
 
 struct server *find_server(const char *namespace_name, const char *server_name) {
-	struct namespace *namespace;
+	struct namespace *namespace = NULL;
 	int ret = hash_table_search(&namespace_table, (void*)namespace_name,
 		strlen(namespace_name), (void**)&namespace);
 	if(ret == -1 || namespace == NULL) {
 		return NULL;
 	}
 
-	struct server *server;
+	struct server *server = NULL;
 	ret = hash_table_search(&namespace->server_table,
 			(void*)server_name, strlen(server_name), (void**)&server);
-	if(ret == -1) return NULL;
+	if(ret == -1 || server == NULL) return NULL;
 
 	return server;
 }
+
+int spawn_server(const char *namespace, const char *identifier) {
+	struct server *server = find_server(namespace, identifier);
+	if(server == NULL) RETURN_ERROR;
+
+	struct sched_queue_config *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+
+	config->cid = server->context->comms.cid;
+	config->cgroup = 0;
+	config->nice = 0;
+	config->offload = 0;
+
+	int ret = notification_queue(server->context, master_scheduler->context,
+		SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+	if(ret == -1) {
+		print("dufay: failed to send scheduling notification on [%s][%s]\n", namespace, identifier);
+		RETURN_ERROR;
+	}
+
+	return 0;
+}
+
+SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier, void*, arg, int, length, {
+	if(namespace == NULL || identifier == NULL) return -1;
+
+	struct server *server = find_server(namespace, identifier);
+	if(server == NULL) return -1;
+
+	int ret = launch_server(server, arg, length);
+	if(ret == -1) {
+		print("dufay: failed to launch server {%s}\n", server->name);
+		RETURN_ERROR;
+	}
+
+	ret = spawn_server(namespace, identifier);
+	if(ret == -1) return -1;
+})
 
 int launch_servers(void) {
 	if(limine_module_request.response == NULL) {
@@ -116,39 +155,30 @@ int launch_servers(void) {
 
 		print("dufay: launching server {%s}\n", modules[i]->cmdline);
 
-		char *server_name = alloc(SERVER_MAX_NAME_LENGTH);
-		sprint(server_name, "%s", modules[i]->cmdline);
-
 		struct server *server = alloc(sizeof(struct server));
 
-		ret = create_server("IO", server_name, server);
+		ret = create_server("IO", modules[i]->cmdline, server);
 		if(ret == -1) { 
 			print("dufay: failed to initiate server meta {%s}\n", modules[i]->cmdline);
 			RETURN_ERROR;
 		}
 
 		server->file = modules[i];
-	
-		ret = launch_server(server, NULL, 0);
-		if(ret == -1) {
-			print("dufay: failed to launch server {%s}\n", modules[i]->cmdline);
-			RETURN_ERROR;
-		}
 
-		struct sched_queue_config *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+		if(strcmp(modules[i]->cmdline, "pci") == 0) {
+			struct mcfg *mcfg = acpi_find_sdt("MCFG");
+			if(mcfg == NULL) RETURN_ERROR;
 
-		config->cid = server->context->comms.cid;
-		config->cgroup = 0;
-		config->nice = 0;
-		config->offload = 0;
-
-		ret = notification_queue(server->context, master_scheduler->context,
-			SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
-		if(ret == -1) {
-			print("dufay: failed to send scheduling notification on {%s}\n", modules[i]->cmdline);
-			RETURN_ERROR;
+			int ret = launch_server(server, mcfg, mcfg->length);
+			if(ret == -1) {
+				print("dufay: failed to launch server {%s}\n", modules[i]->cmdline);
+				RETURN_ERROR;
+			}
 		}
 	}
+
+	ret = spawn_server("IO", "pci");
+	if(ret == -1) RETURN_ERROR;
 
 	return 0;
 }
@@ -217,7 +247,7 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	char *location = (void*)(stack_physical + HIGH_VMA);
 
 	if(arg) {
-		location -= arg_length;
+		location = (void*)(((uintptr_t)location - arg_length) & ~15);
 		memcpy(location, arg, arg_length);
 		ucontext->regs.rdi = stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
 	}
@@ -271,7 +301,8 @@ static int launch_schedulers(struct limine_file *file) {
 
 		req->morphology.addr = virtual_base;
 		req->morphology.length = page_cnt * PAGE_SIZE;
-		for(int i = 0; i < page_cnt; i++, physical_base += PAGE_SIZE) req->morphology.paddr[i] = physical_base;
+		req->morphology.pcnt = page_cnt;
+		req->morphology.paddr = physical_base;
 
 		ret = portal(req, &resp);
 		if(ret == -1) RETURN_ERROR;

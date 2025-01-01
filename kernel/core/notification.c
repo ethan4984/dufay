@@ -167,7 +167,7 @@ int notification_dispatch(struct context *context) {
 
 	if(!queue->active || !queue->pending) {
 		spinrelease(&queue->lock);
-		RETURN_ERROR;
+		return 0;
 	}
 
 	struct ucontext *top = context->ucontext_top;

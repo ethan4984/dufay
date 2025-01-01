@@ -81,7 +81,8 @@ int sched_establish_shared_link(struct context *scheduler_context,
 
 	req->morphology.addr = virtual_base;
 	req->morphology.length = page_cnt * PAGE_SIZE;
-	for(int i = 0; i < page_cnt; i++) req->morphology.paddr[i] = physical_base + i * PAGE_SIZE;
+	req->morphology.pcnt = page_cnt;
+	req->morphology.paddr = physical_base;
 
 	int ret = portal(req, &resp);
 	if(ret == -1) RETURN_ERROR;
