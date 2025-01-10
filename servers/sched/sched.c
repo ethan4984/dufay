@@ -44,18 +44,18 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 		if(optimal_sched == sched_desc) goto exit;
 
 		struct comm_bridge bridge = {
-			.not = SCHED_NOTIFY_ENQUEUE,
+			.not = SCHED_ENQUEUE,
 			.cid = optimal_sched->cid,
 			.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 			.namespace = NULL,
 			.destination = NULL
 		};
 
-		bridge.data.length = sizeof(struct sched_queue_config);
+		bridge.data.limit = sizeof(struct sched_queue_config);
 		uintptr_t vaddr;
 		ret = as_allocate(&address_space, &vaddr,
-			DIV_ROUNDUP(bridge.data.length, PAGE_SIZE));
-		bridge.data.ptr = (void*)vaddr;
+			DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
+		bridge.data.base = (void*)vaddr;
 		if(ret == -1) {
 			print("DUFAY: SCHEDULER: failed address allocation unable to offload thread to other core\n");
 			goto finish;
@@ -68,7 +68,7 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 		}
 
 		config->offload = 0;
-		memcpy(bridge.data.ptr, config, bridge.data.length);
+		memcpy(bridge.data.base, config, bridge.data.limit);
 
 		response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
 		if(response.ret == -1) {
@@ -120,10 +120,7 @@ static int traverse_and_queue(struct thread **thread) {
 	if(thread == NULL) return -1;
 
 	struct thread *enqueue = thread_tree;
-	while(enqueue && enqueue->left) {
-		enqueue = enqueue->left;
-	}
-
+	while(enqueue && enqueue->left) enqueue = enqueue->left;
 	*thread = enqueue;
 
 	return 0;
@@ -138,10 +135,10 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 		{ .handler = notify_dequeue_thread };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
-		SCHED_NOTIFY_ENQUEUE, &enqueue_action, NULL);
+		SCHED_ENQUEUE, &enqueue_action, NULL);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
 
-	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, SCHED_NOTIFY_DEQUEUE, &dequeue_action, NULL);
+	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, SCHED_DEQUEUE, &dequeue_action, NULL);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
 
 	print("DUFAY: SCHEDULER: Initialised enqueue and dequeue notifications\n");

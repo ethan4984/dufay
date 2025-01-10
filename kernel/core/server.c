@@ -103,7 +103,7 @@ int spawn_server(const char *namespace, const char *identifier) {
 	config->offload = 0;
 
 	int ret = notification_queue(server->context, master_scheduler->context,
-		SCHED_NOTIFY_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+		SCHED_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if(ret == -1) {
 		print("dufay: failed to send scheduling notification on [%s][%s]\n", namespace, identifier);
 		RETURN_ERROR;
@@ -201,6 +201,8 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 
 	ret = create_blank_context(context); 
 	if(ret == -1) RETURN_ERROR;
+
+	context->comms.server = server->name;
 
 	struct ustack *ustack = alloc(sizeof(struct ustack));
 

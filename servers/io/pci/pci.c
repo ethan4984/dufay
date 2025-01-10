@@ -15,18 +15,21 @@ struct hash_table segment_tree;
 static int pci_device_spawn(struct pci_device*); 
 static int pci_device_bar(union pci_config*, struct pci_bar*, int);
 
-static void notify_bar(struct notification_info*, void *data, int) {
-	struct pci_notify_bar *notify_bar = data;
-	if(notify_bar == NULL) { print("DUFAY: PCI: descriptor does not exist\n"); goto finish; }
+// TODO
+// ENSURE THAT THIS PARAMATER IS ACTUALLY BEING PASSED!!! AND THAT IS MAPPED ACCORDINGLY
+
+static void nbar(struct notification_info*, void *data, int) {
+	struct pci_nbar *nbar = data;
+	if(nbar == NULL) { print("DUFAY: PCI: descriptor does not exist\n"); goto finish; }
 
 	struct pci_device *device = NULL;
-	int ret = hash_table_search(&device_tree, &notify_bar->descriptor,
+	int ret = hash_table_search(&device_tree, &nbar->descriptor,
 		sizeof(struct pci_descriptor), (void**)&device);
 	if(ret == -1 || device == NULL) { print("DUFAY: PCI: can not find device\n"); goto finish; }
 
-	ret = pci_device_bar(device->config, &notify_bar->bar, 0);
-	if(ret == -1) { notify_bar->valid = false; goto finish; }
-	else notify_bar->valid = true;
+	ret = pci_device_bar(device->config, &nbar->bar, 0);
+	if(ret == -1) { nbar->valid = false; goto finish; }
+	else nbar->valid = true;
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -37,6 +40,7 @@ static int pci_device_bar(union pci_config *config, struct pci_bar *bar, int ind
     uint64_t bar_low = config->device.bar[index];
 
     bool is_mmio = (bar_low & 1) == 0;
+
     bool is_prefetchable = is_mmio && (bar_low & (1 << 3)) != 0;
     bool is_64_bits = is_mmio && ((bar_low >> 1) & 0b11) == 0b10;
     uint64_t bar_high = is_64_bits ? config->device.bar[index + 1] : 0;
@@ -98,11 +102,14 @@ int pci(struct mcfg *mcfg) {
 		return -1;
 	}
 
-	struct notification_action bar_action = { .handler = notify_bar };
+	struct notification_action bar_action = { .handler = nbar };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
-		PCI_NOTIFY_BAR, &bar_action, NULL);
+		PCI_BAR, &bar_action, NULL);
 	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NOTIFY_BAR\n"); return -1; }
+
+	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
+	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }
 
 	for(unsigned int i = 0; i < (mcfg->length - sizeof(struct mcfg)) /
 		sizeof(struct mcfg_entry); i++) {
@@ -170,9 +177,6 @@ int pci(struct mcfg *mcfg) {
 			}
 		}
 	}
-
-	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }
 
 	return 0;
 }

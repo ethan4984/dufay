@@ -8,8 +8,10 @@
 
 #include <stdbool.h>
 
-#define NOTIFICATION_MAX 64
+#define NOTIFICATION_MAX 32
 #define NOTIFICATION_MASK(NOT) (1ull << ((NOT) - 1))
+#define NOTIFICATION_INDEX(NOT) ((NOT) - 1)
+#define NOTIFICATION_PENDING_CAPACITY 8
 
 struct notification_parameter {
 	uintptr_t vaddr;
@@ -29,48 +31,15 @@ struct notification {
 	struct notification_info *info;
 	struct notification_queue *queue;
 
-	struct notification *next;
-	struct notification *last;
+	bool active;
 };
 
-#define NOTIFICATION_PUSH(QUEUE, NOTIFICATION) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	if((NOTIFICATION) == NULL || (QUEUE) == NULL) { ret = -1; goto finish; } \
-	if((QUEUE)->queue[(NOTIFICATION)->notnum]) { \
-		(QUEUE)->queue[(NOTIFICATION)->notnum]->last = (NOTIFICATION); \
-		(NOTIFICATION)->next = (QUEUE)->queue[(NOTIFICATION)->notnum - 1]; \
-	} \
-	(QUEUE)->queue[(NOTIFICATION)->notnum] = (NOTIFICATION); \
-	(QUEUE)->pending |= NOTIFICATION_MASK((NOTIFICATION)->notnum); \
-finish: \
-	ret; \
-})
-
-#define NOTIFICATION_POP(QUEUE, NOTIFICATION, NOT) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	if((QUEUE) == NULL) { ret = -1; goto finish; } \
-	typeof(NOTIFICATION) root = (QUEUE)->queue[NOT - 1]; \
-	for(; root;) { \
-		if(root->next == NULL) break; \
-		root->next; \
-	} \
-	(NOTIFICATION) = root; \
-	if(root == NULL) goto finish; \
-	if(root->last == NULL) (QUEUE)->pending &= ~NOTIFICATION_MASK(NOT); \
-	if(root->last) root->last->next = NULL; \
-finish: \
-	ret; \
-})
-
-struct notification_queue { 
-	struct notification *queue[NOTIFICATION_MAX]; 
-	int mask;
+struct notification_queue {
+	struct notification *queue[NOTIFICATION_MAX][NOTIFICATION_PENDING_CAPACITY];
 
 	bool active;
-	int pending; 
-	int delivered;
+	int pending;
+	int mask;
 
 	struct spinlock lock;
 };

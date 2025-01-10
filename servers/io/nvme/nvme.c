@@ -26,22 +26,33 @@ struct nvme_controller {
 int nvme(struct pci_descriptor *pci_descriptor) {
 	if(pci_descriptor == NULL) return -1;
 
-	struct pci_notify_bar notify_bar =
-		{ .descriptor = *pci_descriptor };
-
 	struct comm_bridge bridge = {
-		.not = PCI_NOTIFY_BAR,
+		.not = PCI_BAR,
 		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 		.namespace = "IO",
-		.destination = "pci",
-		.data = {
-			.ptr = pci_descriptor,
-			.length = sizeof(struct pci_descriptor)
-		}
+		.destination = "pci"
 	};
 
-	int ret = notify_and_block(&bridge);
-	if(ret == -1) RETURN_ERROR;
+	bridge.data.limit = sizeof(struct pci_nbar);
+	uintptr_t vaddr;
+	int ret = as_allocate(&address_space, &vaddr,
+		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
+	if(ret == -1) return -1;
+	bridge.data.base = (void*)vaddr;
+
+	struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
+	if(response.ret == -1) return -1;
+
+	struct pci_nbar *nbar = (void*)vaddr;
+	nbar->descriptor = *pci_descriptor;
+	nbar->bar_index = NVME_PCI_BAR;
+
+	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
+	if(response.ret == -1) return -1;
+
+	print("dufay: nvme: BAR0: %x\n", nbar->bar.base);
+
+	for(;;);
 
 	uintptr_t addr;
 	ret = as_address(&address_space, &addr, PAGE_SIZE);
@@ -55,7 +66,7 @@ int nvme(struct pci_descriptor *pci_descriptor) {
 		.length = sizeof(struct portal_req),
 		.morphology = {
 			.addr = addr, .length = PAGE_SIZE, 
-			.paddr = notify_bar.bar.base, .pcnt = DIV_ROUNDUP(notify_bar.bar.limit, PAGE_SIZE)
+			.paddr = nbar->bar.base, .pcnt = 1
 		}
 	};
 

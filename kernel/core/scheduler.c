@@ -111,14 +111,8 @@ void reschedule(struct registers *regs, void*) {
 
 	struct context *next_context;
 
-	if(CORE_LOCAL->current_context) {
-		if(CORE_LOCAL->current_context->notification.queue) {
-			if(CORE_LOCAL->current_context->notification.queue->active) {
-				int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
-				if(ret != -1) goto finish;
-			}
-		}
-	}
+	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
+	if(ret == 0) { goto finish; }
 
 	bool found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
 		({
@@ -194,6 +188,8 @@ end:
 	set_user_gs(next_context->user_gs_base);
 
 	CORE_LOCAL->current_context = next_context;
+
+	print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
 
 	if(ucontext->notification) ucontext->delivered = 1;
 

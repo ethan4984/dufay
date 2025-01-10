@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define NVME_PCI_BAR 0
+
 constexpr size_t nvme_version_1_0_0_id = (1 << 8 | 0) << 8 | 0;
 constexpr size_t nvme_version_1_1_0_id = (1 << 8 | 1) << 8 | 0;
 constexpr size_t nvme_version_1_2_0_id = (1 << 8 | 2) << 8 | 0;
