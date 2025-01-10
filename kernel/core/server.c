@@ -18,6 +18,7 @@
 #include <fayt/string.h>
 #include <fayt/notification.h>
 #include <fayt/debug.h>
+#include <fayt/sched.h>
 
 static struct hash_table namespace_table;
 static struct bitmap nid_bitmap;
@@ -103,7 +104,7 @@ int spawn_server(const char *namespace, const char *identifier) {
 	config->offload = 0;
 
 	int ret = notification_queue(server->context, master_scheduler->context,
-		SCHED_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+		NOT_SCHED_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if(ret == -1) {
 		print("dufay: failed to send scheduling notification on [%s][%s]\n", namespace, identifier);
 		RETURN_ERROR;

@@ -403,6 +403,24 @@ finish:
 	);
 })
 
+SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
+	struct context *context = CORE_LOCAL->current_context;
+	struct context *destination;
+
+	int ret = bridge_to_destination(bridge, &destination);
+	if(ret == -1) RETURN_ERROR;
+
+	if(bridge->lnkidx < 0 || bridge->lnkidx > NOTIFICATION_PENDING_CAPACITY) return -1;
+	struct notification_queue *queue = destination->notification.queue;
+	if(queue == NULL) RETURN_ERROR;
+
+	struct notification *notification = queue->queue[NOTIFICATION_INDEX(bridge->not)][bridge->lnkidx];
+	if(notification == NULL) return -1;
+
+	context->common.blocked = 1;
+	for(;context->common.blocked;) yield();
+})
+
 SYSCALL_DEFINE0(notification_unmute, {
 	struct context *current_context = CORE_LOCAL->current_context; 
 	if(current_context == NULL) RETURN_ERROR;

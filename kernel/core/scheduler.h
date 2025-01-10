@@ -4,6 +4,7 @@
 #include <arch/x86/cpu.h>
 #include <fayt/vector.h>
 #include <fayt/lock.h>
+#include <fayt/sched.h>
 
 #define CONTEXT_DEFAULT_STACK_SIZE 0x200000
 #define SCHEDULER_DEFAULT_QUEUE_SIZE 0x10000
@@ -87,6 +88,8 @@ struct context {
 
 	struct ucontext *ucontext_active;
 	struct ucontext *ucontext_top;
+
+	struct sched_common common;
 
 	struct {
 		struct notification_action *actions;

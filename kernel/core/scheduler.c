@@ -114,12 +114,18 @@ void reschedule(struct registers *regs, void*) {
 	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
 	if(ret == 0) { goto finish; }
 
-	bool found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
-		({
-			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
-				CORE_LOCAL->thread_queue_link->data_offset, &next_context);
-		})
-	);
+	bool found;		
+	for(;;) {
+		found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
+			({
+				circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
+					CORE_LOCAL->thread_queue_link->data_offset, &next_context);
+			})
+		);
+		
+		if(found && next_context->common.blocked) continue;
+		break;
+	}
 
 	if(found == false) {
 		struct server *scheduling_server = CORE_LOCAL->scheduling_server;
