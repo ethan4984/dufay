@@ -148,12 +148,6 @@ static inline uint64_t get_user_fs(void) {
 	return rdmsr(MSR_FS_BASE);
 }
 
-static inline uint64_t rdtsc(void) {
-	uint64_t rax, rdx;
-	__asm__ volatile ("rdtsc" : "=a"(rax), "=d"(rdx));
-	return (uint64_t)rax | ((uint64_t)rdx << 32);
-}
-
 static inline uint64_t rdseed(void) {
 	uint64_t ret;
 	__asm__ volatile ("rdseed %0" : "=r"(ret));

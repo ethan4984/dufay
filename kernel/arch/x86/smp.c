@@ -37,7 +37,6 @@ static void core_bootstrap(struct cpu_local *cpu_local) {
 	xapic_write(XAPIC_TPR_OFF, 0);
 	xapic_write(XAPIC_SINT_OFF, xapic_read(XAPIC_SINT_OFF) | 0x1ff);
 
-	
 	apic_timer_init(20);
 
 	__asm__ volatile ("mov %0, %%cr8\nsti" :: "r"(0ull));

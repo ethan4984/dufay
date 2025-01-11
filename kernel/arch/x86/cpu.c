@@ -15,19 +15,29 @@ extern void syscall_main(void);
 struct cpuid_state cpuid(size_t leaf, size_t subleaf) {
 	struct cpuid_state ret = { .leaf = leaf, subleaf = subleaf };
 
-	size_t max;
-	__asm__ volatile ("cpuid" : "=a"(max) : "a"(leaf & 0x80000000) : "rbx", "rcx", "rdx");
+	uint64_t cpuid_max;
+	__asm__ volatile ("cpuid" : "=a" (cpuid_max) : "a" (leaf & 0x80000000) : "rbx", "rcx", "rdx");
 
-	if(leaf > max) {
-		return ret;
-	}
+	if(leaf > cpuid_max) return ret;
 
-	__asm__ volatile ("cpuid" : "=a"(ret.rax), "=b"(ret.rbx), "=c"(ret.rcx), "=d"(ret.rbx) : "a"(leaf), "c"(subleaf));
+	__asm__ volatile ("cpuid" : "=a" (ret.rax), "=b" (ret.rbx), 
+		"=c" (ret.rcx), "=d" (ret.rdx) : "a" (leaf), "c" (subleaf));
 
 	return ret;
 }
 
 void x86_system_init(void) {
+	struct cpuid_state cpuid_state = cpuid(1, 0);
+	if((cpuid_state.rdx & (1 << 4)) == 0) panic("dufay: cpuid: tsc/rdtsc unsupported");
+	if((cpuid_state.rdx & (1 << 25)) == 0) panic("dufay: cpuid: sse unsupported");
+	if((cpuid_state.rcx & (1 << 24)) == 0) panic("dufay: cpuid: tsc-deadline unsupported");
+
+	cpuid_state = cpuid(0x80000007, 0);
+	if((cpuid_state.rdx & (1 << 8)) == 0) panic("dufay: cpuid: tsc-invariant unsupported\n");
+
+	cpuid_state = cpuid(0x80000001, 0);
+	if((cpuid_state.rdx & (1 << 24)) == 0) panic("dufay: cpuid: fxsave/fxrstor unsupported\n");
+
 	wrmsr(MSR_EFER, rdmsr(MSR_EFER) | (1 << 0) | (1 << 11)); // set SCE and NX
 	wrmsr(MSR_STAR, 0x33ull << 48 | 0x28ull << 32);
 	wrmsr(MSR_LSTAR, (uintptr_t)syscall_main);
@@ -44,18 +54,16 @@ void x86_system_init(void) {
 	uint64_t cr4;
 	__asm__ volatile ("mov %%cr4, %0" : "=r"(cr4));
 
-	cr4 |=	(1 << 7) | // allow for global pages
-			(1 << 9) | // enables xsave/xstore
-			(1 << 10); // enables XM exceptions
-											
+	cr4 |= (1 << 7) | // allow for global pages
+		(1 << 9) | // enables xsave/xstore
+		(1 << 10); // enables XM exceptions
+
 	__asm__ volatile ("mov %0, %%cr4" :: "r"(cr4));
 
 	serial_init();
 }
 
 void x86_fpu_init(struct cpu_local *cpu_local) {
-	// TODO check cpuid for fpu capabilities
-
 	cpu_local->fpu_context_size = 512;
 	cpu_local->fpu_save = fxsave;
 	cpu_local->fpu_rstor = fxrstor;
