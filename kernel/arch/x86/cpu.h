@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <fayt/time.h>
+
 #define PAGE_SIZE 0x1000ull
 #define KERNEL_HIGH_VMA 0xffffffff80000000
 
@@ -168,12 +170,20 @@ static inline void fxrstor(void *data) {
 	__asm__ volatile ("fxrstor (%0)" :: "r"(data) : "memory");
 }
 
+static inline uint64_t rdtsc(void) {
+	uint64_t rax, rdx;
+	__asm__ volatile ("rdtsc" : "=a"(rax), "=d"(rdx));
+	return (uint64_t)rax | ((uint64_t)rdx << 32);
+}
+
 struct cpuid_state cpuid(size_t leaf, size_t subleaf);
 
 struct cpu_local; 
-void x86_fpu_init(struct cpu_local *);
-
+void x86_fpu_init(struct cpu_local*);
 void x86_system_init(void);
 void x86_system_tables(void);
+
+void x86_tsc_calibrate(void);
+extern struct timer invariant_tsc;
 
 #endif

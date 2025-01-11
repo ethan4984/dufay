@@ -3,6 +3,8 @@
 
 #include <fayt/rb_tree.h>
 #include <fayt/lock.h>
+#include <fayt/sched.h>
+#include <fayt/time.h>
 
 #include <portal.h>
 
@@ -35,6 +37,7 @@ struct thread {
 };
 
 struct sched_descriptor {
+	struct timer timer;
 	int processor_id;
 	int queue_default_refill;
 	int load;

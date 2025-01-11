@@ -105,7 +105,7 @@ int pci(struct mcfg *mcfg) {
 	struct notification_action bar_action = { .handler = nbar };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
-		PCI_BAR, &bar_action, NULL);
+		NOT_PCI_BAR, &bar_action, NULL);
 	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NOTIFY_BAR\n"); return -1; }
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);

@@ -14,6 +14,17 @@ static void spfree(void*, uint64_t, uint64_t);
 int main(struct sched_descriptor *desc) {
 	print("DUFAY: SCHEDULER: booting server {processor_id=%x}\n", desc->processor_id);
 
+	if(desc->timer.source == TIME_SOURCE_INVARIANT_TSC) {
+		print("DUFAY: SCHEDULER: using invariant TSC as timer [freq: %d]\n", desc->timer.freq);
+		desc->timer.read = invariant_tsc_read;
+	} else if(desc->timer.source == TIME_SOURCE_HPET) {
+		print("DUFAY: SCHEDULER: using HPET as timer [unsupported]\n");
+		goto failure;
+	} else {
+		print("DUFAY: SCHEDULER: timer source unknown\n");
+		goto failure;
+	}
+
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
 		.page_alloc = spalloc,

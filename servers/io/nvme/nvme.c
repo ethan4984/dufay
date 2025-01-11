@@ -27,7 +27,7 @@ int nvme(struct pci_descriptor *pci_descriptor) {
 	if(pci_descriptor == NULL) return -1;
 
 	struct comm_bridge bridge = {
-		.not = PCI_BAR,
+		.not = NOT_PCI_BAR,
 		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 		.namespace = "IO",
 		.destination = "pci"

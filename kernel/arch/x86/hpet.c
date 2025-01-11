@@ -26,10 +26,10 @@ void hpet_usleep(size_t us) {
 	}
 }
 
-void hpet_nsleep(size_t us) {
+void hpet_nsleep(size_t ns) {
 	uint32_t period = hpet_regs->capabilities >> 32;
 
-	volatile size_t ticks = hpet_regs->counter_value + (us * (1000000 / period));
+	volatile size_t ticks = hpet_regs->counter_value + (ns * (1000000 / period));
 
 	while(hpet_regs->counter_value < ticks) {
 		__asm__ ("pause");

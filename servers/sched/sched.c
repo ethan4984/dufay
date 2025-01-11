@@ -8,6 +8,7 @@
 #include <fayt/slab.h>
 #include <fayt/hash.h>
 #include <fayt/string.h> 
+#include <fayt/sched.h>
 
 #include <sched.h>
 
@@ -44,7 +45,7 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 		if(optimal_sched == sched_desc) goto exit;
 
 		struct comm_bridge bridge = {
-			.not = SCHED_ENQUEUE,
+			.not = NOT_SCHED_ENQUEUE,
 			.cid = optimal_sched->cid,
 			.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 			.namespace = NULL,
@@ -135,10 +136,10 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 		{ .handler = notify_dequeue_thread };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
-		SCHED_ENQUEUE, &enqueue_action, NULL);
+		NOT_SCHED_ENQUEUE, &enqueue_action, NULL);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
 
-	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, SCHED_DEQUEUE, &dequeue_action, NULL);
+	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, NOT_SCHED_DEQUEUE, &dequeue_action, NULL);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
 
 	print("DUFAY: SCHEDULER: Initialised enqueue and dequeue notifications\n");

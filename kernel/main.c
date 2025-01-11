@@ -14,10 +14,6 @@
 
 #include <limine.h>
 
-//	TODO
-//		begin the process of pci enumeration and figure a very fast and logic
-//		method for receiving and responding to commands
-
 struct limine_hhdm_request limine_hhdm_request = {
 	.id = LIMINE_HHDM_REQUEST,
 	.revision = 0
@@ -30,6 +26,9 @@ static volatile struct limine_rsdp_request limine_rsdp_request = {
 
 static void *spalloc(void*, uint64_t s) { return (void*)pmm_alloc(s, 1) + HIGH_VMA; }
 static void spfree(void *addr, uint64_t s, uint64_t) { pmm_free((uint64_t)addr - HIGH_VMA, s); }
+
+#include <fayt/time.h>
+#include <arch/x86/hpet.h>
 
 void dufay_entry(void) {
 	if(limine_hhdm_request.response) HIGH_VMA = limine_hhdm_request.response->offset;

@@ -26,14 +26,31 @@ struct cpuid_state cpuid(size_t leaf, size_t subleaf) {
 	return ret;
 }
 
-void x86_system_init(void) {
+struct timer invariant_tsc;
+
+void x86_tsc_calibrate(void) {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
 	if((cpuid_state.rdx & (1 << 4)) == 0) panic("dufay: cpuid: tsc/rdtsc unsupported");
-	if((cpuid_state.rdx & (1 << 25)) == 0) panic("dufay: cpuid: sse unsupported");
-	if((cpuid_state.rcx & (1 << 24)) == 0) panic("dufay: cpuid: tsc-deadline unsupported");
 
 	cpuid_state = cpuid(0x80000007, 0);
 	if((cpuid_state.rdx & (1 << 8)) == 0) panic("dufay: cpuid: tsc-invariant unsupported\n");
+
+	uint64_t a = rdtsc();
+	hpet_msleep(50);
+	uint64_t b = rdtsc();
+
+	uint64_t freq = ((b - a) * 1000000000) / 50000000;
+
+	invariant_tsc = (struct timer) {
+		.source = TIME_SOURCE_INVARIANT_TSC,
+		.freq = freq,
+		.read = invariant_tsc_read
+	};
+}
+
+void x86_system_init(void) {
+	struct cpuid_state cpuid_state = cpuid(1, 0);
+	if((cpuid_state.rdx & (1 << 25)) == 0) panic("dufay: cpuid: sse unsupported");
 
 	cpuid_state = cpuid(0x80000001, 0);
 	if((cpuid_state.rdx & (1 << 24)) == 0) panic("dufay: cpuid: fxsave/fxrstor unsupported\n");
@@ -54,6 +71,7 @@ void x86_system_init(void) {
 	uint64_t cr4;
 	__asm__ volatile ("mov %%cr4, %0" : "=r"(cr4));
 
+	cr4 &= ~(1 << 2);
 	cr4 |= (1 << 7) | // allow for global pages
 		(1 << 9) | // enables xsave/xstore
 		(1 << 10); // enables XM exceptions
@@ -75,5 +93,6 @@ void x86_system_tables(void) {
 	hpet_init();
 	apic_init();
 	apic_timer_init(20);
+	x86_tsc_calibrate();
 	boot_aps();
 }

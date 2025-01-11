@@ -316,7 +316,8 @@ static int launch_schedulers(struct limine_file *file) {
 
 	for(int i = 0; i < bootable_processor_cnt; i++) {
 		struct sched_descriptor *descriptor = descriptors + i;
-
+	
+		descriptor->timer = invariant_tsc; descriptor->timer.read = NULL;
 		descriptor->processor_id = i;
 		descriptor->queue_default_refill = 0xa;
 		descriptor->load = 0;

@@ -11,7 +11,7 @@ QEMUFLAGS = -m 4G \
 			-device ahci,id=ahci \
 			-device ide-hd,drive=disk,bus=ahci.0 \
 			-device intel-iommu,aw-bits=48 \
-			-machine type=q35
+			-machine type=q35 \
 
 QEMUFLAGS_ISO = -m 4G \
 				-smp 1 \
@@ -19,7 +19,8 @@ QEMUFLAGS_ISO = -m 4G \
 				-drive file=disk.img,if=none,id=nvm \
 				-device nvme,serial=deadbeef,drive=nvm \
 				-machine type=q35 \
-				-boot d
+				-boot d \
+				-cpu host,migratable=no,+invtsc
 
 .PHONY: run
 run: $(DISK_IMAGE)

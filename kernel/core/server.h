@@ -68,6 +68,7 @@ struct server_env {
 };
 
 struct sched_descriptor {
+	struct timer timer;
 	int processor_id;
 	int queue_default_refill;
 	int load;
