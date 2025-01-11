@@ -28,6 +28,8 @@ struct thread {
 	int cid;
 	int cgroup;
 
+	struct time epoch;
+
 	uint64_t weight;
 	uint64_t vruntime;
 
@@ -42,6 +44,7 @@ struct sched_descriptor {
 	int queue_default_refill;
 	int load;
 	int cid;
+	struct time slice;
 };
 
 struct sched_queue_config {
@@ -55,7 +58,6 @@ struct sched_queue_config {
 static inline uint64_t weight_set_nice(int nice) {
 	if(nice < NICE_MIN) nice = NICE_MIN;
 	if(nice > NICE_MAX) nice = NICE_MAX;
-
 	return nice_to_weight[nice + 20];
 }
 

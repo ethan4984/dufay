@@ -160,6 +160,9 @@ finish:
 		*r = *regs;
 		current_context->user_fs_base = get_user_fs();
 		current_context->user_gs_base = get_user_gs();
+
+		current_context->sysctx.user_stack = CORE_LOCAL->user_stack;
+		current_context->sysctx.error = CORE_LOCAL->error;
 	}
 
 	struct ucontext *ucontext = ({
@@ -190,12 +193,15 @@ end:
 
 	CORE_LOCAL->fpu_rstor(*fpu_context);
 
+	CORE_LOCAL->user_stack = next_context->sysctx.user_stack;
+	CORE_LOCAL->error = next_context->sysctx.user_stack;
+
 	set_user_fs(next_context->user_fs_base);
 	set_user_gs(next_context->user_gs_base);
 
 	CORE_LOCAL->current_context = next_context;
 
-	print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
+	//print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
 
 	if(ucontext->notification) ucontext->delivered = 1;
 

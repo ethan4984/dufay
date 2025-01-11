@@ -71,6 +71,6 @@ uint64_t syscall_handler(struct registers *regs) {
 		print("SYSCALL: handler not properly initialised\n");
 		return SYSRET(-1, 0);
 	}
-
+	
 	return SYSRET(error ? error : 0, error);
 }

@@ -107,12 +107,16 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 	struct sched_queue_config *config = data;
 	if(config == NULL) goto finish;
 
-	void *thread;
-	int ret = hash_table_search(&thread_table, &config->cid, sizeof(config->cid), &thread);
+	struct thread *thread;
+	int ret = hash_table_search(&thread_table, &config->cid, sizeof(config->cid), (void**)&thread);
 	if(ret == -1 || thread == NULL) goto finish;
 
-	ret = RB_GENERIC_DELETE(thread_tree, runtime, (struct thread*)thread); 
+	ret = RB_GENERIC_DELETE(thread_tree, vruntime, thread); 
 	if(ret == -1) goto finish;
+
+	struct time epoch = sched_desc->timer.read(&sched_desc->timer);
+	struct time delta = time_sub(epoch, thread->epoch);
+	thread->vruntime -= VRUNTIME(thread->weight, time_to_ns(delta));
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -178,6 +182,8 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	for(;;) {
 		SYSCALL0(SYSCALL_SCHED_ACQUIRE);
 
+		struct time epoch = desc->timer.read(&desc->timer);
+
 		for(int i = 0; i < sched_desc->queue_default_refill; i++) {
 			struct thread *thread = NULL;
 			int ret = traverse_and_queue(&thread);
@@ -186,13 +192,19 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 
 			ret = OPERATE_LINK(link, LINK_CIRCULAR,
 				({
-					thread->vruntime += VRUNTIME(thread->weight, DEFAULT_TIME_SLICE);
+					thread->vruntime += VRUNTIME(thread->weight, time_to_ns(desc->slice));
+					thread->epoch = epoch;
+
 					RB_GENERIC_DELETE(thread_tree, vruntime, thread);
 					RB_GENERIC_INSERT(thread_tree, vruntime, thread);
-					//print("scheduler: cid=%x vruntime=%x\n", thread->cid, thread->vruntime);
+
+					//print("scheduler: cid=%x vruntime=%x [epoch: s [%d] ns [%d]]", thread->cid, thread->vruntime, epoch.sec, epoch.nsec);
+
 					ret = circular_queue_push((void*)link + link->data_offset, &thread->private);
 				})
 			);
+
+			epoch = time_add(epoch, desc->slice);
 
 			if(ret == -1) {
 				print("DUFAY: SCHEDULER: Failued to push onto the share queue\n");

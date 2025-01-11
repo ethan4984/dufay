@@ -8,6 +8,8 @@
 
 #include <core/debug.h>
 
+#include <fayt/sched.h>
+
 uint64_t HIGH_VMA = 0xffff800000000000;
 
 extern void syscall_main(void);
@@ -92,7 +94,7 @@ void x86_system_tables(void) {
 	idt_init();
 	hpet_init();
 	apic_init();
-	apic_timer_init(20);
+	apic_timer_init(SCHED_TICK_RATE_MS);
 	x86_tsc_calibrate();
 	boot_aps();
 }

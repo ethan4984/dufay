@@ -73,6 +73,7 @@ struct sched_descriptor {
 	int queue_default_refill;
 	int load;
 	int cid;
+	struct time slice;
 };
 
 struct sched_queue_config {

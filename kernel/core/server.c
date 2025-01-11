@@ -321,6 +321,9 @@ static int launch_schedulers(struct limine_file *file) {
 		descriptor->processor_id = i;
 		descriptor->queue_default_refill = 0xa;
 		descriptor->load = 0;
+		descriptor->slice = (struct time) { 
+			.sec = 0, .nsec = MS_TO_NS(SCHED_TICK_RATE_MS)
+		};
 
 		if(launch_server(servers[i], descriptor, sizeof(struct sched_descriptor)) == -1) {
 			print("dufay: failed to launch server\n");

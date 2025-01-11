@@ -3,7 +3,7 @@ SERVER := pci
 C ?= gcc
 LD ?= ld
 
-CFLAGS ?= -Wall -Wextra -Ofast -pipe -fsanitize=undefined
+CFLAGS ?= -Wall -Wextra -O0 -pipe -fsanitize=undefined
 LDFLAGS ?=
 
 INTERNALLDFLAGS := \
