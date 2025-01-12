@@ -13,10 +13,7 @@ struct hash_table device_tree;
 struct hash_table segment_tree;
 
 static int pci_device_spawn(struct pci_device*); 
-static int pci_device_bar(union pci_config*, struct pci_bar*, int);
-
-// TODO
-// ENSURE THAT THIS PARAMATER IS ACTUALLY BEING PASSED!!! AND THAT IS MAPPED ACCORDINGLY
+static int pci_device_bar(volatile union pci_config*, struct pci_bar*, int);
 
 static void nbar(struct notification_info*, void *data, int) {
 	struct pci_nbar *nbar = data;
@@ -34,25 +31,27 @@ finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 
-static int pci_device_bar(union pci_config *config, struct pci_bar *bar, int index) {
+static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar, int index) {
 	if(config == NULL || bar == NULL) return -1;
 
     uint64_t bar_low = config->device.bar[index];
 
     bool is_mmio = (bar_low & 1) == 0;
-
     bool is_prefetchable = is_mmio && (bar_low & (1 << 3)) != 0;
     bool is_64_bits = is_mmio && ((bar_low >> 1) & 0b11) == 0b10;
     uint64_t bar_high = is_64_bits ? config->device.bar[index + 1] : 0;
-
-    uint64_t base = bar_high << 32 | bar_low;
-    base = is_mmio ? base & ~0xf : base & ~0x3;
+	
+    uint64_t base = (bar_high << 32) | bar_low;
+    base = is_mmio ? (base & ~0xf) : (base & ~0x3);
 
 	config->device.bar[index] = 0xffffffff;
     uint64_t bar_size_low = config->device.bar[index];
 
     config->device.bar[index + 1] = 0xffffffff;
     uint64_t bar_size_high = config->device.bar[index + 1];
+
+	config->device.bar[index] = bar_low;
+	config->device.bar[index + 1] = bar_high;
 
     uint64_t limit = bar_size_high << 32 | bar_size_low;
 	limit = is_mmio ? limit & ~0xf : limit & ~0x3;
@@ -155,7 +154,7 @@ int pci(struct mcfg *mcfg) {
 		for(int bus = mcfg_entry->bus_start; bus < mcfg_entry->bus_end; bus++) {
 			for(int device = 0; device < 32; device++) {
 				for(int func = 0; func < 8; func++) {
-					union pci_config *config = PCI_CONFIG(pci_segment->address_space, bus, device, func);
+					volatile union pci_config *config = PCI_CONFIG(pci_segment->address_space, bus, device, func);
 					if(config->device.vendor_id == 0xffff) continue;
 
 					struct pci_device *pci_device = alloc(sizeof(struct pci_device));

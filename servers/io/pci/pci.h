@@ -38,7 +38,7 @@ struct pci_segment {
 
 struct pci_device {
 	struct pci_descriptor descriptor;
-	union pci_config *config;
+	volatile union pci_config *config;
 };
 
 #define PCI_CONFIG(BASE, BUS, DEVICE, FUNC) ({ \

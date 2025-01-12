@@ -36,7 +36,7 @@ int nvme(struct pci_descriptor *pci_descriptor) {
 	bridge.data.limit = sizeof(struct pci_nbar);
 	uintptr_t vaddr;
 	int ret = as_allocate(&address_space, &vaddr,
-		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
+		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE) * PAGE_SIZE);
 	if(ret == -1) return -1;
 	bridge.data.base = (void*)vaddr;
 
@@ -50,12 +50,8 @@ int nvme(struct pci_descriptor *pci_descriptor) {
 	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
 	if(response.ret == -1) return -1;
 
-	print("dufay: nvme: BAR0: %x\n", nbar->bar.base);
-
-	for(;;);
-
 	uintptr_t addr;
-	ret = as_address(&address_space, &addr, PAGE_SIZE);
+	ret = as_address(&address_space, &addr, nbar->bar.limit);
 	if(ret == -1) RETURN_ERROR;
 
 	struct nvme_controller *controller = alloc(sizeof(struct nvme_controller));
@@ -65,23 +61,23 @@ int nvme(struct pci_descriptor *pci_descriptor) {
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
 		.morphology = {
-			.addr = addr, .length = PAGE_SIZE, 
-			.paddr = nbar->bar.base, .pcnt = 1
+			.addr = addr, .length = nbar->bar.limit,
+			.paddr = nbar->bar.base, .pcnt = DIV_ROUNDUP(nbar->bar.limit, PAGE_SIZE)
 		}
 	};
 
 	struct portal_resp portal_resp;
 	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
 	if(syscall_response.ret == -1 || portal_resp.base != addr ||
-		portal_resp.limit != PAGE_SIZE) RETURN_ERROR;
+		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
 
-	struct nvme_regs *regs = (void*)addr;
+	volatile struct nvme_regs *regs = (volatile struct nvme_regs*)addr;
 
 	controller->version.major = (regs->vs >> 16) & 0xffff;
 	controller->version.minor = (regs->vs >> 8) & 0xff;
 	controller->version.tertiary = (regs->vs >> 0) & 0xff;
 
-	print("dufay: nvme: version detected %d:%d:%d\n", controller->version.major,
+	print("DUFAY: NVME: version detected %d:%d:%d\n", controller->version.major,
 		controller->version.minor, controller->version.tertiary);
 
 	return 0;

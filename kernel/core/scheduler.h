@@ -57,6 +57,11 @@ struct ucontext {
 	struct registers regs;
 	void *fpu_context;
 
+	struct {
+		uintptr_t user_stack;
+		uint64_t error;
+	} sysctx;
+
 	struct notification *notification;
 	int ready;
 	int delivered;
@@ -88,11 +93,6 @@ struct context {
 
 	struct ucontext *ucontext_active;
 	struct ucontext *ucontext_top;
-
-	struct {
-		uintptr_t user_stack;
-		uint64_t error;
-	} sysctx;
 
 	struct sched_common common;
 

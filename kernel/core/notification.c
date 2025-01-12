@@ -378,6 +378,9 @@ finish:
 	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
 	CORE_LOCAL->fpu_rstor(rcontext->fpu_context);
 
+	CORE_LOCAL->user_stack = rcontext->sysctx.user_stack;
+	CORE_LOCAL->error = rcontext->sysctx.user_stack;
+
 	SWAP_TLS(&rcontext->regs);
 
 	__asm__ volatile (

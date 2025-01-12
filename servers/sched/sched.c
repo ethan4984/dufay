@@ -99,6 +99,7 @@ exit:
 		print("DUFAY: SCHEDULER: Unable to insert on thread tree\n");
 		goto finish; 
 	}
+
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
