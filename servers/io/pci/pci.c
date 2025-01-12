@@ -34,26 +34,26 @@ finish:
 static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar, int index) {
 	if(config == NULL || bar == NULL) return -1;
 
-    uint64_t bar_low = config->device.bar[index];
+	uint64_t bar_low = config->device.bar[index];
 
-    bool is_mmio = (bar_low & 1) == 0;
-    bool is_prefetchable = is_mmio && (bar_low & (1 << 3)) != 0;
-    bool is_64_bits = is_mmio && ((bar_low >> 1) & 0b11) == 0b10;
-    uint64_t bar_high = is_64_bits ? config->device.bar[index + 1] : 0;
-	
-    uint64_t base = (bar_high << 32) | bar_low;
-    base = is_mmio ? (base & ~0xf) : (base & ~0x3);
+	bool is_mmio = (bar_low & 1) == 0;
+	bool is_prefetchable = is_mmio && (bar_low & (1 << 3)) != 0;
+	bool is_64_bits = is_mmio && ((bar_low >> 1) & 0b11) == 0b10;
+	uint64_t bar_high = is_64_bits ? config->device.bar[index + 1] : 0;
+
+	uint64_t base = (bar_high << 32) | bar_low;
+	base = is_mmio ? (base & ~0xf) : (base & ~0x3);
 
 	config->device.bar[index] = 0xffffffff;
-    uint64_t bar_size_low = config->device.bar[index];
+	uint64_t bar_size_low = config->device.bar[index];
 
-    config->device.bar[index + 1] = 0xffffffff;
-    uint64_t bar_size_high = config->device.bar[index + 1];
+	config->device.bar[index + 1] = 0xffffffff;
+	uint64_t bar_size_high = config->device.bar[index + 1];
 
 	config->device.bar[index] = bar_low;
 	config->device.bar[index + 1] = bar_high;
 
-    uint64_t limit = bar_size_high << 32 | bar_size_low;
+	uint64_t limit = bar_size_high << 32 | bar_size_low;
 	limit = is_mmio ? limit & ~0xf : limit & ~0x3;
 	limit = ~limit + 1;
 
