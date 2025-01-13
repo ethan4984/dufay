@@ -1,5 +1,6 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/smp.h> 
+#include <arch/x86/idt.h>
 
 #include <core/server.h>
 #include <core/virtual.h>
@@ -17,6 +18,7 @@
 #include <fayt/bitmap.h>
 #include <fayt/string.h>
 #include <fayt/notification.h>
+#include <fayt/pci.h>
 #include <fayt/debug.h>
 #include <fayt/sched.h>
 
@@ -118,6 +120,11 @@ SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier
 
 	struct server *server = find_server(namespace, identifier);
 	if(server == NULL) return -1;
+
+	if(strcmp(namespace, "IO") == 0) {
+		struct pci_info *info = arg;
+		info->irq_vector = idt_alloc_vector(NULL, NULL);
+	}
 
 	int ret = launch_server(server, arg, length);
 	if(ret == -1) {

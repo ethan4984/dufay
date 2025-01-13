@@ -10,8 +10,8 @@
 #include <nvme.h>
 
 struct nvme_controller {
-	struct nvme_regs *regs;
-	struct nvme_controller_id *id;
+	volatile struct nvme_regs *regs;
+	volatile struct nvme_controller_id *id;
 
 	struct {
 		int major;
@@ -19,66 +19,45 @@ struct nvme_controller {
 		int tertiary;
 	} version;
 
-	unsigned int page_size_max;
-	unsigned int page_size_min;
+	int queue_entries;
+	int page_size_max;
+	int page_size_min;
+	int page_size;
+	int max_transfer_shift;
+	int max_prps;
+	int strides;
 };
 
-int nvme(struct pci_descriptor *pci_descriptor) {
-	if(pci_descriptor == NULL) return -1;
-
-	struct comm_bridge bridge = {
-		.not = NOT_PCI_BAR,
-		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-		.namespace = "IO",
-		.destination = "pci"
-	};
-
-	bridge.data.limit = sizeof(struct pci_nbar);
-	uintptr_t vaddr;
-	int ret = as_allocate(&address_space, &vaddr,
-		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE) * PAGE_SIZE);
-	if(ret == -1) return -1;
-	bridge.data.base = (void*)vaddr;
-
-	struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
-	if(response.ret == -1) return -1;
-
-	struct pci_nbar *nbar = (void*)vaddr;
-	nbar->descriptor = *pci_descriptor;
-	nbar->bar_index = NVME_PCI_BAR;
-
-	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
-	if(response.ret == -1) return -1;
-
-	uintptr_t addr;
-	ret = as_address(&address_space, &addr, nbar->bar.limit);
-	if(ret == -1) RETURN_ERROR;
+int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
+	if(pci_info == NULL || regs == NULL) return -1;
 
 	struct nvme_controller *controller = alloc(sizeof(struct nvme_controller));
 
-	struct portal_req portal_req = {
-		.type = PORTAL_REQ_DIRECT,
-		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.length = sizeof(struct portal_req),
-		.morphology = {
-			.addr = addr, .length = nbar->bar.limit,
-			.paddr = nbar->bar.base, .pcnt = DIV_ROUNDUP(nbar->bar.limit, PAGE_SIZE)
-		}
-	};
-
-	struct portal_resp portal_resp;
-	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(syscall_response.ret == -1 || portal_resp.base != addr ||
-		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
-
-	volatile struct nvme_regs *regs = (volatile struct nvme_regs*)addr;
-
-	controller->version.major = (regs->vs >> 16) & 0xffff;
-	controller->version.minor = (regs->vs >> 8) & 0xff;
-	controller->version.tertiary = (regs->vs >> 0) & 0xff;
+	controller->regs = regs;
+	controller->version.major = (controller->regs->vs >> 16) & 0xffff;
+	controller->version.minor = (controller->regs->vs >> 8) & 0xff;
+	controller->version.tertiary = (controller->regs->vs >> 0) & 0xff;
 
 	print("DUFAY: NVME: version detected %d:%d:%d\n", controller->version.major,
 		controller->version.minor, controller->version.tertiary);
+
+	controller->page_size_max = 1 << (12 + (controller->regs->cap >> 52 & 0xf));
+	controller->page_size_min = 1 << (12 + (controller->regs->cap >> 48 & 0xf));
+
+	if(controller->regs->cc & (1 << 0)) controller->regs->cc &= ~(1 << 0);
+	for(; controller->regs->cc & (1 << 0););
+
+	if(pci_info->msix_capable) {
+		print("DUFAY: NVME: device is MSIX capable\n");
+	} else if(pci_info->msi_capable) {
+		print("DUFAY: NVME: device is MSI capable\n");
+	} else {
+		print("DUFAY: NVME: device is neither MSI or MSIX capable\n");
+		return -1;
+	}
+
+	controller->queue_entries = controller->regs->cap & 0xffff;
+	controller->strides = (controller->regs->cap >> 32) & 0xf;
 
 	return 0;
 }

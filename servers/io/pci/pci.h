@@ -2,6 +2,7 @@
 #define PCI_H_ 
 
 #include <fayt/pci.h>
+#include <fayt/bitmap.h>
 
 #include <stdint.h>
 #include <stddef.h>
@@ -38,6 +39,16 @@ struct pci_segment {
 
 struct pci_device {
 	struct pci_descriptor descriptor;
+
+	bool msi_capable;	
+	int msi_offset;
+
+	bool msix_capable;
+	int msix_offset;
+	struct pci_bar msix_bar;
+	int msix_bar_offset;
+	struct bitmap msix_bitmap;
+
 	volatile union pci_config *config;
 };
 

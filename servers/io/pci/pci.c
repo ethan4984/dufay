@@ -12,21 +12,42 @@
 struct hash_table device_tree;
 struct hash_table segment_tree;
 
-static int pci_device_spawn(struct pci_device*); 
 static int pci_device_bar(volatile union pci_config*, struct pci_bar*, int);
+static int pci_device_msi(struct pci_device*, int);
+static int pci_device_msix(struct pci_device*, int);
 
 static void nbar(struct notification_info*, void *data, int) {
 	struct pci_nbar *nbar = data;
-	if(nbar == NULL) { print("DUFAY: PCI: descriptor does not exist\n"); goto finish; }
+	if(nbar == NULL) { print("DUFAY: PCI: NBAR: is null\n"); goto finish; }
 
 	struct pci_device *device = NULL;
 	int ret = hash_table_search(&device_tree, &nbar->descriptor,
 		sizeof(struct pci_descriptor), (void**)&device);
-	if(ret == -1 || device == NULL) { print("DUFAY: PCI: can not find device\n"); goto finish; }
+	if(ret == -1 || device == NULL) { print("DUFAY: PCI: NBAR: can not find device\n"); goto finish; }
 
 	ret = pci_device_bar(device->config, &nbar->bar, 0);
 	if(ret == -1) { nbar->valid = false; goto finish; }
 	else nbar->valid = true;
+finish:
+	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
+}
+
+// IMPEMENT MSI/MSIX and PARSE CAPS LIST
+
+static void nmsi(struct notification_info*, void *data, int) {
+	struct pci_nmsi *nmsi = data;
+	if(nmsi == NULL) { print("DUFAY: PCI: NMSI: is null\n"); goto finish; }
+
+	struct pci_device *device = NULL;
+	int ret = hash_table_search(&device_tree, &nmsi->descriptor,
+		sizeof(struct pci_descriptor), (void**)&device);
+	if(ret == -1 || device == NULL) { print("DUFAY: PCI: NMSI: can not find device\n"); goto finish; }
+
+	if(nmsi->msix) ret = pci_device_msix(device, nmsi->irq_vector);
+	else ret = pci_device_msi(device, nmsi->irq_vector);
+
+	if(ret == -1) { nmsi->valid = false; goto finish; }
+	else nmsi->valid = true;
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -67,6 +88,52 @@ static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar
 	return 0;
 }
 
+#define BSP_APIC_ID 0x0
+
+static int pci_device_msi(struct pci_device *device, int vector) {
+	if(device == NULL) return -1;
+
+	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msi_offset + 2);
+
+	*(volatile uint32_t*)((uintptr_t)device->config +
+		device->msi_offset + 4) = (0xfee << 2) | (BSP_APIC_ID << 12);
+	*(volatile uint32_t*)((uintptr_t)device->config +
+		device->msi_offset + (message_control & (1 << 7) ? 8 : 12)) = vector;
+
+	message_control |= (1 << 0);
+	message_control &= ~(0b111 << 4);
+
+	*(volatile uint16_t*)((uintptr_t)device->config + device->msi_offset + 2) = message_control;
+
+	return 0;
+}
+
+static int pci_device_msix(struct pci_device *device, int vector) {
+	if(device == NULL) return -1;
+
+	int msix_vector_offset;
+	int ret = bitmap_alloc(&device->msix_bitmap, &msix_vector_offset);
+	if(ret == -1) return -1;
+
+	msix_vector_offset *= 16;
+
+	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+		msix_vector_offset) = (0xfee << 2) | (BSP_APIC_ID << 12);
+	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+		msix_vector_offset + 4) = 0;
+	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+		msix_vector_offset + 8) = vector;
+	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+		msix_vector_offset + 12) = 0;
+
+	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msix_offset + 2);
+	message_control |= (1 << 15);
+	message_control &= ~(1 << 14);
+	*(volatile uint16_t*)((uintptr_t)device->config + device->msix_offset + 2) = message_control;
+
+	return 0;
+}
+
 static int pci_device_spawn(struct pci_device *pci_device) {
 	if(pci_device == NULL) RETURN_ERROR;
 
@@ -76,14 +143,52 @@ static int pci_device_spawn(struct pci_device *pci_device) {
 		pci_device->config->device.vendor_id, pci_device->config->device.device_id
 	);
 
+	if(pci_device->config->device.status & (1 << 4)) {
+		int offset = pci_device->config->device.capabilities;
+
+		for(; offset;) {
+			int id = *((volatile uint8_t*)pci_device->config + offset);
+	
+			if(id == 0x5) {
+				pci_device->msi_capable = true;
+				pci_device->msi_offset = offset;
+			} else if(id == 0x11) {
+				pci_device->msix_capable = true;
+				pci_device->msix_offset = offset;
+
+				uint32_t table_ptr = *(volatile uint16_t*)((uintptr_t)pci_device->config +
+					pci_device->msix_offset + 4);
+
+				int bar_index = table_ptr & 0b111;
+
+				int ret = pci_device_bar(pci_device->config, &pci_device->msix_bar, bar_index);
+				if(ret == -1) { print("DUFAY: PCI: failed to locate MSIX bar\n"); continue; }
+
+				pci_device->msix_bar_offset = (table_ptr >> 3) << 3;
+				pci_device->msix_bitmap = (struct bitmap) {
+					.data = NULL,
+					.size = 2048,
+					.resizable = false
+				};
+			}
+
+			offset = *((volatile uint8_t*)pci_device->config + offset + 1);
+		}
+	}
+
 	switch(pci_device->config->device.class) {
 		case 1:
 			switch(pci_device->config->device.subclass) {
 				case 6: { // AHCI
 					break;
 				} case 8: { // NVME
+					struct pci_info pci_info = {
+						.descriptor = pci_device->descriptor,
+						.msi_capable = pci_device->msi_capable,
+						.msix_capable = pci_device->msix_capable
+					};
 					struct syscall_response syscall_response = SYSCALL4(SYSCALL_SERVER_ACTIVATE, "IO",
-						"nvme", &pci_device->descriptor, sizeof(struct pci_descriptor)); 
+						"nvme", &pci_info, sizeof(struct pci_info)); 
 					if(syscall_response.ret == -1) RETURN_ERROR;
 					break;
 				}
@@ -102,10 +207,15 @@ int pci(struct mcfg *mcfg) {
 	}
 
 	struct notification_action bar_action = { .handler = nbar };
+	struct notification_action msi_action = { .handler = nmsi };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
 		NOT_PCI_BAR, &bar_action, NULL);
-	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NOTIFY_BAR\n"); return -1; }
+	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NBAR\n"); return -1; }
+
+	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
+		NOT_PCI_MSI, &msi_action, NULL);
+	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NMSI\n"); return -1; }
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
 	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }

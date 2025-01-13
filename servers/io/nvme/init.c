@@ -3,6 +3,8 @@
 #include <fayt/debug.h>
 #include <fayt/portal.h>
 #include <fayt/stream.h>
+#include <fayt/notification.h>
+#include <fayt/string.h>
 #include <fayt/slab.h>
 #include <fayt/rb_tree.h>
 #include <fayt/pci.h>
@@ -12,7 +14,7 @@
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(struct pci_descriptor *pci_descriptor) {
+int main(struct pci_info *pci_info) {
 	print("DUFAY: NVME: booting nvme server\n"); // TODO launch distinct server for each discrete controller
 
 	struct slab_pool pool = {
@@ -44,7 +46,50 @@ int main(struct pci_descriptor *pci_descriptor) {
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	int ret = nvme(pci_descriptor);
+	struct comm_bridge bridge = {
+		.not = NOT_PCI_BAR,
+		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+		.namespace = "IO",
+		.destination = "pci"
+	};
+
+	bridge.data.limit = sizeof(struct pci_nbar);
+	uintptr_t vaddr;
+	int ret = as_allocate(&address_space, &vaddr,
+		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE) * PAGE_SIZE);
+	if(ret == -1) return -1;
+	bridge.data.base = (void*)vaddr;
+
+	struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
+	if(response.ret == -1) return -1;
+
+	struct pci_nbar *nbar = (void*)vaddr;
+	nbar->descriptor = pci_info->descriptor;
+	nbar->bar_index = NVME_PCI_BAR;
+
+	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
+	if(response.ret == -1) return -1;
+
+	uintptr_t addr;
+	ret = as_address(&address_space, &addr, nbar->bar.limit);
+	if(ret == -1) RETURN_ERROR;
+
+	struct portal_req portal_req = {
+		.type = PORTAL_REQ_DIRECT,
+		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+		.length = sizeof(struct portal_req),
+		.morphology = {
+			.addr = addr, .length = nbar->bar.limit,
+			.paddr = nbar->bar.base, .pcnt = DIV_ROUNDUP(nbar->bar.limit, PAGE_SIZE)
+		}
+	};
+
+	struct portal_resp portal_resp;
+	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
+	if(syscall_response.ret == -1 || portal_resp.base != addr ||
+		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
+
+	ret = nvme(pci_info, (volatile struct nvme_regs*)addr);
 	if(ret == -1) { print("DUFAY: NVME: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

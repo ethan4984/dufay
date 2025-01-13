@@ -234,6 +234,6 @@ struct [[gnu::packed]] nvme_ns_id {
     uint8_t vs[3712];
 };
 
-int nvme(struct pci_descriptor*);
+int nvme(struct pci_info*, volatile struct nvme_regs*);
 
 #endif
