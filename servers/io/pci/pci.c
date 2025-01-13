@@ -166,7 +166,7 @@ static int pci_device_spawn(struct pci_device *pci_device) {
 
 				pci_device->msix_bar_offset = (table_ptr >> 3) << 3;
 				pci_device->msix_bitmap = (struct bitmap) {
-					.data = NULL,
+					.data = alloc(2048 / 8),
 					.size = 2048,
 					.resizable = false
 				};

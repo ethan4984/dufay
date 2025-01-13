@@ -6,8 +6,33 @@
 #include <fayt/syscall.h>
 #include <fayt/notification.h>
 #include <fayt/pci.h>
+#include <fayt/bitmap.h>
 
 #include <nvme.h>
+
+struct nvme_controller;
+
+struct nvme_queue_pair {
+    int qid;
+    int entry_cnt;
+    int sq_head;
+	int sq_tail;
+    int cq_head;
+    int cq_tail;
+    bool phase;
+    int vector;
+    int irq;
+    bool admin;
+
+	struct nvme_controller *controller;
+
+    volatile struct nvme_command *submission_queue;
+    volatile struct nvme_completion *completion_queue;
+    volatile uint32_t *submission_doorbell;
+    volatile uint32_t *completion_doorbell;
+
+	struct bitmap cid_bitmap;
+};
 
 struct nvme_controller {
 	volatile struct nvme_regs *regs;
@@ -26,6 +51,8 @@ struct nvme_controller {
 	int max_transfer_shift;
 	int max_prps;
 	int strides;
+
+	struct nvme_queue_pair *admin_queue;
 };
 
 int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
@@ -47,14 +74,30 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	if(controller->regs->cc & (1 << 0)) controller->regs->cc &= ~(1 << 0);
 	for(; controller->regs->cc & (1 << 0););
 
+	struct pci_nmsi nmsi = {
+		.descriptor = pci_info->descriptor,
+		.irq_vector = pci_info->irq_vector
+	};
+
 	if(pci_info->msix_capable) {
 		print("DUFAY: NVME: device is MSIX capable\n");
+		nmsi.msix = true;
 	} else if(pci_info->msi_capable) {
 		print("DUFAY: NVME: device is MSI capable\n");
+		nmsi.msix = false;
 	} else {
 		print("DUFAY: NVME: device is neither MSI or MSIX capable\n");
 		return -1;
 	}
+
+	struct comm_bridge bridge = {
+		.not = NOT_PCI_MSI, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+		.namespace = "IO", .destination = "pci",
+		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
+	};
+
+	int ret = notify(&bridge);
+	if(ret == -1) return -1;
 
 	controller->queue_entries = controller->regs->cap & 0xffff;
 	controller->strides = (controller->regs->cap >> 32) & 0xf;

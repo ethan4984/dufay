@@ -38,9 +38,9 @@ constexpr size_t nvme_op_abort = 0x8;
 constexpr size_t nvme_op_set_features = 0x9;
 constexpr size_t nvme_op_get_features = 0xa;
 constexpr size_t nvme_op_ns_management = 0xd;
-constexpr size_t nvme_op_format_cmd = 0x80;
+constexpr size_t nvme_op_format_command = 0x80;
 
-struct [[gnu::packed]] nvme_cmd_create_cq {
+struct [[gnu::packed]] nvme_command_create_cq {
     uint32_t rsvd1[5];
     uint64_t prp1;
     uint64_t rsvd8;
@@ -51,7 +51,7 @@ struct [[gnu::packed]] nvme_cmd_create_cq {
     uint32_t rsvd12[4];
 };
 
-struct [[gnu::packed]] nvme_cmd_create_sq {
+struct [[gnu::packed]] nvme_command_create_sq {
     uint32_t rsvd1[5];
     uint64_t prp1;
     uint64_t rsvd8;
@@ -62,21 +62,21 @@ struct [[gnu::packed]] nvme_cmd_create_sq {
     uint32_t rsvd12[4];
 };
 
-struct [[gnu::packed]] nvme_cmd_delete_queue {
+struct [[gnu::packed]] nvme_command_delete_queue {
     uint32_t rsvd1[9];
     uint16_t qid;
     uint16_t rsvd10;
     uint32_t rsvd11[5];
 };
 
-struct [[gnu::packed]] nvme_cmd_abort {
+struct [[gnu::packed]] nvme_command_abort {
     uint32_t rsvd1[9];
     uint16_t sqid;
     uint16_t cid;
     uint32_t rsvd11[5];
 };
 
-struct [[gnu::packed]] nvme_cmd_features {
+struct [[gnu::packed]] nvme_command_features {
     uint32_t nsid;
     uint64_t rsvd2[2];
     uint64_t prp1;
@@ -86,7 +86,7 @@ struct [[gnu::packed]] nvme_cmd_features {
     uint32_t rsvd12[4];
 };
 
-struct [[gnu::packed]] nvme_cmd_identify {
+struct [[gnu::packed]] nvme_command_identify {
     uint32_t nsid;
     uint64_t rsvd2[2];
     uint64_t prp1;
@@ -95,7 +95,7 @@ struct [[gnu::packed]] nvme_cmd_identify {
     uint32_t rsvd11[5];
 };
 
-struct [[gnu::packed]] nvme_cmd_rw {
+struct [[gnu::packed]] nvme_command_rw {
     uint32_t nsid;
     uint64_t rsvd2;
     uint64_t metadata;
@@ -110,19 +110,19 @@ struct [[gnu::packed]] nvme_cmd_rw {
     uint16_t appmask;
 };
 
-struct [[gnu::packed]] cmd {
+struct [[gnu::packed]] nvme_command {
     uint8_t opcode;
     uint8_t flags;
     uint16_t cid;
 
     union {
-        struct nvme_cmd_create_cq create_cq;
-        struct nvme_cmd_create_sq create_sq;
-        struct nvme_cmd_delete_queue delete_queue;
-        struct nvme_cmd_abort abort;
-        struct nvme_cmd_features features;
-        struct nvme_cmd_identify identify;
-        struct nvme_cmd_rw rw;
+        struct nvme_command_create_cq create_cq;
+        struct nvme_command_create_sq create_sq;
+        struct nvme_command_delete_queue delete_queue;
+        struct nvme_command_abort abort;
+        struct nvme_command_features features;
+        struct nvme_command_identify identify;
+        struct nvme_command_rw rw;
     };
 };
 
