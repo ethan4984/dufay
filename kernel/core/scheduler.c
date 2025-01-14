@@ -137,7 +137,7 @@ find_ucontext:
 		}
 
 		for(; ucontext;) {
-			if(!ucontext->common.blocked) break;
+			if(!ucontext->blocking) break;
 			ucontext = ucontext->last;
 		}
 

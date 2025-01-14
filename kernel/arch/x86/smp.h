@@ -26,7 +26,7 @@ struct cpu_local {
 	void (*fpu_rstor)(void*);
 
 	int apic_id;
-} __attribute__((packed));
+};
 
 void boot_aps(void);
 

@@ -2,6 +2,9 @@
 #define SCHEDULE_H_
 
 #include <arch/x86/cpu.h>
+
+#include <core/events.h>
+
 #include <fayt/vector.h>
 #include <fayt/lock.h>
 #include <fayt/sched.h>
@@ -57,7 +60,8 @@ struct ucontext {
 	struct registers regs;
 	void *fpu_context;
 
-	struct sched_common common;
+	struct etrigger *etrigger;
+	int blocking;
 
 	struct {
 		uintptr_t user_stack;

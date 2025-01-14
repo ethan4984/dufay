@@ -232,8 +232,8 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge*, bridge, {
 	}
 	if(bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) {
 		yield();
-		//context->common.blocked = 1;
-		//for(;context->common.blocked;) yield();
+		//context->blocking = true;
+		//for(;context->blocking;) yield();
 	}
 })
 
@@ -429,8 +429,8 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct ucontext *ucontext = context->ucontext_active;
 	if(ucontext == NULL) { print("DUFAY: ucontext is null (should not be)"); return -1; }
 
-	ucontext->common.blocked = 1;
-	for(; ucontext->common.blocked;) yield();
+	ucontext->blocking = true;
+	for(; ucontext->blocking;) yield();
 })
 
 SYSCALL_DEFINE0(notification_unmute, {
