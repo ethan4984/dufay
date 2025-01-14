@@ -19,105 +19,112 @@ static struct sched_descriptor *sched_desc;
 static struct portal_link *sched_meta;
 
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
-	struct sched_queue_config *config = data;
-	if(config == NULL) { print("DUFAY: SCHEDULER: config does not exist\n"); goto finish; }
+	struct sched_queue_config_set *config_set = data;
+	if(config_set == NULL) { print("DUFAY: SCHED: config set is null\n"); goto finish; }
 
-	if(config->offload) {
-		struct sched_descriptor *optimal_sched = sched_desc;
+	for(int i = 0; i < config_set->cnt; i++) {
+		struct sched_queue_config *config = config_set->config + i;
 
-		int ret = OPERATE_LINK(sched_meta, LINK_RAW, 
-			({
-				for(size_t i = 0; i < sched_meta->data_limit / sizeof(struct sched_descriptor); i++) {
-					struct sched_descriptor *desc = (struct sched_descriptor*)sched_meta->data + i;
+		if(config->offload) {
+			struct sched_descriptor *optimal_sched = sched_desc;
 
-					if(unlikely(optimal_sched == NULL)) optimal_sched = desc;
-					else if(desc->load > optimal_sched->load) optimal_sched = desc;
-				}
-				0;
-			})
-		);
+			int ret = OPERATE_LINK(sched_meta, LINK_RAW, 
+				({
+					for(size_t i = 0; i < sched_meta->data_limit / sizeof(struct sched_descriptor); i++) {
+						struct sched_descriptor *desc = (struct sched_descriptor*)sched_meta->data + i;
 
-		if(ret == -1) {
-			print("DUFAY: SCHEDULER: Critical failure to enqueue thread\n");
-			goto finish;
+						if(unlikely(optimal_sched == NULL)) optimal_sched = desc;
+						else if(desc->load > optimal_sched->load) optimal_sched = desc;
+					}
+					0;
+				})
+			);
+
+			if(ret == -1) {
+				print("DUFAY: SCHED: Critical failure to enqueue thread\n");
+				goto finish;
+			}
+
+			if(optimal_sched == sched_desc) goto exit;
+
+			struct comm_bridge bridge = {
+				.not = NOT_SCHED_ENQUEUE,
+				.cid = optimal_sched->cid,
+				.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+				.namespace = NULL,
+				.destination = NULL
+			};
+
+			bridge.data.limit = sizeof(struct sched_queue_config);
+			uintptr_t vaddr;
+			ret = as_allocate(&address_space, &vaddr,
+				DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
+			bridge.data.base = (void*)vaddr;
+			if(ret == -1) {
+				print("DUFAY: SCHED: failed address allocation unable to offload thread to other core\n");
+				continue;
+			} 
+
+			struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
+			if(response.ret == -1) {
+				print("DUFAY: SCHED: NOTIFICAITON BUILD FAILURE: unable to offload thread to other core\n");
+				continue;
+			}
+
+			config->offload = 0;
+			memcpy(bridge.data.base, config, bridge.data.limit);
+
+			response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
+			if(response.ret == -1) {
+				print("DUFAY: SCHED: NOTIFICATION BROADCAST FAILURE: unable to offload thread to other core\n");
+				goto finish;
+			} else continue;
 		}
-
-		if(optimal_sched == sched_desc) goto exit;
-
-		struct comm_bridge bridge = {
-			.not = NOT_SCHED_ENQUEUE,
-			.cid = optimal_sched->cid,
-			.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-			.namespace = NULL,
-			.destination = NULL
-		};
-
-		bridge.data.limit = sizeof(struct sched_queue_config);
-		uintptr_t vaddr;
-		ret = as_allocate(&address_space, &vaddr,
-			DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
-		bridge.data.base = (void*)vaddr;
-		if(ret == -1) {
-			print("DUFAY: SCHEDULER: failed address allocation unable to offload thread to other core\n");
-			goto finish;
-		} 
-
-		struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
-		if(response.ret == -1) {
-			print("DUFAY: SCHEDULER: NOTIFICAITON BUILD FAILURE: unable to offload thread to other core\n");
-			goto finish;
-		}
-
-		config->offload = 0;
-		memcpy(bridge.data.base, config, bridge.data.limit);
-
-		response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
-		if(response.ret == -1) {
-			print("DUFAY: SCHEDULER: NOTIFICATION BROADCAST FAILURE: unable to offload thread to other core\n");
-			goto finish;
-		} else goto finish;
-	}
 exit:
-	struct thread *thread = alloc(sizeof(struct thread));
-	if(thread == NULL) { }
-	
-	void *private;
-	struct syscall_response response = SYSCALL2(SYSCALL_CONTEXT, config->cid, &private);
-	if(response.ret == -1) {
-		print("DUFAY: SCHEDULER: Unable to get context private address\n");
-		goto finish; 
+		struct thread *thread = alloc(sizeof(struct thread));
+		if(thread == NULL) { }
+		
+		void *private;
+		struct syscall_response response = SYSCALL2(SYSCALL_CONTEXT, config->cid, &private);
+		if(response.ret == -1) {
+			print("DUFAY: SCHED: Unable to get context private address\n");
+			continue;
+		}
+
+		thread->cid = config->cid;
+		thread->cgroup = config->cgroup;
+		thread->weight = weight_set_nice(config->nice);
+		thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
+		thread->private = private;
+
+		int ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
+		if(ret == -1) {
+			print("DUFAY: SCHED: Unable to insert on thread tree\n");
+			continue;
+		}
 	}
-
-	thread->cid = config->cid;
-	thread->cgroup = config->cgroup;
-	thread->weight = weight_set_nice(config->nice);
-	thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
-	thread->private = private;
-
-	int ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
-	if(ret == -1) {
-		print("DUFAY: SCHEDULER: Unable to insert on thread tree\n");
-		goto finish; 
-	}
-
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 
 static void notify_dequeue_thread(struct notification_info *, void *data, int) {
-	struct sched_queue_config *config = data;
-	if(config == NULL) goto finish;
+	struct sched_queue_config_set *config_set = data;
+	if(config_set == NULL) goto finish;
 
-	struct thread *thread;
-	int ret = hash_table_search(&thread_table, &config->cid, sizeof(config->cid), (void**)&thread);
-	if(ret == -1 || thread == NULL) goto finish;
+	for(int i = 0; i < config_set->cnt; i++) {
+		struct sched_queue_config *config = config_set->config + i;
 
-	ret = RB_GENERIC_DELETE(thread_tree, vruntime, thread); 
-	if(ret == -1) goto finish;
+		struct thread *thread;
+		int ret = hash_table_search(&thread_table, &config->cid, sizeof(config->cid), (void**)&thread);
+		if(ret == -1 || thread == NULL) continue; 
 
-	struct time epoch = sched_desc->timer.read(&sched_desc->timer);
-	struct time delta = time_sub(epoch, thread->epoch);
-	thread->vruntime -= VRUNTIME(thread->weight, time_to_ns(delta));
+		ret = RB_GENERIC_DELETE(thread_tree, vruntime, thread); 
+		if(ret == -1) continue;
+
+		struct time epoch = sched_desc->timer.read(&sched_desc->timer);
+		struct time delta = time_sub(epoch, thread->epoch);
+		thread->vruntime -= VRUNTIME(thread->weight, time_to_ns(delta));
+	}
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -142,16 +149,16 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
 		NOT_SCHED_ENQUEUE, &enqueue_action, NULL);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
+	if(response.ret == -1) { print("DUFAY: SCHED: Failure to set notification\n"); return -1; }
 
 	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, NOT_SCHED_DEQUEUE, &dequeue_action, NULL);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failure to set notification\n"); return -1; }
+	if(response.ret == -1) { print("DUFAY: SCHED: Failure to set notification\n"); return -1; }
 
-	print("DUFAY: SCHEDULER: Initialised enqueue and dequeue notifications\n");
+	print("DUFAY: SCHED: Initialised enqueue and dequeue notifications\n");
 
 	uintptr_t addr;
 	int ret = as_allocate(&address_space, &addr, 0x10000);
-	if(ret == -1) { print("DUFAY: SCHEDULER: Failed to allocate address\n"); }
+	if(ret == -1) { print("DUFAY: SCHED: Failed to allocate address\n"); }
 
 	struct portal_resp portal_resp;
 	struct portal_req portal_req = {
@@ -170,15 +177,15 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	};
 
 	response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to establish link\n"); }
+	if(response.ret == -1) { print("DUFAY: SCHED: Failed to establish link\n"); }
 
 	sched_meta = (void*)portal_resp.base;
 	sched_desc = desc;
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }
+	if(response.ret == -1) { print("DUFAY: SCHED: Failed to activate notification queue\n"); return -1; }
 
-	print("DUFAY: SCHEDULER: Enabled notifiactions\n");
+	print("DUFAY: SCHED: Enabled notifiactions\n");
 
 	for(;;) {
 		SYSCALL0(SYSCALL_SCHED_ACQUIRE);
@@ -208,7 +215,7 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 			epoch = time_add(epoch, desc->slice);
 
 			if(ret == -1) {
-				print("DUFAY: SCHEDULER: Failued to push onto the share queue\n");
+				print("DUFAY: SCHED: Failued to push onto the share queue\n");
 				return -1;
 			}
 		}

@@ -4,6 +4,7 @@
 #include <arch/x86/cpu.h>
 
 #include <core/events.h>
+#include <core/server.h>
 
 #include <fayt/vector.h>
 #include <fayt/lock.h>
@@ -54,6 +55,7 @@ finish: \
 	ret; \
 })
 
+struct context;
 struct ucontext {
 	struct ustack *stack;
 
@@ -71,6 +73,8 @@ struct ucontext {
 	struct notification *notification;
 	int ready;
 	int delivered;
+
+	struct context *context;
 
 	struct ucontext *next; 
 	struct ucontext *last;
@@ -126,5 +130,7 @@ void reschedule(struct registers*, void*);
 int create_blank_context(struct context*);
 int destroy_ucontext(struct context*, struct ucontext*);
 int sched_establish_shared_link(struct context*, struct cpu_local*, const char*);
+int sched_dequeue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
+int sched_enqueue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
 
 #endif

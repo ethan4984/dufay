@@ -38,23 +38,6 @@ struct thread {
 	RB_META(struct thread);
 };
 
-struct sched_descriptor {
-	struct timer timer;
-	int processor_id;
-	int queue_default_refill;
-	int load;
-	int cid;
-	struct time slice;
-};
-
-struct sched_queue_config {
-	int cid;
-	int cgroup;
-	int nice;
-	int offload;
-	int phantom_runtime;
-};
-
 static inline uint64_t weight_set_nice(int nice) {
 	if(nice < NICE_MIN) nice = NICE_MIN;
 	if(nice > NICE_MAX) nice = NICE_MAX;

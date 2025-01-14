@@ -100,19 +100,19 @@ int spawn_server(const char *namespace, const char *identifier) {
 	struct server *server = find_server(namespace, identifier);
 	if(server == NULL) RETURN_ERROR;
 
-	struct sched_queue_config *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
+		sizeof(struct sched_queue_config));
 
-	config->cid = server->context->comms.cid;
-	config->cgroup = 0;
-	config->nice = 0;
-	config->offload = 0;
+	queue_set->cnt = 1;
+	*queue_set->config = (struct sched_queue_config) {
+		.cid = server->context->comms.cid
+	};
 
-	int ret = notification_queue(server->context, master_scheduler->context,
-		NOT_SCHED_ENQUEUE, NOTIFY_WEIGHT_TICK, 1, 0, (uint64_t)config - HIGH_VMA, 1);
-	if(ret == -1) {
-		print("dufay: failed to send scheduling notification on [%s][%s]\n", namespace, identifier);
-		RETURN_ERROR;
-	}
+	int ret = sched_enqueue_context(master_scheduler, 
+		server->context, queue_set, NOTIFY_WEIGHT_TICK);
+	if(ret == -1) RETURN_ERROR;
+
+	free(queue_set);
 
 	return 0;
 }

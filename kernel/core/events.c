@@ -23,21 +23,18 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
 	spinlock_irqsave(&equeue->lock);
 
 	VECTOR_PUSH(equeue->ucontext, ucontext);
+	
+	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
+		sizeof(struct sched_queue_config));
 
-	{
-		struct sched_queue_config *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+	queue_set->cnt = 1;
+	*queue_set->config = (struct sched_queue_config) {
+		.cid = context->comms.cid
+	};
 
-		config->cid = context->comms.cid;
-		config->cgroup = 0;
-		config->nice = 0;
-		config->offload = 0;
-
-		int ret = notification_queue(context, CORE_LOCAL->scheduling_server->context,
-			NOT_SCHED_DEQUEUE, NOTIFY_WEIGHT_INSTANTANEOUS, 1, 0, (uint64_t)config - HIGH_VMA, 1);
-		if(ret == -1) RETURN_ERROR;
-
-		pmm_free((uintptr_t)config - HIGH_VMA, 1);
-	}
+	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
+		queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
+	if(ret == -1) RETURN_ERROR;
 
 	spinrelease_irqsave(&equeue->lock);
 
@@ -56,6 +53,8 @@ int equeue_arise(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 
 	spinlock_irqsave(&etrigger->lock);
 
+	VECTOR(struct context*) context_unblocked;
+
 	for(int i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
 		if(equeue == NULL) continue;
@@ -68,12 +67,30 @@ int equeue_arise(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 
 			ucontext->etrigger = etrigger;
 			ucontext->blocking = false;
+
+			VECTOR_PUSH(context_unblocked, ucontext->context);
 		}
 
 		VECTOR_CLEAR(equeue->ucontext);
 
 		spinrelease_irqsave(&equeue->lock);
 	}
+
+	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
+		context_unblocked.length * sizeof(struct sched_queue_config));
+
+	queue_set->cnt = context_unblocked.length;
+	for(int i = 0; i < queue_set->cnt; i++) {
+		queue_set->config[i] = (struct sched_queue_config) {
+			.cid = context_unblocked.data[i]->comms.cid
+		};
+	}
+
+	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_server, 
+		CORE_LOCAL->current_context, queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
+	if(ret == -1) RETURN_ERROR;
+
+	VECTOR_CLEAR(context_unblocked);
 
 	spinrelease_irqsave(&etrigger->lock);
 
@@ -84,8 +101,10 @@ int equeue_add(struct equeue *equeue, struct etrigger *trigger) {
 	if(equeue == NULL || trigger == NULL) RETURN_ERROR;
 
 	spinlock_irqsave(&trigger->lock);
+
 	VECTOR_PUSH(trigger->equeue, equeue);
 	trigger->refcnt++;
+
 	spinrelease_irqsave(&trigger->lock);
 
 	return 0;

@@ -67,22 +67,6 @@ struct server_env {
 	const char *name;
 };
 
-struct sched_descriptor {
-	struct timer timer;
-	int processor_id;
-	int queue_default_refill;
-	int load;
-	int cid;
-	struct time slice;
-};
-
-struct sched_queue_config {
-	int cid;
-	int cgroup;
-	int nice;
-	int offload;
-};
-
 extern struct server *master_scheduler;
 
 int launch_servers(void);

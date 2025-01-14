@@ -235,8 +235,40 @@ void reschedule(struct registers *regs, void*) {
 	);
 }
 
+int sched_dequeue_context(struct server *scheduling_server, struct context *context, struct sched_queue_config_set *config_set,int weight) {
+	if(scheduling_server == NULL || context == NULL || config_set == NULL) RETURN_ERROR; 
+
+	struct sched_queue_config_set *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+	memcpy(config, config_set, sizeof(struct sched_queue_config_set) +
+		config_set->cnt * sizeof(struct sched_queue_config));
+
+	int ret = notification_queue(context, scheduling_server->context,
+		NOT_SCHED_DEQUEUE, weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+	if(ret == -1) RETURN_ERROR;
+
+	pmm_free((uintptr_t)config - HIGH_VMA, 1);
+
+	return 0;
+}
+
+int sched_enqueue_context(struct server *scheduling_server, struct context *context, struct sched_queue_config_set *config_set, int weight) {
+	if(scheduling_server == NULL || context == NULL || config_set == NULL) RETURN_ERROR;
+
+	struct sched_queue_config_set *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
+	memcpy(config, config_set, sizeof(struct sched_queue_config_set) +
+		config_set->cnt * sizeof(struct sched_queue_config));
+
+	int ret = notification_queue(context, scheduling_server->context,
+		NOT_SCHED_ENQUEUE, weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+	if(ret == -1) RETURN_ERROR;
+
+	pmm_free((uintptr_t)config - HIGH_VMA, 1);
+
+	return 0;
+}
+
 SYSCALL_DEFINE0(yield, {
-	__asm__ volatile ("int $32");
+	yield();
 })
 
 SYSCALL_DEFINE0(sched_acquire, {
