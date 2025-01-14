@@ -94,57 +94,76 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	return 0;
 }
 
-SYSCALL_DEFINE0(yield, {
-	__asm__ volatile ("int $32");
-})
+// FIND CONTEXT BY EITHER POPPING OFF THE DELIVERY STACK, OR BY POPPING OFF THE QUEUE, IF NONE EXISTS
+// RESCHEDULE TO THE SCHEDULING SERVER TO REFILL THE QUEUE.
+//
+// FOR A GIVEN CONTEXT, THE ACTIVE UCONTEXT IS ASSUMED UCONTEXT_TOP, BUT IF UCONTEXT_TOP IS BLKOCKED
+// ITERATE DONW THE LIST UNTIL YOU FIND ONE THAT IS NOT, IF YOU CANT (ALL UCONTEXTS ARE CURRENTLY BOCKED)
+// FIND ANOTHER CONTEXT AND REPEAT
 
-SYSCALL_DEFINE0(sched_acquire, {
-	spinlock(&CORE_LOCAL->sched_lock);
-})
+static int fetch_context(struct context **context, struct ucontext **ucontext) {
+	struct context *next_context = NULL;
 
-SYSCALL_DEFINE0(sched_release, {
-	spinrelease(&CORE_LOCAL->sched_lock);
-})
+	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
+	if(ret == 0) { goto find_ucontext; }
+find_context:
+	bool found = false;
+	found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
+		({
+			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
+				CORE_LOCAL->thread_queue_link->data_offset, &next_context);
+		})
+	);
+	
+	if(found) goto find_ucontext;
+
+	struct server *scheduling_server = CORE_LOCAL->scheduling_server;
+	if(scheduling_server == NULL) panic("DUFAY: SCHEDULING SERVER DOWN");
+
+	next_context = scheduling_server->context;
+	if(next_context == NULL) panic("DUFAY: SCHEDULING SERVER DOWN");
+find_ucontext:
+	notification_dispatch(next_context);
+
+	struct ucontext *next_ucontext = ({
+		struct ucontext *ucontext = next_context->ucontext_top;
+
+		struct notification_queue *nqueue = next_context->notification.queue;
+		if(nqueue && nqueue->active == 0) {
+			for(; ucontext;) {
+				if(ucontext->notification == NULL) break;
+				ucontext = ucontext->last;
+			}
+		}
+
+		for(; ucontext;) {
+			if(!ucontext->common.blocked) break;
+			ucontext = ucontext->last;
+		}
+
+		if(ucontext == NULL) {
+			if(found) goto find_context;
+			panic("DUFAY: SCHEDULER SERVER DOWN");
+		}
+
+		ucontext;
+	});
+
+	*context = next_context;
+	*ucontext = next_ucontext;
+
+	return 0;
+}
 
 void reschedule(struct registers *regs, void*) {
 	if(__atomic_test_and_set(&CORE_LOCAL->sched_lock.lock, __ATOMIC_ACQUIRE)) return; 
 
-	struct context *next_context;
-
-	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
-	if(ret == 0) { goto finish; }
-
-	bool found;		
-	for(;;) {
-		found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
-			({
-				circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
-					CORE_LOCAL->thread_queue_link->data_offset, &next_context);
-			})
-		);
-		
-		if(found && next_context->common.blocked) continue;
-		break;
-	}
-
-	if(found == false) {
-		struct server *scheduling_server = CORE_LOCAL->scheduling_server;
-		if(scheduling_server == NULL) {
-			spinrelease(&CORE_LOCAL->sched_lock);
-			return;
-		}
-
-		next_context = scheduling_server->context;
-
-		if(next_context == NULL) {
-			spinrelease(&CORE_LOCAL->sched_lock);
-			return;
-		}
-	}
-
-finish:
 	struct context *current_context = CORE_LOCAL->current_context;
-	notification_dispatch(next_context);
+
+	struct context *next_context = NULL;
+	struct ucontext *next_ucontext = NULL;
+
+	fetch_context(&next_context, &next_ucontext);
 
 	void **fpu_context;
 	struct registers *r;
@@ -165,36 +184,18 @@ finish:
 		current_context->user_gs_base = get_user_gs();
 	}
 
-	struct ucontext *ucontext = ({
-		struct ucontext *ucontext = next_context->ucontext_top;
+	next_context->ucontext_active = next_ucontext;
+	CORE_LOCAL->kernel_stack = next_ucontext->stack->kernel_stack.sp;
 
-		struct notification_queue *nqueue = next_context->notification.queue;
-		if(nqueue == NULL) goto end;
-		if(nqueue->active == 0) {
-			for(; ucontext;) {
-				if(ucontext->notification == NULL) break;
-				ucontext = ucontext->last;
-			}
-
-			if(ucontext == NULL) { panic("dufay: ucontext null\n"); }
-			else goto end;
-		}
-end:
-		ucontext;
-	});
-
-	next_context->ucontext_active = ucontext;
-	CORE_LOCAL->kernel_stack = ucontext->stack->kernel_stack.sp;
-
-	fpu_context = &ucontext->fpu_context;
-	r = &ucontext->regs;
+	fpu_context = &next_ucontext->fpu_context;
+	r = &next_ucontext->regs;
 
 	x86_swap_tables(next_context->page_table);
 
 	CORE_LOCAL->fpu_rstor(*fpu_context);
 
-	CORE_LOCAL->user_stack = ucontext->sysctx.user_stack;
-	CORE_LOCAL->error = ucontext->sysctx.user_stack;
+	CORE_LOCAL->user_stack = next_ucontext->sysctx.user_stack;
+	CORE_LOCAL->error = next_ucontext->sysctx.user_stack;
 
 	set_user_fs(next_context->user_fs_base);
 	set_user_gs(next_context->user_gs_base);
@@ -203,7 +204,7 @@ end:
 
 	//print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
 
-	if(ucontext->notification) ucontext->delivered = 1;
+	if(next_ucontext->notification) next_ucontext->delivered = 1;
 
 	xapic_write(XAPIC_EOI_OFF, 0);
 
@@ -233,3 +234,15 @@ end:
 		:: "r" (r)
 	);
 }
+
+SYSCALL_DEFINE0(yield, {
+	__asm__ volatile ("int $32");
+})
+
+SYSCALL_DEFINE0(sched_acquire, {
+	spinlock(&CORE_LOCAL->sched_lock);
+})
+
+SYSCALL_DEFINE0(sched_release, {
+	spinrelease(&CORE_LOCAL->sched_lock);
+})

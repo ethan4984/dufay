@@ -3,7 +3,7 @@ KERNEL := dufay.elf
 CC ?= gcc
 LD ?= ld
 
-CFLAGS ?= -Wall -Wextra -Ofast -pipe -fsanitize=undefined -Wno-unused -DDUFAY
+CFLAGS ?= -Wall -Wextra -O0 -pipe -fsanitize=undefined -Wno-unused -DDUFAY
 LDFLAGS ?=
 
 INTERNALLDFLAGS :=		 \

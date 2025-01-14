@@ -66,7 +66,7 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 
 		struct server *server = find_server(namespace, bridge->destination);
 		if(server == NULL || server->context == NULL) RETURN_ERROR;
-	
+
 		*dest = server->context;
 	} else {
 		int ret = SEARCH_CONTEXT(bridge->cid, dest);
@@ -230,7 +230,11 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge*, bridge, {
 	if(bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS || bridge->weight & NOTIFY_WEIGHT_TICK) {
 		VECTOR_PUSH(CORE_LOCAL->delivery_stack, destination);
 	}
-	if(bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) yield();
+	if(bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) {
+		yield();
+		//context->common.blocked = 1;
+		//for(;context->common.blocked;) yield();
+	}
 })
 
 int notification_dispatch(struct context *context) {
@@ -406,6 +410,8 @@ finish:
 	);
 })
 
+// we need a way to destroy notifications
+
 SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct context *context = CORE_LOCAL->current_context;
 	struct context *destination;
@@ -420,8 +426,11 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct notification *notification = queue->queue[NOTIFICATION_INDEX(bridge->not)][bridge->lnkidx];
 	if(notification == NULL) return -1;
 
-	context->common.blocked = 1;
-	for(;context->common.blocked;) yield();
+	struct ucontext *ucontext = context->ucontext_active;
+	if(ucontext == NULL) { print("DUFAY: ucontext is null (should not be)"); return -1; }
+
+	ucontext->common.blocked = 1;
+	for(; ucontext->common.blocked;) yield();
 })
 
 SYSCALL_DEFINE0(notification_unmute, {

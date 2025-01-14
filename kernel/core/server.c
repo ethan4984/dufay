@@ -79,6 +79,8 @@ int create_namespace(const char *name) {
 }
 
 struct server *find_server(const char *namespace_name, const char *server_name) {
+	if(namespace_name == NULL || server_name == NULL) return NULL;
+
 	struct namespace *namespace = NULL;
 	int ret = hash_table_search(&namespace_table, (void*)namespace_name,
 		strlen(namespace_name), (void**)&namespace);
