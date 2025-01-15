@@ -2,11 +2,11 @@
 #define NOTIFICATION_H_
 
 #include <core/scheduler.h>
+#include <core/events.h>
 
 #include <fayt/lock.h>
 #include <fayt/notification.h>
-
-#include <stdbool.h>
+#include <fayt/vector.h>
 
 #define NOTIFICATION_MAX 32
 #define NOTIFICATION_MASK(NOT) (1ull << ((NOT) - 1))
@@ -20,6 +20,7 @@ struct notification_parameter {
 	int share;
 };
 
+struct ucontext;
 struct notification_queue;
 struct notification {
 	int refcnt;
@@ -30,6 +31,8 @@ struct notification {
 
 	struct notification_info *info;
 	struct notification_queue *queue;
+
+	VECTOR(struct etrigger*) etrigger;
 
 	bool active;
 };

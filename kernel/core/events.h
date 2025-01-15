@@ -24,7 +24,7 @@ struct equeue {
 };
 
 int equeue_block(struct equeue *equeue, struct etrigger **waking_object);
-int equeue_arise(struct etrigger *equeue, struct ucontext *waking_ucontext);
+int equeue_wake(struct etrigger *equeue, struct ucontext *waking_ucontext);
 int equeue_add(struct equeue *equeue, struct etrigger *trigger);
 int equeue_remove(struct equeue *equeue, struct etrigger *trigger);
 

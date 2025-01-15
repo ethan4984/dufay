@@ -37,6 +37,23 @@ int create_blank_context(struct context *context) {
 int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 	if(context == NULL || ucontext == NULL) RETURN_ERROR;
 
+	struct notification *notification = ucontext->notification;
+	if(notification) {
+		struct context *current_context = CORE_LOCAL->current_context; 
+		if(current_context == NULL) RETURN_ERROR;
+
+		struct ucontext *current_ucontext = current_context->ucontext_active;
+		if(current_ucontext == NULL) RETURN_ERROR;
+
+		for(int i = 0; i < notification->etrigger.length; i++) {
+			struct etrigger *etrigger = notification->etrigger.data[i];
+			if(etrigger == NULL) continue;
+
+			int ret = equeue_wake(etrigger, current_ucontext);
+			if(ret == -1) RETURN_ERROR;
+		}
+	}
+
 	if(context->ucontext_top == ucontext) context->ucontext_top = ucontext->last;
 	if(context->ucontext_queue == ucontext) context->ucontext_queue = ucontext->next;
 
@@ -138,6 +155,7 @@ find_ucontext:
 
 		for(; ucontext;) {
 			if(!ucontext->blocking) break;
+			print("we are blocking on %x\n", ucontext); 
 			ucontext = ucontext->last;
 		}
 

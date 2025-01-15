@@ -76,6 +76,23 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 	return 0;
 }
 
+static int notification_destroy(struct notification *notification) {
+	if(notification == NULL) RETURN_ERROR;
+	struct notification_queue *queue = notification->queue;
+	if(queue == NULL) RETURN_ERROR;
+
+	for(int i = 0; i < NOTIFICATION_PENDING_CAPACITY; i++) {
+		if(queue->queue[NOTIFICATION_INDEX(notification->notnum)][i] == notification) {
+			queue->queue[NOTIFICATION_INDEX(notification->notnum)][i] = NULL;
+		}
+	}
+
+	notification->refcnt--;
+	if(notification->refcnt <= 0) free(notification);
+
+	return 0;
+}
+
 static int notification_ucontext_instantiate(struct context *context, struct ucontext *ucontext,
 	struct notification *notification, struct notification_action *action) {
 	if(context == NULL || ucontext == NULL || notification == NULL || action == NULL) RETURN_ERROR; 
@@ -160,6 +177,9 @@ int notification_queue(struct context *sender, struct context *target, int not,
 	if(weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
+		ucontext->etrigger = alloc(sizeof(struct etrigger));
+		ucontext->etrigger->ucontext = ucontext;	
+		ucontext->context = target;
 		ucontext->notification = notification;
 		ucontext->ready = ready;
 
@@ -231,9 +251,21 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge*, bridge, {
 		VECTOR_PUSH(CORE_LOCAL->delivery_stack, destination);
 	}
 	if(bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) {
-		yield();
-		//context->blocking = true;
-		//for(;context->blocking;) yield();
+		struct equeue equeue = { 0 };
+
+		struct ucontext *ucontext = context->ucontext_active;
+		if(ucontext == NULL) RETURN_ERROR;
+
+		VECTOR_PUSH(notification->etrigger, ucontext->etrigger);
+
+		ret = equeue_add(&equeue, ucontext->etrigger);
+		if(ret == -1) RETURN_ERROR;
+
+		for(;;) {
+			int ret = equeue_block(&equeue, NULL);
+			if(ret == -1) RETURN_ERROR;
+			if(!ucontext->blocking) break;
+		}
 	}
 })
 
@@ -281,6 +313,12 @@ int notification_dispatch(struct context *context) {
 		if(notification == NULL || action == NULL) { continue; }
 
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+
+		ucontext->etrigger = alloc(sizeof(struct etrigger));
+		ucontext->etrigger->ucontext = ucontext;
+		ucontext->notification = notification;
+		ucontext->ready = true;
+		ucontext->context = context;
 
 		ret = notification_ucontext_instantiate(context, ucontext, notification, action);
 		if(ret == -1) { spinrelease(&queue->lock); RETURN_ERROR; }
@@ -340,15 +378,27 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 	if(ret == -1) RETURN_ERROR;
 })
 
+SYSCALL_DEFINE1(notification_destroy, struct comm_bridge*, bridge, {
+	struct context *context = CORE_LOCAL->current_context;
+	struct context *destination;
+
+	int ret = bridge_to_destination(bridge, &destination);
+	if(ret == -1) RETURN_ERROR;
+
+	if(bridge->lnkidx < 0 || bridge->lnkidx > NOTIFICATION_PENDING_CAPACITY) return -1;
+	struct notification_queue *queue = destination->notification.queue;
+	if(queue == NULL) RETURN_ERROR;
+
+	struct notification *notification = queue->queue[NOTIFICATION_INDEX(bridge->not)][bridge->lnkidx];
+	if(notification == NULL) return -1;
+
+	ret = notification_destroy(notification);
+	if(ret == -1) return -1;
+})
+
 SYSCALL_DEFINE0(notification_return, {
 	struct context *context = CORE_LOCAL->current_context; 
 	if(context == NULL) RETURN_ERROR;
-
-	struct notification_queue *queue = context->notification.queue;
-	if(queue == NULL) panic("dufay: nqueue is null\n");
-
-	int ret = destroy_ucontext(context, context->ucontext_active);
-	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
 
 	struct ucontext *rcontext = ({
 		__label__ finish;
@@ -376,6 +426,10 @@ finish:
 
 		rcontext->delivered = 1;
 	}
+
+	rcontext->blocking = false;
+	int ret = destroy_ucontext(context, context->ucontext_active);
+	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
 
 	context->ucontext_active = rcontext;
 
@@ -410,8 +464,6 @@ finish:
 	);
 })
 
-// we need a way to destroy notifications
-
 SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct context *context = CORE_LOCAL->current_context;
 	struct context *destination;
@@ -429,6 +481,7 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct ucontext *ucontext = context->ucontext_active;
 	if(ucontext == NULL) { print("DUFAY: ucontext is null (should not be)"); return -1; }
 
+	print("setting this on %x\n", ucontext);
 	ucontext->blocking = true;
 	for(; ucontext->blocking;) yield();
 })

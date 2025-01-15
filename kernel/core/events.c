@@ -11,49 +11,16 @@
 #include <fayt/debug.h>
 #include <fayt/sched.h>
 
-int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
-	if(equeue == NULL) RETURN_ERROR;
-	
-	struct context *context = CORE_LOCAL->current_context;
-	if(context == NULL) RETURN_ERROR;
+// WE ARE NEVER UNBLOCKED
 
-	struct ucontext *ucontext = context->ucontext_active;
-	if(ucontext == NULL) RETURN_ERROR;
-
-	spinlock_irqsave(&equeue->lock);
-
-	VECTOR_PUSH(equeue->ucontext, ucontext);
-	
-	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
-		sizeof(struct sched_queue_config));
-
-	queue_set->cnt = 1;
-	*queue_set->config = (struct sched_queue_config) {
-		.cid = context->comms.cid
-	};
-
-	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
-		queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
-	if(ret == -1) RETURN_ERROR;
-
-	spinrelease_irqsave(&equeue->lock);
-
-	ucontext->blocking = true;
-	for(; ucontext->blocking;) yield();
-
-	if(waking_object) *waking_object = ucontext->etrigger;
-
-	return 0;
-}
-
-int equeue_arise(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
+int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 	if(etrigger == NULL || waking_ucontext == NULL) RETURN_ERROR;
 
 	etrigger->ucontext = waking_ucontext;
 
 	spinlock_irqsave(&etrigger->lock);
 
-	VECTOR(struct context*) context_unblocked;
+	VECTOR(struct context*) context_unblocked = { 0 };
 
 	for(int i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
@@ -79,11 +46,16 @@ int equeue_arise(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
 		context_unblocked.length * sizeof(struct sched_queue_config));
 
-	queue_set->cnt = context_unblocked.length;
-	for(int i = 0; i < queue_set->cnt; i++) {
+	queue_set->cnt = 0;
+	for(int i = 0; i < context_unblocked.length; i++) {
+		struct context *context = context_unblocked.data[i];
+		if(context == NULL) continue;
+
 		queue_set->config[i] = (struct sched_queue_config) {
-			.cid = context_unblocked.data[i]->comms.cid
+			.cid = context->comms.cid
 		};
+
+		queue_set->cnt++;
 	}
 
 	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_server, 
@@ -93,6 +65,42 @@ int equeue_arise(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 	VECTOR_CLEAR(context_unblocked);
 
 	spinrelease_irqsave(&etrigger->lock);
+
+	return 0;
+}
+
+int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
+	if(equeue == NULL) RETURN_ERROR;
+	
+	struct context *context = CORE_LOCAL->current_context;
+	if(context == NULL) RETURN_ERROR;
+
+	struct ucontext *ucontext = context->ucontext_active;
+	if(ucontext == NULL) RETURN_ERROR;
+
+	spinlock_irqsave(&equeue->lock);
+
+	VECTOR_PUSH(equeue->ucontext, ucontext);
+	
+	struct sched_queue_config_set *queue_set = alloc(sizeof(struct sched_queue_config_set) +
+		sizeof(struct sched_queue_config));
+
+	queue_set->cnt = 1;
+	*queue_set->config = (struct sched_queue_config) {
+		.cid = context->comms.cid
+	};
+
+	spinrelease_irqsave(&equeue->lock);
+
+	ucontext->blocking = true;
+
+	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
+		queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
+	if(ret == -1) RETURN_ERROR;
+
+	for(; ucontext->blocking;) yield();
+
+	if(waking_object) *waking_object = ucontext->etrigger;
 
 	return 0;
 }

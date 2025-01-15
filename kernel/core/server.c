@@ -230,6 +230,9 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 
 	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
 	ucontext->stack = ustack;
+	ucontext->context = context;
+	ucontext->etrigger = alloc(sizeof(struct etrigger));
+	ucontext->etrigger->ucontext = ucontext;	
 
 	ret = UCONTEXT_PUSH(context, ucontext);
 	if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }

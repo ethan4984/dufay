@@ -16,7 +16,52 @@ static struct thread *thread_tree;
 static struct hash_table thread_table;
 
 static struct sched_descriptor *sched_desc;
-static struct portal_link *sched_meta;
+static struct portal_link *sched_meta_link;
+static struct portal_link *sched_queue_link;
+
+static int traverse_and_queue(struct thread**);
+
+static int sched_flush_queue(void) {
+	struct time epoch = sched_desc->timer.read(&sched_desc->timer);
+
+	int ret = OPERATE_LINK(sched_queue_link, LINK_CIRCULAR,
+		({
+			circular_queue_flush((void*)sched_queue_link + sched_queue_link->data_offset);
+			0;
+		})
+	);
+	if(ret == -1) return -1;
+
+	for(int i = 0; i < sched_desc->queue_default_refill; i++) {
+		struct thread *thread = NULL;
+		int ret = traverse_and_queue(&thread);
+		if(ret == -1) return -1;
+		if(thread == NULL) break;
+
+		ret = OPERATE_LINK(sched_queue_link, LINK_CIRCULAR,
+			({
+				thread->vruntime += VRUNTIME(thread->weight, time_to_ns(sched_desc->slice));
+				thread->epoch = epoch;
+
+				RB_GENERIC_DELETE(thread_tree, vruntime, thread);
+				RB_GENERIC_INSERT(thread_tree, vruntime, thread);
+
+				ret = circular_queue_push((void*)sched_queue_link +
+					sched_queue_link->data_offset, &thread->private);
+				ret;
+			})
+		);
+
+		epoch = time_add(epoch, sched_desc->slice);
+
+		if(ret == -1) {
+			print("DUFAY: SCHED: Failued to push onto the share queue\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
 
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 	struct sched_queue_config_set *config_set = data;
@@ -28,10 +73,10 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 		if(config->offload) {
 			struct sched_descriptor *optimal_sched = sched_desc;
 
-			int ret = OPERATE_LINK(sched_meta, LINK_RAW, 
+			int ret = OPERATE_LINK(sched_meta_link, LINK_RAW, 
 				({
-					for(size_t i = 0; i < sched_meta->data_limit / sizeof(struct sched_descriptor); i++) {
-						struct sched_descriptor *desc = (struct sched_descriptor*)sched_meta->data + i;
+					for(size_t i = 0; i < sched_meta_link->data_limit / sizeof(struct sched_descriptor); i++) {
+						struct sched_descriptor *desc = (struct sched_descriptor*)sched_meta_link->data + i;
 
 						if(unlikely(optimal_sched == NULL)) optimal_sched = desc;
 						else if(desc->load > optimal_sched->load) optimal_sched = desc;
@@ -97,12 +142,21 @@ exit:
 		thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
 		thread->private = private;
 
-		int ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
+		int ret = hash_table_push(&thread_table, &thread->cid, thread, sizeof(thread->cid));
+		if(ret == -1) {
+			print("DUFAY: SCHED: unable to push thread onto thread_table\n");
+			continue;
+		}
+
+		ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 		if(ret == -1) {
 			print("DUFAY: SCHED: Unable to insert on thread tree\n");
 			continue;
 		}
 	}
+
+	int ret = sched_flush_queue();
+	if(ret == -1) { print("DUFAY: SCHED: Failed to activate notification queue\n"); }
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -114,7 +168,7 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 	for(int i = 0; i < config_set->cnt; i++) {
 		struct sched_queue_config *config = config_set->config + i;
 
-		struct thread *thread;
+		struct thread *thread = NULL;
 		int ret = hash_table_search(&thread_table, &config->cid, sizeof(config->cid), (void**)&thread);
 		if(ret == -1 || thread == NULL) continue; 
 
@@ -125,6 +179,9 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 		struct time delta = time_sub(epoch, thread->epoch);
 		thread->vruntime -= VRUNTIME(thread->weight, time_to_ns(delta));
 	}
+
+	int ret = sched_flush_queue();
+	if(ret == -1) { print("DUFAY: SCHED: Failed to activate notification queue\n"); }
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
@@ -141,6 +198,9 @@ static int traverse_and_queue(struct thread **thread) {
 
 int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	if(link == NULL || desc == NULL) return -1;
+
+	sched_queue_link = link;
+	sched_desc = desc;
 
 	struct notification_action enqueue_action =
 		{ .handler = notify_enqueue_thread };
@@ -179,8 +239,7 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
 	if(response.ret == -1) { print("DUFAY: SCHED: Failed to establish link\n"); }
 
-	sched_meta = (void*)portal_resp.base;
-	sched_desc = desc;
+	sched_meta_link = (void*)portal_resp.base;
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
 	if(response.ret == -1) { print("DUFAY: SCHED: Failed to activate notification queue\n"); return -1; }
@@ -190,36 +249,9 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	for(;;) {
 		SYSCALL0(SYSCALL_SCHED_ACQUIRE);
 
-		struct time epoch = desc->timer.read(&desc->timer);
+		int ret = sched_flush_queue();
+		if(ret == -1) { print("DUFAY: SCHED: critical failure to refill queue\n"); return -1; }
 
-		for(int i = 0; i < sched_desc->queue_default_refill; i++) {
-			struct thread *thread = NULL;
-			int ret = traverse_and_queue(&thread);
-			if(ret == -1) return -1;
-			if(thread == NULL) goto end;
-
-			ret = OPERATE_LINK(link, LINK_CIRCULAR,
-				({
-					thread->vruntime += VRUNTIME(thread->weight, time_to_ns(desc->slice));
-					thread->epoch = epoch;
-
-					RB_GENERIC_DELETE(thread_tree, vruntime, thread);
-					RB_GENERIC_INSERT(thread_tree, vruntime, thread);
-
-					//print("scheduler: cid=%x vruntime=%x [epoch: s [%d] ns [%d]]", thread->cid, thread->vruntime, epoch.sec, epoch.nsec);
-
-					ret = circular_queue_push((void*)link + link->data_offset, &thread->private);
-				})
-			);
-
-			epoch = time_add(epoch, desc->slice);
-
-			if(ret == -1) {
-				print("DUFAY: SCHED: Failued to push onto the share queue\n");
-				return -1;
-			}
-		}
-end:
 		SYSCALL0(SYSCALL_SCHED_RELEASE);
 		SYSCALL0(SYSCALL_YIELD);
 	}
