@@ -57,13 +57,13 @@ Portals are each assigned a composite of classes that descibe the behaviour of t
 
 ### Portal Link over Shared Memory
 
-We provide an interface that is intended to encapsulate a region of shared memory known as `Portal Links`, intended to ensure safety, as well as provide some utilities. It is both the responsibility of the client and server to understand the nature of the data being passed over shared memory. FAYT will provide macros and wrappers for data access to ensure safety.
+We provide an interface that is intended to encapsulate a region of shared memory known as Portal Links, intended to ensure safety, as well as provide some utilities. It is both the responsibility of all parties involved to understand the nature of the data being passed over shared memory. FAYT will provide macros and wrappers for data access to ensure safety.
 
 The kernel will maintain a table describing all shared memory portals. Each with an identifier, a list of the captured threads, and a pointer to the physical memory of the shared object.
 
-To create a share-point, you will create a portal under the classification ANON (or DIRECT) and SHARE. You will provide a name identifying the share-point, and pass a proper morphology. Then the caller will populate it with the share objects.
+To create a link, you will create a portal under the classification ANON (or DIRECT) and SHARE. You will provide a name identifying the link, and pass a proper morphology. Then the caller will populate it with the share objects.
 
-For any share-point, the first bytes will always be a meta-structure understood by all parties to be a governing object used for synchronization which is defined as:
+For any link, the first bytes will always be a meta-structure understood by all parties to be a governing object used for synchronization which is defined as:
 
 ```c
 struct [[gnu::packed]] portal_link {
@@ -93,7 +93,7 @@ int ret = OPERATE_LINK(link, LINK_CIRCULAR,
 );
 ```
 
-The contents of the share-point begins at the next 16-byte aligned address following this meta-structure. All access to the share-point will be understood to only be accessed by a set of wrappers that ensure all locking, protection, and boundary conditions are respected.
+The contents of the portal link begins at the next 16-byte aligned address following this meta-structure. All access to the portal link will be understood to only be accessed by a set of wrappers that ensure all locking, protection, and boundary conditions are respected.
 
 # Events
 
