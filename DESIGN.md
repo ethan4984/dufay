@@ -18,11 +18,11 @@ A thread is represented by a `context`, and a `context` is in essence just a set
 
 # Notifications
 
-A notification is our primary interface used for RPC. To send a burst of infomration that require mutual processing between different contexts. A notification has an associated weight, which describes the priority in which it should be delivered. We support nested notifications.
+Notification are our primary interface used for RPC. To send a burst of infomration that require mutual processing between different contexts. A notification has an associated weight, which describes the priority in which it should be delivered. We support nested notifications.
 
 - **NOTIFY_WEIGHT_INSTANTANEOUS**: Delivered instantaneously in a single continuous chain of execution.
 - **NOTIFY_WEIGHT_TICK**: Delivered upon the next tick of the preemptive timer. 
-- **NOTIFY_WEIGHT_SCHEDULED**: Delivered according to the weight of its destination
+- **NOTIFY_WEIGHT_SCHEDULED**: Delivered according to the weight of its destination.
 
 Each notification must have its own stack. But since the kernel has has minimal authority over the virtual address space of a user-space server, it is the responsibility of the server to supply these stacks. If we were to ever exhaust this repository of stacks, the kernel will invokve a notification `NOTIFY_USTACK_REFILL`. 
 
