@@ -6,7 +6,7 @@
 
 # Scheduling
 
-We utilise a per-processor scheduling server that interacts with the kernel over a a circular queue located within shared memory, used for passing schedulable objects. It is the responsibility of the kernel to context switch, while it is the responsibility of the user-space scheduling server to inform the kernel of what to context switch. When the kernel depletes this queue, it shall reschedule to the pre-processor scheduling server which will then refill this queue and yield. We implement a Completely Fair Scheduler, where each thread enqueued is the next left-most node within a Red-Black tree with respect to virtual runtime. And we invariant TSC, with the HPET set to backup, to update our runtime.
+We utilise a per-processor scheduling server that interacts with the kernel over a circular queue located within shared memory, used for passing schedulable objects. It is the responsibility of the kernel to context switch, while it is the responsibility of the user-space scheduling server to inform the kernel of what to schedule. When the kernel depletes this queue, it shall reschedule to the pre-processor scheduling server which will then refill this queue and yield. We implement a Completely Fair Scheduler, where each thread enqueued is the next left-most node within a Red-Black tree with respect to virtual runtime. And we use the invariant TSC, with the HPET set to backup, to update our runtime.
 
 ![image](schedule.png)
 
@@ -57,7 +57,7 @@ Portals are each assigned a composite of classes that descibe the behaviour of t
 
 ### Portal Link over Shared Memory
 
-We provide an interface that is intended to encapsulate a region of shared memory, intended to ensure its safety and synchronization, as well as provide some utilities. It is both the responsibility of the client and server to understand the nature of the data being passed over shared memory. FAYT will provide macros and wrappers for data access to ensure safety.
+We provide an interface that is intended to encapsulate a region of shared memory known as `Portal Links`, intended to ensure safety, as well as provide some utilities. It is both the responsibility of the client and server to understand the nature of the data being passed over shared memory. FAYT will provide macros and wrappers for data access to ensure safety.
 
 The kernel will maintain a table describing all shared memory portals. Each with an identifier, a list of the captured threads, and a pointer to the physical memory of the shared object.
 
@@ -119,4 +119,4 @@ for(a; b; c) {
 }
 ```
 
-You add possible trigger sources to the queue. Then you block on the queue, the active ucontext is dequeued. If unblocked by a trigger, it will confirm that the condition of interest has been satisfied, if not it will block again. Depending on your morphology of queues and triggers, near any configuration of blocking is possible.
+You add trigger sources to the queue. Then you block on the queue and the active ucontext is dequeued. If unblocked by a trigger, it will confirm that the condition of interest has been satisfied, if not it will block again. Depending on your morphology of queues and triggers, near any configuration of blocking is possible.
