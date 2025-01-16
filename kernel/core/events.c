@@ -90,9 +90,9 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
 		.cid = context->comms.cid
 	};
 
-	spinrelease_irqsave(&equeue->lock);
-
 	ucontext->blocking = true;
+
+	spinrelease_irqsave(&equeue->lock);
 
 	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
 		queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);

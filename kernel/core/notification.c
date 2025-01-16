@@ -481,7 +481,6 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	struct ucontext *ucontext = context->ucontext_active;
 	if(ucontext == NULL) { print("DUFAY: ucontext is null (should not be)"); return -1; }
 
-	print("setting this on %x\n", ucontext);
 	ucontext->blocking = true;
 	for(; ucontext->blocking;) yield();
 })

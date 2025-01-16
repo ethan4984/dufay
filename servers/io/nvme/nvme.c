@@ -13,23 +13,23 @@
 struct nvme_controller;
 
 struct nvme_queue_pair {
-    int qid;
-    int entry_cnt;
-    int sq_head;
+	int qid;
+	int entry_cnt;
+	int sq_head;
 	int sq_tail;
-    int cq_head;
-    int cq_tail;
-    bool phase;
-    int vector;
-    int irq;
-    bool admin;
+	int cq_head;
+	int cq_tail;
+	bool phase;
+	int vector;
+	int irq;
+	bool admin;
 
 	struct nvme_controller *controller;
 
-    volatile struct nvme_command *submission_queue;
-    volatile struct nvme_completion *completion_queue;
-    volatile uint32_t *submission_doorbell;
-    volatile uint32_t *completion_doorbell;
+	volatile struct nvme_command *submission_queue;
+	volatile struct nvme_completion *completion_queue;
+	volatile uint32_t *submission_doorbell;
+	volatile uint32_t *completion_doorbell;
 
 	struct bitmap cid_bitmap;
 };

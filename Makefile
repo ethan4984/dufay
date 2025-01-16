@@ -5,22 +5,22 @@ INITRAMFS = initramfs.tar
 .PHONY: all
 all: $(DISK_IMAGE)
 
-QEMUFLAGS = -m 4G \
-			-smp 4 \
-			-drive id=disk,file=$(DISK_IMAGE),if=none \
-			-device ahci,id=ahci \
-			-device ide-hd,drive=disk,bus=ahci.0 \
+QEMUFLAGS = -m 2G \
+			-smp 1 \
+			-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
+			-device nvme,drive=nvme0,serial=12345,bus=pcie.0 \
 			-device intel-iommu,aw-bits=48 \
 			-machine type=q35 \
+			-cpu host,migratable=no,+invtsc -trace "nvme_*"
 
-QEMUFLAGS_ISO = -m 4G \
+QEMUFLAGS_ISO = -m 2G \
 				-smp 1 \
 				-cdrom $(ISO_IMAGE) \
-				-drive file=disk.img,if=none,id=nvm \
-				-device nvme,serial=deadbeef,drive=nvm \
-				-machine type=q35 \
 				-boot d \
-				-cpu host,migratable=no,+invtsc
+				-machine type=q35,accel=kvm \
+				-drive file=disk.img,if=none,id=nvme0,format=raw \
+				-device nvme,drive=nvme0,serial=12345,bus=pcie.0 \
+				-cpu host,migratable=no,+invtsc -trace "nvme_*"
 
 .PHONY: run
 run: $(DISK_IMAGE)
@@ -32,7 +32,7 @@ run_initrd: $(ISO_IMAGE)
 
 .PHONY: console
 console: $(ISO_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS_ISO) -enable-kvm -no-reboot -monitor stdio -d int -D qemu.log -no-shutdown
+	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -no-reboot -monitor stdio -d int -D qemu.log -no-shutdown
 
 .PHONY: int
 int: $(ISO_IMAGE)
@@ -67,6 +67,8 @@ $(ISO_IMAGE): $(INITRAMFS) limine kernel
 	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
 	./limine/limine bios-install dufay.iso
 	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
+	parted -s disk.img mklabel msdos
+	parted -s disk.img mkpart primary 1 100%
 
 $(DISK_IMAGE): limine kernel
 	rm -f dufay.img 
@@ -79,6 +81,11 @@ $(DISK_IMAGE): limine kernel
 	sudo mkfs.ext2 `cat loopback_dev`p1
 	sudo mount `cat loopback_dev`p1 disk_image
 	sudo mkdir disk_image/boot
+	sudo mkdir disk_image/servers/
+	sudo cp servers/sched/sched disk_image/servers
+	sudo cp servers/io/nvme/nvme disk_image/servers
+	sudo cp servers/io/pci/pci disk_image/servers
+	sudo cp servers/fs/vfs/vfs disk_image/servers
 	sudo cp kernel/dufay.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	sync
 	sudo umount disk_image/
