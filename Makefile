@@ -1,26 +1,29 @@
 DISK_IMAGE = dufay.img
 ISO_IMAGE = dufay.iso
 INITRAMFS = initramfs.tar
+BUILD = build/system-root/servers
 
 .PHONY: all
 all: $(DISK_IMAGE)
 
-QEMUFLAGS = -m 2G \
-			-smp 1 \
-			-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
-			-device nvme,drive=nvme0,serial=12345,bus=pcie.0 \
-			-device intel-iommu,aw-bits=48 \
-			-machine type=q35 \
-			-cpu host,migratable=no,+invtsc -trace "nvme_*"
+QEMUFLAGS = \
+	-m 2G \
+	-smp 1 \
+	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
+	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
+	-device intel-iommu,aw-bits=48 \
+	-machine type=q35 \
+	-cpu host,migratable=no,+invtsc
 
-QEMUFLAGS_ISO = -m 2G \
-				-smp 1 \
-				-cdrom $(ISO_IMAGE) \
-				-boot d \
-				-machine type=q35,accel=kvm \
-				-drive file=disk.img,if=none,id=nvme0,format=raw \
-				-device nvme,drive=nvme0,serial=12345,bus=pcie.0 \
-				-cpu host,migratable=no,+invtsc -trace "nvme_*"
+QEMUFLAGS_ISO = \
+	-m 2G \
+	-smp 1 \
+	-cdrom $(ISO_IMAGE) \
+	-boot d \
+	-machine type=q35,accel=kvm \
+	-drive file=disk.img,if=none,id=nvme0,format=raw \
+	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
+	-cpu host,migratable=no,+invtsc
 
 .PHONY: run
 run: $(DISK_IMAGE)
@@ -50,10 +53,14 @@ limine:
 kernel:
 	$(MAKE) -C kernel
 
+$(BUILD):
+	mkdir -p build/system-root/servers
+	git submodule update --init --recursive
+
 $(INITRAMFS):
 	cd build/system-root/ && tar -c --format=posix -f ../../initramfs.tar .
 
-$(ISO_IMAGE): $(INITRAMFS) limine kernel
+$(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel recompile_servers
 	rm -rf dufay.iso
 	rm -rf disk_image
 	mkdir disk_image
@@ -70,7 +77,7 @@ $(ISO_IMAGE): $(INITRAMFS) limine kernel
 	parted -s disk.img mklabel msdos
 	parted -s disk.img mkpart primary 1 100%
 
-$(DISK_IMAGE): limine kernel
+$(DISK_IMAGE): limine kernel recompile_servers
 	rm -f dufay.img 
 	dd if=/dev/zero bs=1M count=0 seek=1024 of=dufay.img
 	parted -s dufay.img mklabel msdos
@@ -101,7 +108,7 @@ rebuild_servers:
 
 .PHONY: clean
 clean:
-	rm -f $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) serial.log qemu.log
+	rm -f $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) disk_image disk.img serial.log qemu.log
 	$(MAKE) -C kernel clean
 
 .PHONY: distclean
