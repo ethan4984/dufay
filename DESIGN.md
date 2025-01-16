@@ -30,8 +30,8 @@ A notification handler exists in the following form, where the kernel passes the
 
 ```c
 static void notification(struct notification_info *notificaion_info, void *data, int notnum) {
-  ...
-  SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
+	...
+	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 ```
 
@@ -68,14 +68,14 @@ For any share-point, the first bytes will always be a meta-structure understood 
 ```c
 struct [[gnu::packed]] portal_link {
 	int lock;
-
+	
 	unsigned int length;
 	unsigned int header_offset;
 	unsigned int header_limit;
 	unsigned int data_offset;
 	unsigned int data_limit;
 	unsigned int magic;
-
+	
 	char data[];
 };
 ```
@@ -84,15 +84,39 @@ All operations performed adjacent to this link, will be required to be routed th
 
 ```c
 int ret = OPERATE_LINK(link, LINK_CIRCULAR,
-    ({
-        struct thread *thread;
-        int ret = traverse_and_queue(&thread);
-        if(ret != -1) ret = circular_queue_push((void*)link->data, thread);
-        ret;
-    })
+	({
+		struct thread *thread;
+		int ret = traverse_and_queue(&thread);
+		if(ret != -1) ret = circular_queue_push((void*)link->data, thread);
+		ret;
+	})
 );
 ```
 
-- The share-point begins at the next 16-byte aligned address following this meta-structure. All access to the share-point will be understood to only be accessed by a set of wrappers that ensure all locking, protection, and boundary conditions are respected.
+The contents of the share-point begins at the next 16-byte aligned address following this meta-structure. All access to the share-point will be understood to only be accessed by a set of wrappers that ensure all locking, protection, and boundary conditions are respected.
 
 # Events
+
+Within the kernel, we implement a protocol known as `equeue`, that provides the ability to block, and then wake, a set of threads based on a set of arbitrary conditions. You attach triggers, created by instantiating an `etrigger`, to various `equeues`. A trigger is capable of being activated in any context. These triggers are capable of waking all those currently blocking on any attached `equeue`. The following is an example of the protocol in action:
+
+```c
+struct equeue equeue;
+
+for(a; b; c) {
+	equeue_add(&equeue, possible_trigger);
+}
+
+for(;;) {
+	if(condition) break;
+						      
+	struct equeue_trigger *waking_trigger;
+	int ret = equeue_block(&equeue, &waking_trigger);
+	if(ret == -1) return -1;
+}
+					  
+for(a; b; c) {
+	equeue_remove(&equeue, possible_trigger);
+}
+```
+
+You add possible trigger sources to the queue. Then you block on the queue, the active ucontext is dequeued. If unblocked by a trigger, it will confirm that the condition of interest has been satisfied, if not it will block again. Depending on your morphology of queues and triggers, near any configuration of blocking is possible.
