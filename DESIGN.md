@@ -97,7 +97,7 @@ The contents of the share-point begins at the next 16-byte aligned address follo
 
 # Events
 
-Within the kernel, we implement a protocol known as `equeue`, that provides the ability to block, and then wake, a set of threads based on a set of arbitrary conditions. You attach triggers, created by instantiating an `etrigger`, to various `equeues`. A trigger is capable of being activated in any context. These triggers are capable of waking all those currently blocking on any attached `equeue`. The following is an example of the protocol in action:
+Within the kernel, we implement a protocol known as `equeue`, that provides the ability to block, and then wake, a set of threads based on a set of arbitrary conditions. You attach triggers, created by instantiating an `etrigger`, to various `equeues`. A trigger is capable of being activated in any context. These triggers are capable of waking all those currently blocking on any attached `equeue`. The following is an example of how the protocol is intended to be used:
 
 ```c
 struct equeue equeue;
