@@ -138,6 +138,21 @@ SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier
 	if(ret == -1) return -1;
 })
 
+struct limine_file *limine_search_module(const char *identifier) {
+	if(limine_module_request.response == NULL) return NULL;
+
+	struct limine_file **modules = limine_module_request.response->modules;
+	uint64_t module_count = limine_module_request.response->module_count;
+
+	for(uint64_t i = 0; i < module_count; i++) {
+		if(strcmp(modules[i]->cmdline, identifier) == 0) {
+			return modules[i];
+		}
+	}
+
+	return NULL;
+}
+
 int launch_servers(void) {
 	if(limine_module_request.response == NULL) {
 		RETURN_ERROR;

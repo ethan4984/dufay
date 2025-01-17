@@ -7,6 +7,8 @@
 
 #include <core/scheduler.h>
 
+#include <limine.h>
+
 extern struct hash_table context_table;
 extern struct bitmap cid_bitmap;
 
@@ -74,5 +76,6 @@ int create_server(const char*, const char*, struct server*);
 int create_namespace(const char*);
 
 struct server *find_server(const char*, const char*);
+struct limine_file *limine_search_module(const char*);
 
 #endif

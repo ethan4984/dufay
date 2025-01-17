@@ -42,6 +42,11 @@
 #define ELF_PF_W 0x2
 #define ELF_PF_X 0x4
 
+#define ELF_ET_NONE 0x0
+#define ELF_ET_REL 0x1
+#define ELF_ET_EXEC 0x2
+#define ELF_ET_DYN 0x3
+
 struct aux {
 	uint64_t at_phnum;
 	uint64_t at_phent;
