@@ -212,9 +212,18 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	if(server == NULL) RETURN_ERROR;
 
 	struct elf64_file *elf = alloc(sizeof(struct elf64_file));
-
 	elf->data.buffer = server->file->address;
 	elf->data.length = server->file->size;
+
+	struct aslr *aslr = alloc(sizeof(struct aslr));
+
+	*aslr = (struct aslr) {
+		.layout = NULL,
+		.minimum_vaddr = 0x100000000000,
+		.maximum_vaddr = 0x7fffffffffff
+	};
+
+	elf->aslr = aslr;
 
 	int ret = elf64_file_init(elf);
 	if(ret == -1) RETURN_ERROR;

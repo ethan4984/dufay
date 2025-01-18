@@ -2,15 +2,16 @@
 
 #include <core/physical.h>
 #include <core/virtual.h>
-#include <fayt/slab.h>
 #include <core/scheduler.h>
 #include <core/server.h>
-
 #include <core/debug.h>
-#include <fayt/string.h>
+#include <core/aslr.h>
 
 #include <acpi/rsdp.h> 
 #include <acpi/madt.h>
+
+#include <fayt/string.h>
+#include <fayt/slab.h>
 
 #include <limine.h>
 
@@ -58,6 +59,7 @@ void dufay_entry(void) {
 	slab_cache_create(&pool, "CACHE16384", 16384);
 	slab_cache_create(&pool, "CACHE32768", 32768);
 	slab_cache_create(&pool, "CACHE65536", 65536);
+	slab_cache_create(&pool, "CACHE131072", 131072);
 
 	rsdp = limine_rsdp_request.response->address;
 

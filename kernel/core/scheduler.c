@@ -220,7 +220,7 @@ void reschedule(struct registers *regs, void*) {
 
 	CORE_LOCAL->current_context = next_context;
 
-	//print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
+	print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
 
 	if(next_ucontext->notification) next_ucontext->delivered = 1;
 
