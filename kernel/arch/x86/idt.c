@@ -5,6 +5,7 @@
 #include <core/scheduler.h>
 #include <core/portal.h>
 #include <core/debug.h>
+#include <core/irq.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>
@@ -105,9 +106,11 @@ extern void isr_handler_main(struct registers *regs) {
 			uint64_t faulting_address;
 			__asm__ volatile ("mov %%cr2, %0" : "=a"(faulting_address));
 
-			if(portal_resolve_fault(faulting_address, regs->error_code) == 0) {
-				goto done;
-			}
+			int ret = irq_cortex_resolve_fault(faulting_address, regs->error_code);
+			if(ret == 0) goto done;
+
+			ret = portal_resolve_fault(faulting_address, regs->error_code);
+			if(ret == 0) goto done;
 		}
 
 		spinlock(&exception_lock);

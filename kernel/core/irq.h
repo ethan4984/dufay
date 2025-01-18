@@ -4,6 +4,7 @@
 #include <core/virtual.h>
 #include <core/server.h>
 #include <core/lock.h>
+#include <core/aslr.h>
 
 #include <fayt/pci.h>
 
@@ -27,10 +28,11 @@ struct anchor_cluster {
 };
 
 struct irq_cortex {
-	struct server *server;
 	struct anchor_cluster *cluster;
+	struct aslr_layout *aslr_layout;
 };
 
-int instantiate_irq_cortex(const char*);
+int irq_cortex_resolve_fault(uintptr_t, uint64_t);
+int irq_cortex_instantiate(const char*);
 
 #endif
