@@ -43,7 +43,7 @@ int: $(ISO_IMAGE)
 
 .PHONY:
 recompile_servers:
-	cd servers && make clean && make 
+	cd servers && make 
 
 limine:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
@@ -108,7 +108,7 @@ rebuild_servers:
 
 .PHONY: clean
 clean:
-	rm -f $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) disk_image disk.img serial.log qemu.log
+	rm -rf $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) disk_image disk.img serial.log qemu.log
 	$(MAKE) -C kernel clean
 
 .PHONY: distclean
