@@ -18,21 +18,19 @@ struct anchor {
 		struct pci_bar bar;
 	} mmio;
 
+	struct anchor *next;
+	struct anchor *last;
+
 	int refcnt;
 	struct spinlock lock;
 };
 
-struct anchor_cluster {
-	int length;
-	struct anchor anchors[];
-};
-
 struct irq_cortex {
-	struct anchor_cluster *cluster;
+	struct anchor *anchor_cluster;
 	struct aslr_layout *aslr_layout;
+	struct elf64_file *elf;
 };
 
 int irq_cortex_resolve_fault(uintptr_t, uint64_t);
-int irq_cortex_instantiate(const char*);
 
 #endif

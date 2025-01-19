@@ -9,8 +9,8 @@ LDFLAGS ?=
 INTERNALLDFLAGS := \
 	-nostdlib \
 	-zmax-page-size=0x1000 \
-	-static \
-	-ztext
+	-ztext \
+	-pie
 
 INTERNALCFLAGS := \
 	-I.	\
@@ -22,7 +22,8 @@ INTERNALCFLAGS := \
 	-mno-mmx \
 	-mno-3dnow \
 	-mno-sse \
-	-mno-sse2
+	-mno-sse2 \
+	-fPIC
 
 CFILES := $(shell find ./ -type f -name '*.c')
 OBJ := $(CFILES:.c=.o)

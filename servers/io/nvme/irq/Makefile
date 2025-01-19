@@ -1,4 +1,4 @@
-SERVER := vfs
+IRQ := nvme_irq
 
 C ?= gcc
 LD ?= ld
@@ -30,9 +30,9 @@ OBJ := $(CFILES:.c=.o)
 HEADER_DEPS := $(CFILES:.c=.d)
 
 .PHONY: all
-all: $(SERVER)
+all: $(IRQ)
 
-$(SERVER): $(OBJ)
+$(IRQ): $(OBJ)
 	$(LD) $(LDFLAGS) $(INTERNALLDFLAGS) $(OBJ) -n -T linker.ld -o $@
 
 -include $(HEADER_DEPS)
@@ -42,5 +42,5 @@ $(SERVER): $(OBJ)
 
 .PHONY: clean
 clean:
-	rm -rf $(SERVER) $(OBJ) $(HEADER_DEPS)
+	rm -rf $(IRQ) $(OBJ) $(HEADER_DEPS)
 

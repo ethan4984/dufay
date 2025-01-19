@@ -3,44 +3,42 @@ OUTPUT_ARCH(i386:x86-64)
 
 ENTRY(main)
 
-SECTIONS
-{
+PHDRS {
+	null PT_NULL FLAGS(0);
+	text PT_LOAD FLAGS((1 << 0) | (1 << 2));
+	rodata  PT_LOAD	FLAGS((1 << 2));
+	data PT_LOAD FLAGS((1 << 1) | (1 << 2));
+	dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2));
+	bss PT_LOAD	FLAGS((1 << 1) | (1 << 2));
+}
+
+SECTIONS {
 	. = 0x0000000000401000;
 
 	.text : ALIGN(0x1000) {
 		*(.text)
 		*(.init)
 		*(.fini)
-	}
+	} :text
 
 	. = ALIGN(0x1000);
 	.data : ALIGN(0x1000) {
 		*(.data)
-	}
+	} :data
 
 	. = ALIGN(0x1000);
-	.bss : ALIGN(0x1000) {
-		*(.bss)
-		*(COMMON)
-	}
-
-	. = ALIGN(0x1000);
-	.ctors : ALIGN(0x1000) {
-		*(.ctors)
-	}
-
-	. = ALIGN(0x1000);
-	.dtors : ALIGN(0x1000) {
-		*(.dtors)
-	}
+	.dynamic : {
+		*(.dynamic)
+	} :data :dynamic
 
 	. = ALIGN(0x1000);
 	.rodata : ALIGN(0x1000) {
 		*(.rodata)
-	}
+	} :rodata
 
-	/DISCARD/ : {
-		*(.note.*)
-	}
+	. = ALIGN(0x1000);
+	.bss : ALIGN(0x1000) {
+		*(COMMON)
+		*(.bss)
+	} :bss
 }
-

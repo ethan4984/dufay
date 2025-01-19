@@ -6,6 +6,8 @@
 #include <fayt/string.h>
 #include <fayt/slab.h>
 #include <fayt/notification.h>
+#include <fayt/vector.h>
+#include <fayt/compiler.h>
 
 #include <pci.h>
 
@@ -15,6 +17,14 @@ struct hash_table segment_tree;
 static int pci_device_bar(volatile union pci_config*, struct pci_bar*, int);
 static int pci_device_msi(struct pci_device*, int);
 static int pci_device_msix(struct pci_device*, int);
+
+struct pci_core_morphology {
+	int load;
+	int lapic_id;	
+};
+
+static VECTOR(struct pci_core_morphology*) pci_core_morphology;
+static struct pci_core_morphology *pci_fetch_optimal_core(void);
 
 static void nbar(struct notification_info*, void *data, int) {
 	struct pci_nbar *nbar = data;
@@ -31,8 +41,6 @@ static void nbar(struct notification_info*, void *data, int) {
 finish:
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
-
-// IMPEMENT MSI/MSIX and PARSE CAPS LIST
 
 static void nmsi(struct notification_info*, void *data, int) {
 	struct pci_nmsi *nmsi = data;
@@ -95,8 +103,11 @@ static int pci_device_msi(struct pci_device *device, int vector) {
 
 	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msi_offset + 2);
 
+	struct pci_core_morphology *core_morphology = pci_fetch_optimal_core();
+	if(core_morphology == NULL) RETURN_ERROR;
+
 	*(volatile uint32_t*)((uintptr_t)device->config +
-		device->msi_offset + 4) = (0xfee << 2) | (BSP_APIC_ID << 12);
+		device->msi_offset + 4) = (0xfee << 2) | (core_morphology->lapic_id << 12);
 	*(volatile uint32_t*)((uintptr_t)device->config +
 		device->msi_offset + (message_control & (1 << 7) ? 8 : 12)) = vector;
 
@@ -115,10 +126,13 @@ static int pci_device_msix(struct pci_device *device, int vector) {
 	int ret = bitmap_alloc(&device->msix_bitmap, &msix_vector_offset);
 	if(ret == -1) return -1;
 
+	struct pci_core_morphology *core_morphology = pci_fetch_optimal_core();
+	if(core_morphology == NULL) RETURN_ERROR;
+
 	msix_vector_offset *= 16;
 
 	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
-		msix_vector_offset) = (0xfee << 2) | (BSP_APIC_ID << 12);
+		msix_vector_offset) = (0xfee << 2) | (core_morphology->lapic_id << 12);
 	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
 		msix_vector_offset + 4) = 0;
 	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
@@ -132,6 +146,21 @@ static int pci_device_msix(struct pci_device *device, int vector) {
 	*(volatile uint16_t*)((uintptr_t)device->config + device->msix_offset + 2) = message_control;
 
 	return 0;
+}
+
+static struct pci_core_morphology *pci_fetch_optimal_core(void) {
+	struct pci_core_morphology *ret = NULL;
+
+	for(size_t i = 0; i < pci_core_morphology.length; i++) {
+		struct pci_core_morphology *core_morphology = pci_core_morphology.data[i];
+		if(core_morphology == NULL) continue;
+
+		if(unlikely(ret == NULL)) ret = core_morphology;
+		else if(ret->load > core_morphology->load) ret = core_morphology;
+		if(ret->load == 0) break;
+	}
+
+	return ret;
 }
 
 static int pci_device_spawn(struct pci_device *pci_device) {
@@ -199,7 +228,20 @@ static int pci_device_spawn(struct pci_device *pci_device) {
 	return 0;
 }
 
-int pci(struct mcfg *mcfg) {
+int pci(struct pci_server_meta *server_meta) {
+	if(server_meta == NULL) RETURN_ERROR;
+
+	for(int i = 0; i < server_meta->logical_processor_cnt; i++) {
+		struct pci_core_morphology *core_morphology = alloc(sizeof(struct pci_core_morphology));
+		if(unlikely(core_morphology == NULL)) RETURN_ERROR;
+
+		core_morphology->lapic_id = server_meta->lapic_id[i];
+		core_morphology->load = 0;
+
+		VECTOR_PUSH(pci_core_morphology, core_morphology);
+	}
+	
+	struct mcfg *mcfg = server_meta->mcfg;
 	if(mcfg == NULL || !(mcfg->signature[0] == 'M' && mcfg->signature[1] == 'C'
 		&& mcfg->signature[2] == 'F' && mcfg->signature[3] == 'G')) {
 		print("DUFAY: PCI: mcfg does not exist\n");

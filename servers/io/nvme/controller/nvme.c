@@ -52,6 +52,8 @@ struct nvme_controller {
 	int max_prps;
 	int strides;
 
+	struct bitmap qid_bitmap;
+
 	struct nvme_queue_pair *admin_queue;
 };
 
@@ -99,8 +101,31 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	int ret = notify(&bridge);
 	if(ret == -1) return -1;
 
+	struct syscall_response syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
+		"nvme_irq", pci_info->irq_vector);
+	if(syscall_response.ret == -1) return -1;
+
+	/*controleler->qid_bitmap = (struct bitmap) {
+		.data = alloc(0xffff / 8),
+		.size = 0xffff,
+		.resizable = false,
+	};
+
 	controller->queue_entries = controller->regs->cap & 0xffff;
 	controller->strides = (controller->regs->cap >> 32) & 0xf;
+
+	struct portal_req portal_req = {
+
+	};
+
+	struct portal_resp portal_resp;
+
+	controller->admin_queue = alloc(sizeof(struct nvme_queue_pair));
+	if(controller->admin_queue) RETURN_ERROR;
+
+	ret = bitmap_alloc(&controller->qid_bitmap, &controller->admin_queue->qid);
+	if(ret == -1 || controller->admin_queue->qid) RETURN_ERROR;
+	controller->admin_queue->controller = controller;*/
 
 	return 0;
 }

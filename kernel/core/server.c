@@ -125,7 +125,7 @@ SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier
 
 	if(strcmp(namespace, "IO") == 0) {
 		struct pci_info *info = arg;
-		info->irq_vector = idt_alloc_vector(NULL, NULL);
+		info->irq_vector = idt_reserve_vector();
 	}
 
 	int ret = launch_server(server, arg, length);
@@ -194,7 +194,20 @@ int launch_servers(void) {
 			struct mcfg *mcfg = acpi_find_sdt("MCFG");
 			if(mcfg == NULL) RETURN_ERROR;
 
-			int ret = launch_server(server, mcfg, mcfg->length);
+			struct pci_server_meta *server_meta = alloc(sizeof(struct pci_server_meta) +
+				logical_processor_cnt * sizeof(*server_meta->lapic_id) + mcfg->length);
+
+			server_meta->logical_processor_cnt = logical_processor_cnt; 
+			for(int i = 0; i < server_meta->logical_processor_cnt; i++) {
+				server_meta->lapic_id[i] = logical_processor_locales[i].apic_id;
+			}
+
+			server_meta->mcfg = (void*)server_meta +
+				sizeof(struct pci_server_meta) + logical_processor_cnt * sizeof(*server_meta->lapic_id);
+			memcpy(server_meta->mcfg, mcfg, mcfg->length);
+
+			int ret = launch_server(server, server_meta, sizeof(struct pci_server_meta) +
+				logical_processor_cnt * sizeof(*server_meta->lapic_id) + mcfg->length);
 			if(ret == -1) {
 				print("dufay: failed to launch server {%s}\n", modules[i]->cmdline);
 				RETURN_ERROR;

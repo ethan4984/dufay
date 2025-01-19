@@ -11,7 +11,7 @@
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(struct mcfg *mcfg) {
+int main(struct pci_server_meta *server_meta) {
 	print("DUFAY: PCI: booting PCI server\n");
 
 	struct slab_pool pool = {
@@ -45,7 +45,7 @@ int main(struct mcfg *mcfg) {
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
-	int ret = pci(mcfg);
+	int ret = pci(server_meta);
 	if(ret == -1) { print("DUFAY: PCI: Internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

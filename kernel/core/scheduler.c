@@ -173,6 +173,8 @@ find_ucontext:
 	return 0;
 }
 
+static int cnt = 0;
+
 void reschedule(struct registers *regs, void*) {
 	if(__atomic_test_and_set(&CORE_LOCAL->sched_lock.lock, __ATOMIC_ACQUIRE)) return; 
 
@@ -220,7 +222,7 @@ void reschedule(struct registers *regs, void*) {
 
 	CORE_LOCAL->current_context = next_context;
 
-	print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
+	//print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
 
 	if(next_ucontext->notification) next_ucontext->delivered = 1;
 

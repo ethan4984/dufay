@@ -23,3 +23,9 @@
 [submodule "servers/io/pci/fayt"]
 	path = servers/io/pci/fayt
 	url = https://github.com/ethan4984/fayt
+[submodule "servers/io/nvme/irq/fayt"]
+	path = servers/io/nvme/irq/fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "servers/io/nvme/controller/fayt"]
+	path = servers/io/nvme/controller/fayt
+	url = https://github.com/ethan4984/fayt

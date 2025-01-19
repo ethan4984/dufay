@@ -40,16 +40,23 @@ static void set_idt_descriptor(uint16_t cs, uint8_t ist, uint8_t attributes, uin
 	};
 }
 
-int idt_alloc_vector(void (*handler)(struct registers*, void*), void *ptr) {
+int idt_reserve_vector(void) {
 	for(size_t i = 0; i < 256; i++) {
-		if(interrupt_vectors[i].reserved == 0) {
-			interrupt_vectors[i].handler = handler;
-			interrupt_vectors[i].ptr = ptr;
-			interrupt_vectors[i].reserved = 1;
+		if(!interrupt_vectors[i].reserved) {
+			interrupt_vectors[i].reserved = true;
 			return i;
 		}
 	}
-	RETURN_ERROR;
+
+	return -1;
+}
+
+int idt_instantiate_vector(uint8_t vector, void (*handler)(struct registers*, void*), void *ptr) {
+	interrupt_vectors[vector].handler = handler;
+	interrupt_vectors[vector].ptr = ptr;
+	interrupt_vectors[vector].reserved = 1;
+
+	return 0;
 }
 
 const char *exception_messages[] = {

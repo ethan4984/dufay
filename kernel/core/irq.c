@@ -1,5 +1,6 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/smp.h>
+#include <arch/x86/idt.h>
 
 #include <core/irq.h>
 #include <core/debug.h>
@@ -39,40 +40,51 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code) {
 	return -1;
 found:
 	uint64_t faulting_page = faulting_address & ~(0xfff);
-	uint64_t *pml_entry = page_table->page_entry(&kernel_mappings, faulting_page);
+	uint64_t *pml_entry = kernel_mappings.page_entry(&kernel_mappings, faulting_page);
 	if(pml_entry == NULL) return -1;
 
-	page_table->map_page(page_table, faulting_page, *pml_entry & 0xfff, *pml_entry & ~(0xfff));
+	page_table->map_page(page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
 
 	return 0;
 }
 
-int irq_cortex_instantiate(const char *identifier) {
+static int irq_cortex_instantiate(const char *identifier, int vector) {
 	if(identifier == NULL) RETURN_ERROR;
+
+	struct irq_cortex *cortex = alloc(sizeof(struct irq_cortex));
+	if(cortex == NULL) RETURN_ERROR;
 
 	struct limine_file *module = limine_search_module(identifier);
 	if(module == NULL) RETURN_ERROR;
 
-	struct elf64_file *elf = alloc(sizeof(struct elf64_file));
+	cortex->elf = alloc(sizeof(struct elf64_file));
+	if(cortex->elf == NULL) RETURN_ERROR; 
 
-	elf->data.buffer = module->address;
-	elf->data.length = module->size;
-	elf->page_table = &kernel_mappings;
-	elf->aslr = &aslr_irq;
+	cortex->elf->data.buffer = module->address;
+	cortex->elf->data.length = module->size;
+	cortex->elf->page_table = &kernel_mappings;
+	cortex->elf->aslr = &aslr_irq;
 
-	int ret = elf64_file_init(elf);
+	int ret = elf64_file_init(cortex->elf);
 	if(ret == -1) RETURN_ERROR;
 
-	ret = elf64_file_aux(elf, &elf->aux);
+	cortex->aslr_layout = cortex->elf->aslr_layout;
+
+	ret = elf64_file_aux(cortex->elf, &cortex->elf->aux);
 	if(ret == -1) RETURN_ERROR;
 
-	ret = elf64_file_load(elf);
+	ret = elf64_file_load(cortex->elf);
+	if(ret == -1) RETURN_ERROR;
+
+	VECTOR_PUSH(cortex_table, cortex);
+
+	ret = idt_instantiate_vector(vector, (void*)cortex->elf->aux.at_entry, NULL);
 	if(ret == -1) RETURN_ERROR;
 
 	return 0;
 }
 
-SYSCALL_DEFINE1(spawn_irq_cortex, const char*, identifier, {
-	int ret = irq_cortex_instantiate(identifier);
+SYSCALL_DEFINE2(irq_cortex_instantiate, const char*, identifier, int, vector, {
+	int ret = irq_cortex_instantiate(identifier, vector);
 	if(ret == -1) return -1;
 })
