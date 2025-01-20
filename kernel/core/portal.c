@@ -17,29 +17,16 @@
 #define PAGE_FAULT_SHARE (1 << 10)
 #define PAGE_FAULT_SP (1 << 11)
 
-static int portal_handle_direct(struct portal *portal, struct portal_req *req);
-static int portal_handle_anon(struct portal *portal, struct portal_req *req);
-static int portal_handle_share(struct portal *portal, struct portal_req *req);
-static int portal_handle_cow(struct portal *portal, struct portal_req *req);
-static int portal_handle_sp(struct portal *portal, struct portal_req *req);
+static int portal_handle_direct(struct portal *portal, struct portal_req *req, struct portal_resp*);
+static int portal_handle_anon(struct portal *portal, struct portal_req *req,  struct portal_resp*);
+static int portal_handle_share(struct portal *portal, struct portal_req *req, struct portal_resp*);
+static int portal_handle_cow(struct portal *portal, struct portal_req *req,  struct portal_resp*);
+static int portal_handle_sp(struct portal *portal, struct portal_req *req, struct portal_resp*);
 
 static int portal_fault_anon(struct page_table *page_table, uintptr_t addr);
 static int portal_fault_share(struct page_table *page_table, uintptr_t addr);
 static int portal_fault_sp(struct page_table *page_table, uintptr_t addr);
 static int portal_fault_cow(struct page_table *page_table, uintptr_t addr);
-
-//	SHARED MEMORY
-//		ANONYMOUS SHARED
-//		DIRECT SHARED
-//			both cases the bulk can be handled simultaneously. Imagine multiple contexts
-//			unified both around a single shared portal, when an elemental mapping is
-//			modified (such as the case where you modify a direct mapping, or an anonymous
-//			allocation occurs, we need a way of notifying all other contexts that this change
-//			occured. To account for this, we need a structure that contains information privy
-//			and private to all contexts, most importantly a pointer to the underlying elemental
-//			mapping, such that when a modification occurs, an access causes a page fault and within
-//			this page fault should the mapping be purified.
-//			
 
 struct gateway_orb {
 	const char *identifier;
@@ -170,7 +157,7 @@ static int portal_fault_cow(struct page_table *page_table, uintptr_t addr) {
 	RETURN_ERROR;
 }
 
-static int portal_handle_direct(struct portal *portal, struct portal_req *req) {
+static int portal_handle_direct(struct portal *portal, struct portal_req *req, struct portal_resp*) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
 
 	int page_cnt = req->morphology.pcnt;
@@ -191,13 +178,35 @@ static int portal_handle_direct(struct portal *portal, struct portal_req *req) {
 	return 0;
 }
 
-static int portal_handle_anon(struct portal *portal, struct portal_req *req) {
+static int portal_handle_anon(struct portal *portal, struct portal_req *req, struct portal_resp *resp) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
+
+	if(req->type & PORTAL_REQ_CONTINUOUS) {
+		uint64_t permissions = portal_translate_protections(req->prot);
+
+		uintptr_t vaddr = req->morphology.addr;
+		uint64_t paddr = pmm_alloc(req->morphology.pcnt, 1);
+
+		for(size_t i = 0; i < req->morphology.pcnt; i++) {
+			portal->page_table->map_page(portal->page_table,
+				vaddr + i * PAGE_SIZE, paddr + i * PAGE_SIZE, permissions);
+		}
+
+		portal->type |= PORTAL_REQ_CONTINUOUS;
+		if(req->type & PORTAL_REQ_PEEK) {
+			resp->morphology.paddr = paddr;
+			resp->morphology.pcnt = req->morphology.pcnt;
+
+			portal->type |= PORTAL_REQ_PEEK;
+		}
+	}
+
 	portal->type |= PORTAL_REQ_ANON;
+
 	return 0;
 }
 
-static int portal_handle_share(struct portal *portal, struct portal_req *req) {
+static int portal_handle_share(struct portal *portal, struct portal_req *req, struct portal_resp *resp) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
 
 	struct gateway_orb *orb = NULL;
@@ -232,11 +241,8 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req) {
 			}
 
 			if(unlikely((portal->type & PORTAL_REQ_DIRECT) != PORTAL_REQ_DIRECT))
-				if(portal_handle_direct(portal, req) == -1) RETURN_ERROR;
+				if(portal_handle_direct(portal, req, resp) == -1) RETURN_ERROR;
 		}
-
-		// MAKE SURE THIS STUFF WORKS (REMEMBER THAT EITHER IT MUST ALREADY BE MAPPED OR BE PUT INTO A POSITION
-		// WHERE THE ADDRESS CAN BE RESOLVED UPON A PAGE FAULT
 
 		if((req->share.type & LINK_CIRCULAR) == LINK_CIRCULAR) {
 			struct portal_link *link = (void*)req->morphology.addr;
@@ -293,13 +299,13 @@ map:
 	return 0;
 }
 
-static int portal_handle_cow(struct portal *portal, struct portal_req *req) {
+static int portal_handle_cow(struct portal *portal, struct portal_req *req, struct portal_resp*) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
 	portal->type |= PORTAL_REQ_COW;
 	return 0;
 }
 
-static int portal_handle_sp(struct portal *portal, struct portal_req *req) {
+static int portal_handle_sp(struct portal *portal, struct portal_req *req, struct portal_resp*) {
 	if(unlikely(portal == NULL || req == NULL)) RETURN_ERROR;
 	portal->type |= PORTAL_REQ_SP;
 	return 0;
@@ -328,11 +334,11 @@ int portal(struct portal_req *req, struct portal_resp *resp) {
 
 	BST_GENERIC_INSERT(page_table->portal_root, base, portal);
 
-	if(req->type & PORTAL_REQ_DIRECT) if(portal_handle_direct(portal, req) == -1) goto failure;
-	if(req->type & PORTAL_REQ_ANON) if(portal_handle_anon(portal, req) == -1) goto failure;
-	if(req->type & PORTAL_REQ_SHARE) if(portal_handle_share(portal, req) == -1) goto failure;
-	if(req->type & PORTAL_REQ_COW) if(portal_handle_cow(portal, req) == -1) goto failure;
-	if(req->type & PORTAL_REQ_SP) if(portal_handle_sp(portal, req) == -1) goto failure;
+	if(req->type & PORTAL_REQ_DIRECT) if(portal_handle_direct(portal, req, resp) == -1) goto failure;
+	if(req->type & PORTAL_REQ_ANON) if(portal_handle_anon(portal, req, resp) == -1) goto failure;
+	if(req->type & PORTAL_REQ_SHARE) if(portal_handle_share(portal, req, resp) == -1) goto failure;
+	if(req->type & PORTAL_REQ_COW) if(portal_handle_cow(portal, req, resp) == -1) goto failure;
+	if(req->type & PORTAL_REQ_SP) if(portal_handle_sp(portal, req, resp) == -1) goto failure;
 
 	resp->base = portal->base;
 	resp->limit = portal->limit;
