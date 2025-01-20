@@ -29,6 +29,10 @@ int main(struct pci_info *pci_info) {
 	slab_cache_create(&pool, "CACHE256", 256);
 	slab_cache_create(&pool, "CACHE512", 512);
 	slab_cache_create(&pool, "CACHE1024", 1024);
+	slab_cache_create(&pool, "CACHE2048", 2048);
+	slab_cache_create(&pool, "CACHE4096", 4096);
+	slab_cache_create(&pool, "CACHE8192", 8192);
+	slab_cache_create(&pool, "CACHE16384", 16384);
 
 	print("DUFAY: NVME: Slab cache directory initialised\n");
 

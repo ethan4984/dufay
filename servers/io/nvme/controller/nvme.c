@@ -76,6 +76,8 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	if(controller->regs->cc & (1 << 0)) controller->regs->cc &= ~(1 << 0);
 	for(; controller->regs->cc & (1 << 0););
 
+	print("DUFAY: NVME: controller reset\n");
+
 	struct pci_nmsi nmsi = {
 		.descriptor = pci_info->descriptor,
 		.irq_vector = pci_info->irq_vector
@@ -105,27 +107,65 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 		"nvme_irq", pci_info->irq_vector);
 	if(syscall_response.ret == -1) return -1;
 
-	/*controleler->qid_bitmap = (struct bitmap) {
-		.data = alloc(0xffff / 8),
-		.size = 0xffff,
-		.resizable = false,
-	};
-
 	controller->queue_entries = controller->regs->cap & 0xffff;
 	controller->strides = (controller->regs->cap >> 32) & 0xf;
 
-	struct portal_req portal_req = {
-
-	};
-
-	struct portal_resp portal_resp;
-
 	controller->admin_queue = alloc(sizeof(struct nvme_queue_pair));
-	if(controller->admin_queue) RETURN_ERROR;
+	if(controller->admin_queue == NULL) RETURN_ERROR;
+
+	controller->qid_bitmap = (struct bitmap) {
+		.data = alloc(NVME_QID_MAX / 8),
+		.size = NVME_QID_MAX,
+		.resizable = false
+	};
 
 	ret = bitmap_alloc(&controller->qid_bitmap, &controller->admin_queue->qid);
 	if(ret == -1 || controller->admin_queue->qid) RETURN_ERROR;
-	controller->admin_queue->controller = controller;*/
+	controller->admin_queue->controller = controller;
+	controller->admin_queue->entry_cnt = controller->queue_entries;
+
+	uintptr_t address;
+	ret = as_address(&address_space, &address, controller->admin_queue->entry_cnt * sizeof(struct nvme_command));
+	if(ret == -1) RETURN_ERROR;
+
+	struct portal_resp portal_resp;
+	struct portal_req portal_req = {
+		.type = PORTAL_REQ_ANON | PORTAL_REQ_CONTINUOUS | PORTAL_REQ_PEEK,
+		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+		.morphology = {
+			.addr = address,
+			.length = ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE),
+			.pcnt = DIV_ROUNDUP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)
+		}
+	};
+
+	syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
+	if(syscall_response.ret == -1 || portal_resp.base != address || portal_resp.limit !=
+		ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)) RETURN_ERROR;
+	
+	controller->regs->asq = portal_resp.morphology.paddr;
+
+	ret = as_address(&address_space, &address, controller->admin_queue->entry_cnt * sizeof(struct nvme_command));
+	if(ret == -1) RETURN_ERROR;
+
+	portal_resp = (struct portal_resp) { 0 };
+	portal_req.morphology.addr = address;
+
+	syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
+	if(syscall_response.ret == -1 || portal_resp.base != address || portal_resp.limit !=
+		ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)) RETURN_ERROR;
+	
+	controller->regs->aqa = (controller->admin_queue->entry_cnt - 1) << 16 |
+		(controller->admin_queue->entry_cnt - 1);
+	controller->regs->acq = portal_resp.morphology.paddr;
+
+	controller->regs->cc = (1 << 0) | (0 << 4) | (0 << 11) | (0 << 14) | (6 << 16) | (4 << 20);
+	for(;;) {
+		if(controller->regs->cc & (1 << 0)) break;
+		else if(controller->regs->csts & (1 << 1)) RETURN_ERROR;
+	}
+
+	print("DUFAY: NVME: controller enabled\n");
 
 	return 0;
 }

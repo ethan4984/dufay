@@ -91,7 +91,8 @@ $(DISK_IMAGE): limine kernel recompile_servers
 	sudo mkdir disk_image/boot
 	sudo mkdir disk_image/servers/
 	sudo cp servers/sched/sched disk_image/servers
-	sudo cp servers/io/nvme/nvme disk_image/servers
+	sudo cp servers/io/nvme/controller/nvme disk_image/servers
+	sudo cp servers/io/nvme/irq/nvme_irq disk_image/servers
 	sudo cp servers/io/pci/pci disk_image/servers
 	sudo cp servers/fs/vfs/vfs disk_image/servers
 	sudo cp kernel/dufay.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
