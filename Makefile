@@ -70,7 +70,6 @@ $(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel recompile_servers
 	cp servers/io/nvme/controller/nvme disk_image/servers
 	cp servers/io/nvme/irq/nvme_irq disk_image/servers
 	cp servers/io/pci/pci disk_image/servers
-	cp servers/fs/vfs/vfs disk_image/servers
 	cp kernel/dufay.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
 	./limine/limine bios-install dufay.iso
@@ -94,7 +93,6 @@ $(DISK_IMAGE): $(BUILD) limine kernel recompile_servers
 	sudo cp servers/io/nvme/controller/nvme disk_image/servers
 	sudo cp servers/io/nvme/irq/nvme_irq disk_image/servers
 	sudo cp servers/io/pci/pci disk_image/servers
-	sudo cp servers/fs/vfs/vfs disk_image/servers
 	sudo cp kernel/dufay.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	sync
 	sudo umount disk_image/
