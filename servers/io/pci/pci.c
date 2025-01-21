@@ -85,6 +85,7 @@ static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar
 	uint64_t limit = bar_size_high << 32 | bar_size_low;
 	limit = is_mmio ? limit & ~0xf : limit & ~0x3;
 	limit = ~limit + 1;
+	limit &= ~0xFFFFFFFF00000000; // hack
 
 	*bar = (struct pci_bar) {
 		.base = base,
@@ -95,8 +96,6 @@ static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar
 
 	return 0;
 }
-
-#define BSP_APIC_ID 0x0
 
 static int pci_device_msi(struct pci_device *device, int vector) {
 	if(device == NULL) return -1;
@@ -131,13 +130,13 @@ static int pci_device_msix(struct pci_device *device, int vector) {
 
 	msix_vector_offset *= 16;
 
-	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset) = (0xfee << 2) | (core_morphology->lapic_id << 12);
-	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 4) = 0;
-	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 8) = vector;
-	*(volatile uint16_t*)(device->msix_bar.base + device->msix_bar_offset +
+	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 12) = 0;
 
 	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msix_offset + 2);
@@ -192,6 +191,25 @@ static int pci_device_spawn(struct pci_device *pci_device) {
 
 				int ret = pci_device_bar(pci_device->config, &pci_device->msix_bar, bar_index);
 				if(ret == -1) { print("DUFAY: PCI: failed to locate MSIX bar\n"); continue; }
+
+				ret = as_address(&address_space, (uintptr_t*)&pci_device->msix_space, pci_device->msix_bar.limit);
+				if(ret == -1) RETURN_ERROR;
+
+				struct portal_req portal_req = {
+					.type = PORTAL_REQ_DIRECT,
+					.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+					.length = sizeof(struct portal_req),
+					.morphology = {
+						.addr = (uintptr_t)pci_device->msix_space, .length = pci_device->msix_bar.limit,
+						.paddr = pci_device->msix_bar.base, .pcnt =
+							DIV_ROUNDUP(pci_device->msix_bar.limit, PAGE_SIZE)
+					}
+				};
+
+				struct portal_resp portal_resp;
+				struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
+				if(syscall_response.ret == -1 || portal_resp.base != (uintptr_t)pci_device->msix_space ||
+					portal_resp.limit != pci_device->msix_bar.limit) RETURN_ERROR;
 
 				pci_device->msix_bar_offset = (table_ptr >> 3) << 3;
 				pci_device->msix_bitmap = (struct bitmap) {

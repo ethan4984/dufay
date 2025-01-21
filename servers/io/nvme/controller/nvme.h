@@ -124,7 +124,7 @@ struct [[gnu::packed]] nvme_command {
 		struct nvme_command_features features;
 		struct nvme_command_identify identify;
 		struct nvme_command_rw rw;
-	};
+	} private;
 };
 
 struct [[gnu::packed]] nvme_completion {

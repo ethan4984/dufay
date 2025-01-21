@@ -24,6 +24,7 @@ struct pci_device {
 	struct pci_bar msix_bar;
 	int msix_bar_offset;
 	struct bitmap msix_bitmap;
+	void *msix_space;
 
 	volatile union pci_config *config;
 };
