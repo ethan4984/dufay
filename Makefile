@@ -78,7 +78,7 @@ $(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel recompile_servers
 	parted -s disk.img mklabel msdos
 	parted -s disk.img mkpart primary 1 100%
 
-$(DISK_IMAGE): limine kernel recompile_servers
+$(DISK_IMAGE): $(BUILD) limine kernel recompile_servers
 	rm -f dufay.img 
 	dd if=/dev/zero bs=1M count=0 seek=1024 of=dufay.img
 	parted -s dufay.img mklabel msdos
