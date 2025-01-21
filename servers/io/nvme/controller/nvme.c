@@ -132,7 +132,7 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	controller->version.minor = (controller->regs->vs >> 8) & 0xff;
 	controller->version.tertiary = (controller->regs->vs >> 0) & 0xff;
 
-	print("DUFAY: NVME: version detected %d:%d:%d\n", controller->version.major,
+	print("Version detected %d:%d:%d\n", controller->version.major,
 		controller->version.minor, controller->version.tertiary);
 
 	controller->page_size_max = 1 << (12 + (controller->regs->cap >> 52 & 0xf));
@@ -141,7 +141,7 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	if(controller->regs->cc & (1 << 0)) controller->regs->cc &= ~(1 << 0);
 	for(; controller->regs->cc & (1 << 0););
 
-	print("DUFAY: NVME: controller reset\n");
+	print("Controller reset\n");
 
 	struct pci_nmsi nmsi = {
 		.descriptor = pci_info->descriptor,
@@ -149,13 +149,13 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	};
 
 	if(pci_info->msix_capable) {
-		print("DUFAY: NVME: device is MSIX capable\n");
+		print("Device is MSIX capable\n");
 		nmsi.msix = true;
 	} else if(pci_info->msi_capable) {
-		print("DUFAY: NVME: device is MSI capable\n");
+		print("Device is MSI capable\n");
 		nmsi.msix = false;
 	} else {
-		print("DUFAY: NVME: device is neither MSI or MSIX capable\n");
+		print("Device is neither MSI or MSIX capable\n");
 		return -1;
 	}
 
@@ -242,7 +242,7 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 		else if(controller->regs->csts & (1 << 1)) RETURN_ERROR;
 	}
 
-	print("DUFAY: NVME: controller enabled\n");
+	print("Controller enabled\n");
 
 	ret = nvme_fetch_controller_id(controller);
 	if(ret == -1) RETURN_ERROR;

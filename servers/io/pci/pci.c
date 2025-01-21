@@ -28,12 +28,12 @@ static struct pci_core_morphology *pci_fetch_optimal_core(void);
 
 static void nbar(struct notification_info*, void *data, int) {
 	struct pci_nbar *nbar = data;
-	if(nbar == NULL) { print("DUFAY: PCI: NBAR: is null\n"); goto finish; }
+	if(nbar == NULL) { print("ERROR: NBAR: is null\n"); goto finish; }
 
 	struct pci_device *device = NULL;
 	int ret = hash_table_search(&device_tree, &nbar->descriptor,
 		sizeof(struct pci_descriptor), (void**)&device);
-	if(ret == -1 || device == NULL) { print("DUFAY: PCI: NBAR: can not find device\n"); goto finish; }
+	if(ret == -1 || device == NULL) { print("ERROR: NBAR: can not find device\n"); goto finish; }
 
 	ret = pci_device_bar(device->config, &nbar->bar, 0);
 	if(ret == -1) { nbar->valid = false; goto finish; }
@@ -44,12 +44,12 @@ finish:
 
 static void nmsi(struct notification_info*, void *data, int) {
 	struct pci_nmsi *nmsi = data;
-	if(nmsi == NULL) { print("DUFAY: PCI: NMSI: is null\n"); goto finish; }
+	if(nmsi == NULL) { print("ERROR: NMSI: is null\n"); goto finish; }
 
 	struct pci_device *device = NULL;
 	int ret = hash_table_search(&device_tree, &nmsi->descriptor,
 		sizeof(struct pci_descriptor), (void**)&device);
-	if(ret == -1 || device == NULL) { print("DUFAY: PCI: NMSI: can not find device\n"); goto finish; }
+	if(ret == -1 || device == NULL) { print("ERROR: NMSI: can not find device\n"); goto finish; }
 
 	if(nmsi->msix) ret = pci_device_msix(device, nmsi->irq_vector);
 	else ret = pci_device_msi(device, nmsi->irq_vector);
@@ -165,7 +165,7 @@ static struct pci_core_morphology *pci_fetch_optimal_core(void) {
 static int pci_device_spawn(struct pci_device *pci_device) {
 	if(pci_device == NULL) RETURN_ERROR;
 
-	print("DUFAY: PCI: [%x:%x:%x] class %x: subclass %x: progif: %x: vendor_id: %x: device_id: %x\n",
+	print("[%x:%x:%x] class %x: subclass %x: progif: %x: vendor_id: %x: device_id: %x\n",
 		pci_device->descriptor.bus, pci_device->descriptor.device, pci_device->descriptor.func,
 		pci_device->config->device.class, pci_device->config->device.subclass, pci_device->config->device.prog_if,
 		pci_device->config->device.vendor_id, pci_device->config->device.device_id
@@ -190,7 +190,7 @@ static int pci_device_spawn(struct pci_device *pci_device) {
 				int bar_index = table_ptr & 0b111;
 
 				int ret = pci_device_bar(pci_device->config, &pci_device->msix_bar, bar_index);
-				if(ret == -1) { print("DUFAY: PCI: failed to locate MSIX bar\n"); continue; }
+				if(ret == -1) { print("ERROR: failed to locate MSIX bar\n"); continue; }
 
 				ret = as_address(&address_space, (uintptr_t*)&pci_device->msix_space, pci_device->msix_bar.limit);
 				if(ret == -1) RETURN_ERROR;
@@ -262,7 +262,7 @@ int pci(struct pci_server_meta *server_meta) {
 	struct mcfg *mcfg = server_meta->mcfg;
 	if(mcfg == NULL || !(mcfg->signature[0] == 'M' && mcfg->signature[1] == 'C'
 		&& mcfg->signature[2] == 'F' && mcfg->signature[3] == 'G')) {
-		print("DUFAY: PCI: mcfg does not exist\n");
+		print("ERROR: MCFG does not exist\n");
 		return -1;
 	}
 
@@ -271,20 +271,20 @@ int pci(struct pci_server_meta *server_meta) {
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
 		NOT_PCI_BAR, &bar_action, NULL);
-	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NBAR\n"); return -1; }
+	if(response.ret == -1) { print("ERROR: failure to set notification PCI_NBAR\n"); return -1; }
 
 	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
 		NOT_PCI_MSI, &msi_action, NULL);
-	if(response.ret == -1) { print("DUFAY: PCI: Failure to set notification PCI_NMSI\n"); return -1; }
+	if(response.ret == -1) { print("ERROR: failure to set notification PCI_NMSI\n"); return -1; }
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to activate notification queue\n"); return -1; }
+	if(response.ret == -1) { print("ERROR: failed to activate notification queue\n"); return -1; }
 
 	for(unsigned int i = 0; i < (mcfg->length - sizeof(struct mcfg)) /
 		sizeof(struct mcfg_entry); i++) {
 		struct mcfg_entry *mcfg_entry = &mcfg->entry[i];
 
-		print("DUFAY: PCI: segment %d bus [%d -> %d] at base [%x]\n",
+		print("segment %d bus [%d -> %d] at base [%x]\n",
 			mcfg_entry->segment, mcfg_entry->bus_start, mcfg_entry->bus_end, mcfg_entry->base);
 
 		size_t page_cnt = DIV_ROUNDUP(PCI_CONFIG(mcfg_entry->base, mcfg_entry->bus_end, 31, 7) -
@@ -293,7 +293,7 @@ int pci(struct pci_server_meta *server_meta) {
 		uintptr_t addr;
 		int ret = as_address(&address_space, &addr, page_cnt * PAGE_SIZE); 
 		if(ret == -1) {
-			print("DUFAY: PCI: failed to map configuration space for segment=%d\n", mcfg_entry->segment);
+			print("ERROR: failed to map configuration space for segment=%d\n", mcfg_entry->segment);
 			RETURN_ERROR;
 		}
 

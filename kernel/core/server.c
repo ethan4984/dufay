@@ -130,7 +130,7 @@ SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier
 
 	int ret = launch_server(server, arg, length);
 	if(ret == -1) {
-		print("dufay: failed to launch server {%s}\n", server->name);
+		print("ERROR: failed to launch server {%s}\n", server->name);
 		RETURN_ERROR;
 	}
 
@@ -161,11 +161,13 @@ int launch_servers(void) {
 	struct limine_file **modules = limine_module_request.response->modules;
 	uint64_t module_count = limine_module_request.response->module_count;
 
-	print("dufay: booting servers {%x}\n", module_count);
+	print("booting servers\n");
 
-	for(uint64_t i = 0; i < module_count; i++)
-		if(strcmp(modules[i]->cmdline, "scheduler") == 0)
+	for(uint64_t i = 0; i < module_count; i++) {
+		if(strcmp(modules[i]->cmdline, "scheduler") == 0) {
 			launch_schedulers(modules[i]);
+		}
+	}
 
 	int ret = create_namespace("IO");
 	if(ret == -1) RETURN_ERROR;
@@ -175,13 +177,13 @@ int launch_servers(void) {
 			strcmp(modules[i]->cmdline, "ahci") != 0 && 
 			strcmp(modules[i]->cmdline, "nvme") != 0) continue;
 
-		print("dufay: launching IO server {%s}\n", modules[i]->cmdline);
+		print("launching IO server [%s]\n", modules[i]->cmdline);
 
 		struct server *server = alloc(sizeof(struct server));
 
 		ret = create_server("IO", modules[i]->cmdline, server);
 		if(ret == -1) { 
-			print("dufay: failed to initiate server meta {%s}\n", modules[i]->cmdline);
+			print("ERROR: failed to initiate server meta {%s}\n", modules[i]->cmdline);
 			RETURN_ERROR;
 		}
 
@@ -206,7 +208,7 @@ int launch_servers(void) {
 			int ret = launch_server(server, server_meta, sizeof(struct pci_server_meta) +
 				logical_processor_cnt * sizeof(*server_meta->lapic_id) + mcfg->length);
 			if(ret == -1) {
-				print("dufay: failed to launch server {%s}\n", modules[i]->cmdline);
+				print("ERROR: failed to launch server {%s}\n", modules[i]->cmdline);
 				RETURN_ERROR;
 			}
 		}
@@ -238,7 +240,8 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	int ret = elf64_file_init(elf);
 	if(ret == -1) RETURN_ERROR;
 
-	print("dufay: aslr: [%s]: %x -> %x\n", server->name, elf->aslr_layout->lower_bound, elf->aslr_layout->upper_bound);
+	print("ASLR: applied to [%s]: %x -> %x\n", server->name,
+		elf->aslr_layout->lower_bound, elf->aslr_layout->upper_bound);
 
 	ret = elf64_file_aux(elf, &elf->aux);
 	if(ret == -1) RETURN_ERROR;
@@ -260,7 +263,7 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	ustack->active = 1;
 
 	ret = USTACK_PUSH(context, ustack);
-	if(ret == -1) { print("dufay: unable to push ustack\n"); RETURN_ERROR; }
+	if(ret == -1) { print("ERROR: unable to push ustack\n"); RETURN_ERROR; }
 
 	struct ucontext *ucontext = alloc(sizeof(struct ucontext));
 
@@ -271,7 +274,7 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	ucontext->etrigger->ucontext = ucontext;	
 
 	ret = UCONTEXT_PUSH(context, ucontext);
-	if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }
+	if(ret == -1) { print("ERROR: failed to push ucontext on stack\n"); RETURN_ERROR; }
 	
 	context->ucontext_top = ucontext;
 
@@ -374,7 +377,7 @@ static int launch_schedulers(struct limine_file *file) {
 		};
 
 		if(launch_server(servers[i], descriptor, sizeof(struct sched_descriptor)) == -1) {
-			print("dufay: failed to launch server\n");
+			print("ERROR: failed to launch server\n");
 			continue;
 		}
 

@@ -133,7 +133,7 @@ void pmm_init(void) {
 
 	for(size_t i = 0; i < entry_count; i++) { // create bitmap modules for all usable regions
 		if(mmap[i]->type == LIMINE_MEMMAP_USABLE && mmap[i]->length) {
-			print("pmm: [%x -> %x] length %x type %x\n", mmap[i]->base, mmap[i]->base + mmap[i]->length, mmap[i]->length, mmap[i]->type);
+			print("PMM: [%x -> %x] length %x type %x\n", mmap[i]->base, mmap[i]->base + mmap[i]->length, mmap[i]->length, mmap[i]->type);
 
 			if(root_module == NULL) {
 				meta_buffer = (void*)(ALIGN_UP((uintptr_t)meta_buffer - HIGH_VMA, sizeof(struct pmm_module)) + HIGH_VMA);
@@ -158,7 +158,7 @@ void pmm_init(void) {
 		}
 	}
 
-	print("pmm: initialised\n");
+	print("PMM: initialised\n");
 }
 
 

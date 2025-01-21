@@ -19,13 +19,19 @@ void print(const char *str, ...) {
 	va_list arg;
 	va_start(arg, str);
 
+	const char *prefix = "DUFAY: [NVME IRQ] "; 
+	for(; *prefix;) {
+		print_stream.write(&print_stream, *prefix);
+		prefix++;
+	}
+
 	stream_print(&print_stream, str, arg);
 
 	va_end(arg);
 }
 
 void panic(const char *str, ...) {
-	print("DUFAY: NVME: PANIC < ");
+	print("PANIC [ ");
 
 	va_list arg;
 	va_start(arg, str);
@@ -34,7 +40,7 @@ void panic(const char *str, ...) {
 
 	va_end(arg);
 
-	print(" >\n");
+	print(" ]\n");
 
 	for(;;);
 }

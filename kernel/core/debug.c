@@ -18,7 +18,7 @@ struct stream_info print_stream = {
 };
 
 SYSCALL_DEFINE1(log, char, character, ({
-	print("%c", character);
+	print_stream.write(&print_stream, character);
 }))
 
 void print_unlocked(const char *str, ...) {
@@ -34,9 +34,13 @@ void print(const char *str, ...) {
 	va_list arg; 
 	va_start(arg, str);
 
-	//spinlock(&print_stream.lock);
+	const char *prefix = "DUFAY: [KERNEL] "; 
+	for(; *prefix;) {
+		print_stream.write(&print_stream, *prefix);
+		prefix++;
+	}
+
 	stream_print(&print_stream, str, arg);
-	//spinrelease(&print_stream.lock);
 
 	va_end(arg);
 }
@@ -47,7 +51,6 @@ void panic(const char *str, ...) {
 	va_list arg;
 	va_start(arg, str);
 
-	//spinlock(&print_stream.lock);
 	stream_print(&print_stream, str, arg);
 	
 	va_end(arg);
@@ -57,8 +60,6 @@ void panic(const char *str, ...) {
 	uint64_t rbp;
 	__asm__ volatile ("mov %%rbp, %0" : "=r"(rbp));
 	stacktrace((void*)rbp);
-
-	//spinrelease(&print_stream.lock);
 
 	for(;;) __asm__ volatile ("cli\nhlt");
 }

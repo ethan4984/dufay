@@ -141,7 +141,7 @@ static int notification_ucontext_instantiate(struct context *context, struct uco
 
 	ret = portal(&req, &resp);
 	if(ret == -1 || resp.base != ucontext->regs.rsp) {
-		print("dufay: unable to anonymously map notification stack\n");
+		print("ERROR: unable to anonymously map notification stack\n");
 		RETURN_ERROR;
 	}
 
@@ -184,7 +184,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		ucontext->ready = ready;
 
 		int ret = UCONTEXT_PUSH(target, ucontext);
-		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }
+		if(ret == -1) { print("ERROR: failed to push ucontext on stack\n"); RETURN_ERROR; }
 
 		target->ucontext_top = ucontext;
 		VECTOR_PUSH(CORE_LOCAL->delivery_stack, target);
@@ -291,7 +291,7 @@ int notification_dispatch(struct context *context) {
 		int ret = notification_ucontext_instantiate(context, context->ucontext_top,
 			context->ucontext_top->notification, action);	
 		if(ret == -1) {
-			print("dufay: failed to initialise ucontext\n");
+			print("ERROR: failed to initialise ucontext\n");
 			spinrelease(&queue->lock); RETURN_ERROR;
 		}
 
@@ -307,7 +307,7 @@ int notification_dispatch(struct context *context) {
 
 		int ret = notification_pop(queue, &notification, i);
 		if(ret == -1) {
-			print("dufay: failed to pop notification from stack\n");
+			print("ERROR: failed to pop notification from stack\n");
 			spinrelease(&queue->lock); RETURN_ERROR;
 		}
 		if(notification == NULL || action == NULL) { continue; }
@@ -324,7 +324,7 @@ int notification_dispatch(struct context *context) {
 		if(ret == -1) { spinrelease(&queue->lock); RETURN_ERROR; }
 
 		ret = UCONTEXT_PUSH(context, ucontext);
-		if(ret == -1) { print("dufay: failed to push ucontext on stack\n"); RETURN_ERROR; }
+		if(ret == -1) { print("ERROR: failed to push ucontext on stack\n"); RETURN_ERROR; }
 
 		context->ucontext_top = ucontext;
 
@@ -418,20 +418,20 @@ SYSCALL_DEFINE0(notification_return, {
 finish:
 		rcontext;
 	});
-	if(rcontext == NULL) panic("dufay: rcontext is null\n");
+	if(rcontext == NULL) panic("rcontext is null\n");
 
 	if(rcontext->notification) {
 		struct notification_action *action = &context->notification.actions[rcontext->notification->notnum - 1];
 		int ret = notification_ucontext_instantiate(context, rcontext,
 			rcontext->notification, action);	
-		if(ret == -1) panic("dufay: cant instantiate ucontetx");
+		if(ret == -1) panic("unable to instantiate ucontetx");
 
 		rcontext->delivered = 1;
 	}
 
 	rcontext->blocking = false;
 	int ret = destroy_ucontext(context, context->ucontext_active);
-	if(ret == -1) panic("dufay: failed to kill active ucontext\n");
+	if(ret == -1) panic("failed to kill active ucontext\n");
 
 	context->ucontext_active = rcontext;
 
@@ -483,7 +483,7 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge*, bridge, {
 	if(notification == NULL) return -1;
 
 	struct ucontext *ucontext = context->ucontext_active;
-	if(ucontext == NULL) { print("DUFAY: ucontext is null (should not be)"); return -1; }
+	if(ucontext == NULL) { print("ERROR: ucontext is null (should not be)"); return -1; }
 
 	ucontext->blocking = true;
 	for(; ucontext->blocking;) yield();

@@ -122,13 +122,14 @@ extern void isr_handler_main(struct registers *regs) {
 
 		spinlock(&exception_lock);
 
-		print("debug: Kowalski analysis: \"%s\", Error: %x\n", exception_messages[regs->isr_number], regs->error_code);
-		print("debug: RAX: %x | RBX: %x | RCX: %x | RDX: %x\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
-		print("debug: RSI: %x | RDI: %x | RBP: %x | RSP: %x\n", regs->rsi, regs->rdi, regs->rbp, regs->rsp);
-		print("debug: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8, regs->r9, regs->r10, regs->r11);
-		print("debug: r12: %x | r13: %x | r14: %x | r15: %x\n", regs->r12, regs->r13, regs->r14, regs->r15); 
-		print("debug: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs, regs->ss, cr2, regs->rip);
-		print("debug: cr3: %x\n", cr3);
+		print("DEBUG: Kowalski analysis: \"%s\" with error code: %x\n",
+			exception_messages[regs->isr_number], regs->error_code);
+		print("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
+		print("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n", regs->rsi, regs->rdi, regs->rbp, regs->rsp);
+		print("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8, regs->r9, regs->r10, regs->r11);
+		print("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n", regs->r12, regs->r13, regs->r14, regs->r15); 
+		print("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs, regs->ss, cr2, regs->rip);
+		print("DEBUG: cr3: %x\n", cr3);
 
 		spinrelease(&exception_lock);
 

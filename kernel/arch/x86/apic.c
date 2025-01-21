@@ -101,7 +101,7 @@ void apic_init() {
 	madt_hdr = acpi_find_sdt("APIC");
 
 	if(madt_hdr == NULL) {
-		print("apic: unable to locate APIC SDT\n");
+		print("APIC: unable to locate APIC SDT\n");
 		return;
 	}
 
@@ -128,7 +128,7 @@ void apic_init() {
 		i += entry_size - 3;
 	}
 
-	print("apic: core count %d\n", madt_ent0_list.length);
+	print("APIC: processor count %d\n", madt_ent0_list.length);
 
 	for(size_t i = 0; i < madt_ent1_list.length; i++) {
 		struct madt_ent1 *madt1	= &madt_ent1_list.data[i];
@@ -146,11 +146,11 @@ void apic_init() {
 		ioapic.maximum_redirection_entry = ioapic_read(&ioapic, 1) >> 16 & 0xff;
 		ioapic.ioapic_arbitration_id = ioapic_read(&ioapic, 2) >> 23 & 0xf;
 
-		print("ioapic: id %x\n", ioapic.ioapic_id);
-		print("ioapic: version %x\n", ioapic.ioapic_version);
-		print("ioapic: maximum redirection entry %x\n", ioapic.maximum_redirection_entry);
-		print("ioapic: arbitration id %x\n", ioapic.ioapic_arbitration_id);
-		print("ioapic: base %x\n", (uintptr_t)ioapic.ioapic_base);
+		print("IOAPIC: id %x\n", ioapic.ioapic_id);
+		print("IOAPIC: version %x\n", ioapic.ioapic_version);
+		print("IOAPIC: maximum redirection entry %x\n", ioapic.maximum_redirection_entry);
+		print("IOAPIC: arbitration id %x\n", ioapic.ioapic_arbitration_id);
+		print("IOAPIC: base %x\n", (uintptr_t)ioapic.ioapic_base);
 
 		VECTOR_PUSH(ioapic_list, ioapic);
 	}

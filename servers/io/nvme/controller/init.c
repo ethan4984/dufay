@@ -15,7 +15,7 @@ static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
 int main(struct pci_info *pci_info) {
-	print("DUFAY: NVME: booting nvme server\n"); // TODO launch distinct server for each discrete controller
+	print("Booting nvme server\n"); // TODO launch distinct server for each discrete controller
 
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
@@ -34,19 +34,19 @@ int main(struct pci_info *pci_info) {
 	slab_cache_create(&pool, "CACHE8192", 8192);
 	slab_cache_create(&pool, "CACHE16384", 16384);
 
-	print("DUFAY: NVME: Slab cache directory initialised\n");
+	print("Slab cache directory initialised\n");
 
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for(int i = 0; i < 4; i++) {
 		uintptr_t addr;
 		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
-		if(ret == -1) { print("DUFAY: NVME: Failed to allocate address for stack\n"); goto failure; }
+		if(ret == -1) { print("ERROR: failed to allocate address for stack\n"); goto failure; }
 
 		struct syscall_response response = SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
 			addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
 
-		if(response.ret == -1) print("DUFAY: NVME: failed to allocate notification stack\n");
-		else print("DUFAY: NVME: Allocated notificaton stack #%d [%x:%x]\n",
+		if(response.ret == -1) print("ERROR: failed to allocate notification stack\n");
+		else print("Allocated notificaton stack #%d [%x:%x]\n",
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
@@ -94,7 +94,7 @@ int main(struct pci_info *pci_info) {
 		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
 
 	ret = nvme(pci_info, (volatile struct nvme_regs*)addr);
-	if(ret == -1) { print("DUFAY: NVME: Internal critical failure\n"); goto failure; }
+	if(ret == -1) { print("ERROR: internal critical failure\n"); goto failure; }
 failure:
 	for(;;);
 }
@@ -110,15 +110,19 @@ void print(const char *str, ...) {
 	va_list arg; 
 	va_start(arg, str);
 
-	int ret = stream_print(&print_stream, str, arg);
-	if(ret == -1) SYSCALL1(SYSCALL_LOG, 'd');
-	if(print_stream.write == NULL) SYSCALL1(SYSCALL_LOG, 'w');
+	const char *prefix = "DUFAY: [NVME] ";
+	for(; *prefix;) {
+		print_stream.write(&print_stream, *prefix);
+		prefix++;
+	}
+
+	stream_print(&print_stream, str, arg);
 
 	va_end(arg);
 }
 
 void panic(const char *str, ...) {
-	print("DUFAY: NVME: PANIC < ");
+	print("PANIC [ ");
 
 	va_list arg; 
 	va_start(arg, str);
@@ -127,7 +131,7 @@ void panic(const char *str, ...) {
 
 	va_end(arg);
 
-	print(" >\n");
+	print(" ]\n");
 
 	for(;;);
 }

@@ -34,7 +34,7 @@ static void spfree(void *addr, uint64_t s, uint64_t) { pmm_free((uint64_t)addr -
 void dufay_entry(void) {
 	if(limine_hhdm_request.response) HIGH_VMA = limine_hhdm_request.response->offset;
 
-	print("dufay: init\n");
+	print("welcome\n");
 
 	x86_system_init();
 
@@ -65,10 +65,10 @@ void dufay_entry(void) {
 
 	if(rsdp->xsdt_addr) {
 		xsdt = (struct xsdt*)(rsdp->xsdt_addr + HIGH_VMA);
-		print("acpi: xsdt found at %x\n", (uintptr_t)xsdt);
+		print("ACPI: xsdt found at %x\n", (uintptr_t)xsdt);
 	} else {
 		rsdt = (struct rsdt*)(rsdp->rsdt_addr + HIGH_VMA);
-		print("acpi: rsdt found at %x\n", (uintptr_t)rsdt);
+		print("ACPI: rsdt found at %x\n", (uintptr_t)rsdt);
 	}
 
 	fadt = acpi_find_sdt("FACP");

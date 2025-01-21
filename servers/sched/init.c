@@ -12,16 +12,16 @@ static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
 int main(struct sched_descriptor *desc) {
-	print("DUFAY: SCHEDULER: booting server {processor_id=%x}\n", desc->processor_id);
+	print("Booting server [processor_id=%x]\n", desc->processor_id);
 
 	if(desc->timer.source == TIME_SOURCE_INVARIANT_TSC) {
-		print("DUFAY: SCHEDULER: using invariant TSC as timer [freq: %d]\n", desc->timer.freq);
+		print("Using invariant TSC as timer [freq: %d]\n", desc->timer.freq);
 		desc->timer.read = invariant_tsc_read;
 	} else if(desc->timer.source == TIME_SOURCE_HPET) {
-		print("DUFAY: SCHEDULER: using HPET as timer [unsupported]\n");
+		print("Using HPET as timer [unsupported]\n");
 		goto failure;
 	} else {
-		print("DUFAY: SCHEDULER: timer source unknown\n");
+		print("Timer source unknown\n");
 		goto failure;
 	}
 
@@ -38,25 +38,25 @@ int main(struct sched_descriptor *desc) {
 	slab_cache_create(&pool, "CACHE512", 512);
 	slab_cache_create(&pool, "CACHE1024", 1024);
 
-	print("DUFAY: SCHEDULER: Slab cache directory initialised\n");
+	print("Slab cache directory initialised\n");
 
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for(int i = 0; i < 4; i++) {
 		uintptr_t addr;
 		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
-		if(ret == -1) { print("DUFAY: SCHEDULER: Failed to allocate address for stack\n"); goto failure; }
+		if(ret == -1) { print("ERROR: failed to allocate address for stack\n"); goto failure; }
 
 		struct syscall_response response = SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
 			addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
 
-		if(response.ret == -1) print("DUFAY: SCHEDULER: failed to allocate notification stack\n");
-		else print("DUFAY: SCHEDULER: Allocated notificaton stack #%d [%x:%x]\n",
+		if(response.ret == -1) print("ERROR: failed to allocate notification stack\n");
+		else print("Allocated notificaton stack #%d [%x:%x]\n",
 			i, addr, NOTIFICATION_STACK_SIZE);
 	}
 
 	uintptr_t addr;
 	int ret = as_allocate(&address_space, &addr, 0x10000);
-	if(ret == -1) { print("DUFAY: SCHEDULER: Failed to allocate address\n"); goto failure; }
+	if(ret == -1) { print("ERROR: failed to allocate address\n"); goto failure; }
 
 	struct portal_resp portal_resp;
 	struct portal_req portal_req = {
@@ -76,13 +76,13 @@ int main(struct sched_descriptor *desc) {
 	};
 
 	struct syscall_response response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(response.ret == -1) { print("DUFAY: SCHEDULER: Failed to estabilish link with kernel\n"); goto failure; }
+	if(response.ret == -1) { print("ERROR: failed to estabilish link with kernel\n"); goto failure; }
 
 	struct portal_link *link = (void*)portal_resp.base;
-	print("DUFAY: SCHEDULER: Has established link with kernel {%x}\n", link);
+	print("Link with kernel has been stablished [%x]\n", link);
 
 	ret = sched(link, desc);
-	if(ret == -1) { print("DUFAY: SCHEDULER: Internal critical failure\n"); goto failure; }
+	if(ret == -1) { print("ERROR: critical failure\n"); goto failure; }
 failure:
 	for(;;);
 }
@@ -98,15 +98,19 @@ void print(const char *str, ...) {
 	va_list arg; 
 	va_start(arg, str);
 
-	int ret = stream_print(&print_stream, str, arg);
-	if(ret == -1) SYSCALL1(SYSCALL_LOG, 'd');
-	if(print_stream.write == NULL) SYSCALL1(SYSCALL_LOG, 'w');
+	const char *prefix = "DUFAY: [SCHED] "; 
+	for(; *prefix;) {
+		print_stream.write(&print_stream, *prefix);
+		prefix++;
+	}
+
+	stream_print(&print_stream, str, arg);
 
 	va_end(arg);
 }
 
 void panic(const char *str, ...) {
-	print("DUFAY: SCHEDULER: PANIC < ");
+	print("PANIC [ ");
 
 	va_list arg; 
 	va_start(arg, str);
@@ -115,7 +119,7 @@ void panic(const char *str, ...) {
 
 	va_end(arg);
 
-	print(" >\n");
+	print(" ]\n");
 
 	for(;;);
 }
