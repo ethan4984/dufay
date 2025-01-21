@@ -36,6 +36,12 @@ int create_blank_context(struct context *context) {
 
 int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 	if(context == NULL || ucontext == NULL) RETURN_ERROR;
+	
+	if(context->ucontext_top == ucontext) context->ucontext_top = ucontext->last;
+	if(context->ucontext_queue == ucontext) context->ucontext_queue = ucontext->next;
+
+	if(ucontext->last) ucontext->last->next = ucontext->next;
+	if(ucontext->next) ucontext->next->last = ucontext->last;
 
 	struct notification *notification = ucontext->notification;
 	if(notification) {
@@ -53,12 +59,6 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 			if(ret == -1) RETURN_ERROR;
 		}
 	}
-
-	if(context->ucontext_top == ucontext) context->ucontext_top = ucontext->last;
-	if(context->ucontext_queue == ucontext) context->ucontext_queue = ucontext->next;
-
-	if(ucontext->last) ucontext->last->next = ucontext->next;
-	if(ucontext->next) ucontext->next->last = ucontext->last;
 
 	pmm_free(ucontext->stack->kernel_stack.sp - HIGH_VMA - ucontext->stack->kernel_stack.size,
 		DIV_ROUNDUP(ucontext->stack->kernel_stack.size, PAGE_SIZE));
@@ -121,10 +121,10 @@ int sched_establish_shared_link(struct context *scheduler_context,
 static int fetch_context(struct context **context, struct ucontext **ucontext) {
 	struct context *next_context = NULL;
 
+	bool found = false;
 	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
 	if(ret == 0) { goto find_ucontext; }
 find_context:
-	bool found = false;
 	found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
 		({
 			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
@@ -155,7 +155,6 @@ find_ucontext:
 
 		for(; ucontext;) {
 			if(!ucontext->blocking) break;
-			print("we are blocking on %x\n", ucontext); 
 			ucontext = ucontext->last;
 		}
 
@@ -172,8 +171,6 @@ find_ucontext:
 
 	return 0;
 }
-
-static int cnt = 0;
 
 void reschedule(struct registers *regs, void*) {
 	if(__atomic_test_and_set(&CORE_LOCAL->sched_lock.lock, __ATOMIC_ACQUIRE)) return; 

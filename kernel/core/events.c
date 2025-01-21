@@ -11,8 +11,6 @@
 #include <fayt/debug.h>
 #include <fayt/sched.h>
 
-// WE ARE NEVER UNBLOCKED
-
 int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 	if(etrigger == NULL || waking_ucontext == NULL) RETURN_ERROR;
 
@@ -32,7 +30,7 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 			struct ucontext *ucontext = equeue->ucontext.data[j];
 			if(ucontext == NULL) continue;
 
-			ucontext->etrigger = etrigger;
+			ucontext->last_etrigger = etrigger;
 			ucontext->blocking = false;
 
 			VECTOR_PUSH(context_unblocked, ucontext->context);
@@ -58,13 +56,12 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 		queue_set->cnt++;
 	}
 
+	VECTOR_CLEAR(context_unblocked);
+	spinrelease_irqsave(&etrigger->lock);
+
 	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_server, 
 		CORE_LOCAL->current_context, queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
 	if(ret == -1) RETURN_ERROR;
-
-	VECTOR_CLEAR(context_unblocked);
-
-	spinrelease_irqsave(&etrigger->lock);
 
 	return 0;
 }
@@ -100,7 +97,7 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
 
 	for(; ucontext->blocking;) yield();
 
-	if(waking_object) *waking_object = ucontext->etrigger;
+	if(waking_object) *waking_object = ucontext->last_etrigger;
 
 	return 0;
 }

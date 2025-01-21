@@ -138,7 +138,8 @@ void apic_init() {
 			.madt1 = madt1
 		};
 
-		kernel_mappings.map_page(&kernel_mappings, (uintptr_t)ioapic.ioapic_base, ((uintptr_t)ioapic.ioapic_base - HIGH_VMA), X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
+		kernel_mappings.map_page(&kernel_mappings, (uintptr_t)ioapic.ioapic_base, 
+			((uintptr_t)ioapic.ioapic_base - HIGH_VMA), X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
 
 		ioapic.ioapic_id = ioapic_read(&ioapic, 0);
 		ioapic.ioapic_version = ioapic_read(&ioapic, 1) & 0xff;
@@ -176,7 +177,8 @@ void apic_init() {
 		}
 	}
 
-	kernel_mappings.map_page(&kernel_mappings, (rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + HIGH_VMA, (rdmsr(MSR_LAPIC_BASE) & 0xfffff000), X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
+	kernel_mappings.map_page(&kernel_mappings, (rdmsr(MSR_LAPIC_BASE) & 0xfffff000) +
+		HIGH_VMA, (rdmsr(MSR_LAPIC_BASE) & 0xfffff000), X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
 
 	xapic_write(XAPIC_TPR_OFF, 0);
 	xapic_write(XAPIC_SINT_OFF, xapic_read(XAPIC_SINT_OFF) | 0x1ff);

@@ -400,6 +400,8 @@ SYSCALL_DEFINE0(notification_return, {
 	struct context *context = CORE_LOCAL->current_context; 
 	if(context == NULL) RETURN_ERROR;
 
+	context->ucontext_active->stack->active = 0;
+
 	struct ucontext *rcontext = ({
 		__label__ finish;
 		struct ucontext *rcontext = context->ucontext_active->last;
@@ -440,6 +442,8 @@ finish:
 	CORE_LOCAL->error = rcontext->sysctx.user_stack;
 
 	SWAP_TLS(&rcontext->regs);
+
+	//print("notification_return: going to rip=%x cid=%x\n", rcontext->regs.rip, rcontext->context->comms.cid);
 
 	__asm__ volatile (
 		"mov %0, %%rsp\n\t"

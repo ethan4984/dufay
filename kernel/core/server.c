@@ -238,6 +238,8 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	int ret = elf64_file_init(elf);
 	if(ret == -1) RETURN_ERROR;
 
+	print("dufay: aslr: [%s]: %x -> %x\n", server->name, elf->aslr_layout->lower_bound, elf->aslr_layout->upper_bound);
+
 	ret = elf64_file_aux(elf, &elf->aux);
 	if(ret == -1) RETURN_ERROR;
 

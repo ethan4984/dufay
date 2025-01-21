@@ -62,6 +62,7 @@ struct ucontext {
 	struct registers regs;
 	void *fpu_context;
 
+	struct etrigger *last_etrigger;
 	struct etrigger *etrigger;
 	int blocking;
 
