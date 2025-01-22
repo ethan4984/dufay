@@ -27,19 +27,15 @@ QEMUFLAGS_ISO = \
 
 .PHONY: run
 run: $(DISK_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio
+	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio -display none
 
 .PHONY: run_initrd
 run_initrd: $(ISO_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS_ISO) -enable-kvm -serial stdio
+	qemu-system-x86_64 $(QEMUFLAGS_ISO) -enable-kvm -serial stdio -display none
 
 .PHONY: console
-console: $(ISO_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -no-reboot -monitor stdio -d int -D qemu.log -no-shutdown
-
-.PHONY: int
-int: $(ISO_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS_ISO) -d int -M smm=off -no-reboot -no-shutdown
+console: $(DISK_IMAGE)
+	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -no-reboot -monitor stdio -d int -D qemu.log -no-shutdown -display none
 
 .PHONY:
 recompile_servers:
