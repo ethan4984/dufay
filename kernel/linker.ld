@@ -1,52 +1,44 @@
-/* Tell the linker that we want an x86_64 ELF64 output file */
 OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
 
-/* We want the symbol _start to be our entry point */
 ENTRY(dufay_entry)
 
-/* Define the program headers we want */
-PHDRS
-{
-	null	PT_NULL	FLAGS(0) ;					 /* Null segment */
-	text	PT_LOAD	FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
-	rodata	PT_LOAD	FLAGS((1 << 2)) ;			/* Read only */
-	data	PT_LOAD	FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
-	dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ; /* Dynamic segment needed for PIE */
+PHDRS {
+	null PT_NULL FLAGS(0);
+	text PT_LOAD FLAGS((1 << 0) | (1 << 2));
+	rodata  PT_LOAD	FLAGS((1 << 2));
+	data PT_LOAD FLAGS((1 << 1) | (1 << 2));
+	dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2));
+	bss PT_LOAD	FLAGS((1 << 1) | (1 << 2));
 }
 
-SECTIONS
-{
-	/* We wanna be placed in the higher half, 2MiB above 0 in physical memory. */
-	/* Since we are going to use PIE, this is just the base load address, but the */
-	/* bootloader will be able to relocate us as it sees fit. */
+SECTIONS {
 	. = 0xffffffff80200000;
 
-	.text : {
-		*(.text*)
+	.text : ALIGN(0x1000) {
+		*(.text)
+		*(.init)
+		*(.fini)
 	} :text
 
-	/* Move to the next memory page for .rodata */
-	. += 0x1000;
-
-	.rodata : {
-		*(.rodata*)
-	} :rodata
-
-	/* Move to the next memory page for .data */
-	. += 0x1000;
-
-	.data : {
-		*(.data*)
+	. = ALIGN(0x1000);
+	.data : ALIGN(0x1000) {
+		*(.data)
 	} :data
 
-	/* Dynamic section needed for PIE */
+	. = ALIGN(0x1000);
 	.dynamic : {
 		*(.dynamic)
 	} :data :dynamic
 
-	.bss : {
+	. = ALIGN(0x1000);
+	.rodata : ALIGN(0x1000) {
+		*(.rodata)
+	} :rodata
+
+	. = ALIGN(0x1000);
+	.bss : ALIGN(0x1000) {
 		*(COMMON)
-		*(.bss*)
-	} :data
+		*(.bss)
+	} :bss
 }

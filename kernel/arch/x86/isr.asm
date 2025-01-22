@@ -42,7 +42,6 @@ extern isr_handler_main
 
 isr_handler:
 	cld
-
 	pushall
 	mov rdi, rsp
 	call isr_handler_main

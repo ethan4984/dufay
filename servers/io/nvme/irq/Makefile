@@ -3,7 +3,7 @@ IRQ := nvme_irq
 C ?= gcc
 LD ?= ld
 
-CFLAGS ?= -Wall -Wextra -Ofast -pipe -fsanitize=undefined
+CFLAGS ?= -Wall -Wextra -Ofast -pipe -fsanitize=undefined -DSYSCALL_INTERRUPT
 LDFLAGS ?=
 
 INTERNALLDFLAGS := \

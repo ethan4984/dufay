@@ -6,6 +6,7 @@
 #include <core/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
+#include <core/syscall.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>
@@ -150,6 +151,8 @@ done:
 	xapic_write(XAPIC_EOI_OFF, 0);
 }
 
+void syscall_handler(struct registers*, void*);
+
 void idt_init() {
 	for(int i = 0; i < 48; i++) {
 		interrupt_vectors[i].reserved = 1;
@@ -157,6 +160,11 @@ void idt_init() {
 
 	interrupt_vectors[32].handler = reschedule;
 	interrupt_vectors[32].ptr = NULL;
+	interrupt_vectors[32].reserved = 1;
+
+	interrupt_vectors[128].handler = syscall_handler;
+	interrupt_vectors[128].ptr = NULL;
+	interrupt_vectors[128].reserved = 1;
 
 	extern void isr0();
 	extern void isr1();

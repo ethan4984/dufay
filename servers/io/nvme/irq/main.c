@@ -5,6 +5,8 @@
 #include <fayt/string.h>
 
 int nvme_irq_handle(void) {
+	print("Hi from the IRQ handler\n");
+
 	return 0;
 }
 

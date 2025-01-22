@@ -20,7 +20,7 @@ static int pci_device_msix(struct pci_device*, int);
 
 struct pci_core_morphology {
 	int load;
-	int lapic_id;	
+	int lapic_id;
 };
 
 static VECTOR(struct pci_core_morphology*) pci_core_morphology;
@@ -100,16 +100,16 @@ static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar
 static int pci_device_msi(struct pci_device *device, int vector) {
 	if(device == NULL) return -1;
 
-	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msi_offset + 2);
-
 	struct pci_core_morphology *core_morphology = pci_fetch_optimal_core();
 	if(core_morphology == NULL) RETURN_ERROR;
 
+	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msi_offset + 2);
+
 	*(volatile uint32_t*)((uintptr_t)device->config +
-		device->msi_offset + 4) = (0xfee << 2) | (core_morphology->lapic_id << 12);
+		device->msi_offset + 4) = (0xfeeull << 20) | (core_morphology->lapic_id << 12);
 	*(volatile uint32_t*)((uintptr_t)device->config +
 		device->msi_offset + (message_control & (1 << 7) ? 8 : 12)) = vector;
-
+	
 	message_control |= (1 << 0);
 	message_control &= ~(0b111 << 4);
 
@@ -130,13 +130,13 @@ static int pci_device_msix(struct pci_device *device, int vector) {
 
 	msix_vector_offset *= 16;
 
-	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
-		msix_vector_offset) = (0xfee << 2) | (core_morphology->lapic_id << 12);
-	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
+	*(volatile uint32_t*)(device->msix_space + device->msix_bar_offset +
+		msix_vector_offset) = (0xfeeull << 20) | (core_morphology->lapic_id << 12);
+	*(volatile uint32_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 4) = 0;
-	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
+	*(volatile uint32_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 8) = vector;
-	*(volatile uint16_t*)(device->msix_space + device->msix_bar_offset +
+	*(volatile uint32_t*)(device->msix_space + device->msix_bar_offset +
 		msix_vector_offset + 12) = 0;
 
 	uint16_t message_control = *(volatile uint16_t*)((uintptr_t)device->config + device->msix_offset + 2);
