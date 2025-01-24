@@ -34,6 +34,7 @@ extern int syscall_server_activate(struct registers*);
 extern int syscall_notification_wait(struct registers*);
 extern int syscall_notification_destroy(struct registers*);
 extern int syscall_irq_cortex_instantiate(struct registers*);
+extern int syscall_irq_cortex_anchor(struct registers*);
 
 static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_log }, // 0
@@ -52,7 +53,8 @@ static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_server_activate }, // 13
 	{ .handler = syscall_notification_wait }, // 14
 	{ .handler = syscall_notification_destroy }, // 15
-	{ .handler = syscall_irq_cortex_instantiate } // 16
+	{ .handler = syscall_irq_cortex_instantiate }, // 16
+	{ .handler = syscall_irq_cortex_anchor } // 17
 };
 
 void syscall_handler(struct registers *regs, void*) {

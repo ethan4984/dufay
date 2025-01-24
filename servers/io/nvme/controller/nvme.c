@@ -7,55 +7,11 @@
 #include <fayt/notification.h>
 #include <fayt/pci.h>
 #include <fayt/bitmap.h>
+#include <fayt/irq.h>
 
 #include <nvme.h>
 
-struct nvme_controller;
-
-struct nvme_queue_pair {
-	int qid;
-	int entry_cnt;
-	int sq_head;
-	int sq_tail;
-	int cq_head;
-	int cq_tail;
-	bool phase;
-	int vector;
-	int irq;
-	bool admin;
-
-	struct nvme_controller *controller;
-
-	volatile struct nvme_command *submission_queue;
-	volatile struct nvme_completion *completion_queue;
-	volatile uint32_t *submission_doorbell;
-	volatile uint32_t *completion_doorbell;
-
-	struct bitmap cid_bitmap;
-};
-
-struct nvme_controller {
-	volatile struct nvme_regs *regs;
-	volatile struct nvme_controller_id *id;
-
-	struct {
-		int major;
-		int minor; 
-		int tertiary;
-	} version;
-
-	int queue_entries;
-	int page_size_max;
-	int page_size_min;
-	int page_size;
-	int max_transfer_shift;
-	int max_prps;
-	int strides;
-
-	struct bitmap qid_bitmap;
-
-	struct nvme_queue_pair *admin_queue;
-};
+#include "../common.h"
 
 #define DUFAY_ALLOCATE_UNBROKEN(SIZE, RESP) ({ \
 	__label__ finish; \
@@ -122,10 +78,72 @@ static int nvme_fetch_controller_id(struct nvme_controller *controller) {
 	return 0;
 }
 
+static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
+	struct nvme_queue_pair **queue, int admin, int irq) {
+	if(controller == NULL) RETURN_ERROR;
+
+	controller->nvme_queue_pair_cnt++;
+	if(sizeof(struct nvme_controller) + sizeof(struct nvme_queue_pair) *
+		controller->nvme_queue_pair_cnt > PAGE_SIZE) RETURN_ERROR;
+	struct nvme_queue_pair *queue_pair = &controller->nvme_queue_pair[controller->nvme_queue_pair_cnt - 1];
+	if(admin) controller->admin_queue = queue_pair;
+
+	int ret = bitmap_alloc(&controller->qid_bitmap, &queue_pair->qid);
+	if(ret == -1 || queue_pair->qid) RETURN_ERROR;
+
+	queue_pair->controller = controller;
+	queue_pair->entry_cnt = controller->queue_entries;
+	queue_pair->cid_bitmap = (struct bitmap) {
+		.data = alloc(DIV_ROUNDUP(queue_pair->entry_cnt, 8)),
+		.size = queue_pair->entry_cnt,
+		.resizable = false
+	};
+	queue_pair->submission_doorbell_offset = PAGE_SIZE + (2 * 0) * (4 << controller->strides);
+	queue_pair->submission_doorbell = (volatile uint32_t*)((void*)controller->regs +
+		PAGE_SIZE + (2 * 0) * (4 << controller->strides));
+	queue_pair->completion_doorbell_offset = PAGE_SIZE + (2 * 0 + 1) * (4 << controller->strides);
+	queue_pair->completion_doorbell = (volatile uint32_t*)((void*)controller->regs +
+		PAGE_SIZE + (2 * 0 + 1) * (4 << controller->strides));
+	queue_pair->irq = irq;
+
+	struct portal_resp portal_resp;
+	ret = DUFAY_ALLOCATE_UNBROKEN(queue_pair->entry_cnt * sizeof(struct nvme_command), &portal_resp);
+	if(ret == -1) RETURN_ERROR;
+
+	if(admin) controller->regs->asq = portal_resp.morphology.paddr;
+	queue_pair->completion_queue_paddr = portal_resp.morphology.paddr;
+	queue_pair->submission_queue = (void*)portal_resp.base;
+
+	ret = DUFAY_ALLOCATE_UNBROKEN(queue_pair->entry_cnt * sizeof(struct nvme_command), &portal_resp);
+	if(ret == -1) RETURN_ERROR;
+
+	queue_pair->completion_queue_paddr = portal_resp.morphology.paddr;
+	queue_pair->completion_queue = (void*)portal_resp.base;
+	if(admin) {
+		controller->regs->acq = portal_resp.morphology.paddr;
+		controller->regs->aqa = (queue_pair->entry_cnt - 1) << 16 |
+			(queue_pair->entry_cnt - 1);
+		goto finish;
+	}
+finish:
+	if(queue) *queue = queue_pair;
+	return 0;
+}
+
 int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 	if(pci_info == NULL || regs == NULL) return -1;
+	
+	struct portal_resp portal_resp;
+	int ret = DUFAY_ALLOCATE_UNBROKEN(sizeof(struct nvme_controller), &portal_resp);
+	if(ret == -1) RETURN_ERROR;
 
-	struct nvme_controller *controller = alloc(sizeof(struct nvme_controller));
+	struct anchor anchor = (struct anchor) {
+		.identifier = NVME_IRQ_CONTROLLER, .paddr = portal_resp.morphology.paddr
+	};
+	struct syscall_response syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
+	if(syscall_response.ret == -1) return -1;
+
+	struct nvme_controller *controller = (void*)portal_resp.base;
 
 	controller->regs = regs;
 	controller->version.major = (controller->regs->vs >> 16) & 0xffff;
@@ -165,76 +183,23 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
 	};
 
-	int ret = notify(&bridge);
+	ret = notify(&bridge);
 	if(ret == -1) return -1;
 
-	struct syscall_response syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
-		"nvme_irq", pci_info->irq_vector);
+	anchor = (struct anchor) { .identifier = NVME_IRQ_CONTROLLER, .paddr = 0 };
+	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
 	if(syscall_response.ret == -1) return -1;
 
 	controller->queue_entries = controller->regs->cap & 0xffff;
 	controller->strides = (controller->regs->cap >> 32) & 0xf;
-
-	controller->admin_queue = alloc(sizeof(struct nvme_queue_pair));
-	if(controller->admin_queue == NULL) RETURN_ERROR;
-
 	controller->qid_bitmap = (struct bitmap) {
 		.data = alloc(NVME_QID_MAX / 8),
 		.size = NVME_QID_MAX,
 		.resizable = false
 	};
 
-	ret = bitmap_alloc(&controller->qid_bitmap, &controller->admin_queue->qid);
-	if(ret == -1 || controller->admin_queue->qid) RETURN_ERROR;
-
-	controller->admin_queue->controller = controller;
-	controller->admin_queue->entry_cnt = controller->queue_entries;
-	controller->admin_queue->cid_bitmap = (struct bitmap) {
-		.data = alloc(controller->admin_queue->entry_cnt / 8),
-		.size = controller->admin_queue->entry_cnt,
-		.resizable = false
-	};
-	controller->admin_queue->submission_doorbell = (volatile uint32_t*)((void*)controller->regs +
-		PAGE_SIZE + (2 * 0) * (4 << controller->strides));
-	controller->admin_queue->completion_doorbell = (volatile uint32_t*)((void*)controller->regs +
-		PAGE_SIZE + (2 * 0 + 1) * (4 << controller->strides));
-
-	uintptr_t address;
-	ret = as_address(&address_space, &address, controller->admin_queue->entry_cnt * sizeof(struct nvme_command));
+	ret = nvme_queue_pair_instantiate(controller, NULL, 1, pci_info->irq_vector);
 	if(ret == -1) RETURN_ERROR;
-
-	struct portal_resp portal_resp;
-	struct portal_req portal_req = {
-		.type = PORTAL_REQ_ANON | PORTAL_REQ_CONTINUOUS | PORTAL_REQ_PEEK,
-		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.morphology = {
-			.addr = address,
-			.length = ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE),
-			.pcnt = DIV_ROUNDUP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)
-		}
-	};
-
-	syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(syscall_response.ret == -1 || portal_resp.base != address || portal_resp.limit !=
-		ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)) RETURN_ERROR;
-	
-	controller->regs->asq = portal_resp.morphology.paddr;
-	controller->admin_queue->submission_queue = (void*)address;
-
-	ret = as_address(&address_space, &address, controller->admin_queue->entry_cnt * sizeof(struct nvme_command));
-	if(ret == -1) RETURN_ERROR;
-
-	portal_resp = (struct portal_resp) { 0 };
-	portal_req.morphology.addr = address;
-
-	syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(syscall_response.ret == -1 || portal_resp.base != address || portal_resp.limit !=
-		ALIGN_UP(controller->admin_queue->entry_cnt * sizeof(struct nvme_command), PAGE_SIZE)) RETURN_ERROR;
-	
-	controller->regs->aqa = (controller->admin_queue->entry_cnt - 1) << 16 |
-		(controller->admin_queue->entry_cnt - 1);
-	controller->regs->acq = portal_resp.morphology.paddr;
-	controller->admin_queue->completion_queue = (void*)address;
 
 	controller->regs->cc = (1 << 0) | (0 << 4) | (0 << 11) | (0 << 14) | (6 << 16) | (4 << 20);
 	for(;;) {

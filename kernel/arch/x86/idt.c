@@ -25,6 +25,7 @@ struct vector {
 	void (*handler)(struct registers*, void*);
 	void *ptr;
 	int reserved;
+	struct irq_cortex *irq_cortex;
 };
 
 static struct vector interrupt_vectors[256];
@@ -52,10 +53,11 @@ int idt_reserve_vector(void) {
 	return -1;
 }
 
-int idt_instantiate_vector(uint8_t vector, void (*handler)(struct registers*, void*), void *ptr) {
+int idt_instantiate_vector(uint8_t vector, void (*handler)(struct registers*, void*), void *ptr, struct irq_cortex *irq_cortex) {
 	interrupt_vectors[vector].handler = handler;
 	interrupt_vectors[vector].ptr = ptr;
 	interrupt_vectors[vector].reserved = 1;
+	interrupt_vectors[vector].irq_cortex = irq_cortex;
 
 	return 0;
 }
@@ -140,7 +142,16 @@ extern void isr_handler_main(struct registers *regs) {
 	}
 
 	if(interrupt_vectors[regs->isr_number].handler != NULL) {
-		interrupt_vectors[regs->isr_number].handler(regs, interrupt_vectors[regs->isr_number].ptr);
+		struct irq_cortex *cortex = interrupt_vectors[regs->isr_number].irq_cortex;
+		if(cortex) {
+			uint64_t error_code = regs->error_code;
+			regs->error_code = cortex->flush;
+			interrupt_vectors[regs->isr_number].handler(regs, interrupt_vectors[regs->isr_number].ptr);
+			regs->error_code = error_code;
+			if(cortex->flush) cortex->flush = false;
+		} else {
+			interrupt_vectors[regs->isr_number].handler(regs, interrupt_vectors[regs->isr_number].ptr);
+		}
 	}
 done:
 

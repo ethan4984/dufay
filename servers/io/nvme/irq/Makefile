@@ -15,6 +15,7 @@ INTERNALLDFLAGS := \
 INTERNALCFLAGS := \
 	-I.	\
 	-Ifayt \
+	-I../controller \
 	-std=c23 \
 	-ffreestanding \
 	-fstack-protector\

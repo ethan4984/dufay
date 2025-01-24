@@ -2,6 +2,7 @@
 #define NVME_H_
 
 #include <fayt/pci.h>
+#include <fayt/bitmap.h>
 
 #include <stdint.h>
 #include <stddef.h>
@@ -233,6 +234,63 @@ struct [[gnu::packed]] nvme_ns_id {
 	struct nvme_lbaf lbaf_list[16];
 	uint8_t rsvd192[192];
 	uint8_t vs[3712];
+};
+
+struct nvme_controller;
+
+struct nvme_queue_pair {
+	int qid;
+	int entry_cnt;
+	int sq_head;
+	int sq_tail;
+	int cq_head;
+	int cq_tail;
+	bool phase;
+	int vector;
+	int irq;
+	bool admin;
+
+	struct nvme_controller *controller;
+
+	uint64_t submission_queue_paddr;
+	volatile struct nvme_command *submission_queue;
+
+	uint64_t completion_queue_paddr;
+	volatile struct nvme_completion *completion_queue;
+
+	int submission_doorbell_offset;
+	volatile uint32_t *submission_doorbell;
+
+	volatile uint32_t *completion_doorbell;
+	int completion_doorbell_offset;
+
+	struct bitmap cid_bitmap;
+};
+
+struct nvme_controller {
+	volatile struct nvme_regs *regs;
+	volatile struct nvme_controller_id *id;
+
+	struct {
+		int major;
+		int minor;
+		int tertiary;
+	} version;
+
+	int queue_entries;
+	int page_size_max;
+	int page_size_min;
+	int page_size;
+	int max_transfer_shift;
+	int max_prps;
+	int strides;
+
+	struct bitmap qid_bitmap;
+
+	struct nvme_queue_pair *admin_queue;
+
+	int nvme_queue_pair_cnt;
+	struct nvme_queue_pair nvme_queue_pair[];
 };
 
 int nvme(struct pci_info*, volatile struct nvme_regs*);

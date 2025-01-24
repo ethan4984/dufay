@@ -1,54 +1,66 @@
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
-#include <fayt/address_space.h>
-#include <fayt/stream.h>
-#include <fayt/string.h>
+#include <fayt/irq.h>
 
-int nvme_irq_handle(void) {
-	print("Hi from the IRQ handler\n");
+#include <nvme.h>
+
+#include "../common.h"
+
+static volatile struct nvme_regs *nvme_regs;
+static struct nvme_controller *nvme_controller;
+
+static int nvme_anchor_flush(struct anchor *root) {
+	if(root == NULL) RETURN_ERROR;
+
+	for(; root;) {
+		switch(root->identifier) {
+			case NVME_IRQ_MMIO:
+				nvme_regs = (void*)root->paddr + 0xffff800000000000;
+				break;
+			case NVME_IRQ_CONTROLLER:
+				nvme_controller = (void*)root->paddr + 0xffff800000000000;
+				break;
+			default: RETURN_ERROR;
+		}
+
+		root = root->next;
+	}
 
 	return 0;
 }
 
-#include <stdarg.h>
+int nvme_irq_handle(struct irq_state *state, struct anchor **private) {
+	if(private == NULL) RETURN_ERROR;
+	struct anchor *anchor_root = *private; 
+	if(anchor_root == NULL) RETURN_ERROR;
 
-static void log_write(struct stream_info*, char c) { SYSCALL1(SYSCALL_LOG, c); }
-static struct stream_info print_stream = {
-	.write = log_write
-};
-
-void print(const char *str, ...) {
-	va_list arg;
-	va_start(arg, str);
-
-	const char *prefix = "DUFAY: [NVME IRQ] "; 
-	for(; *prefix;) {
-		print_stream.write(&print_stream, *prefix);
-		prefix++;
+	if(state->flush) {
+		int ret = nvme_anchor_flush(anchor_root);
+		if(ret == -1) RETURN_ERROR;
 	}
 
-	stream_print(&print_stream, str, arg);
+	struct nvme_queue_pair *queue = NULL;
+	for(int i = 0; i < nvme_controller->nvme_queue_pair_cnt; i++) {
+		if((uint64_t)nvme_controller->nvme_queue_pair[i].irq == state->vector) {
+			queue = &nvme_controller->nvme_queue_pair[i];
+			break;
+		}
+	}
 
-	va_end(arg);
+	if(queue == NULL) RETURN_ERROR;
+
+	volatile struct nvme_completion *completion_queue = (void*)queue->completion_queue_paddr + 0xffff800000000000;
+	volatile uint32_t *completion_doorbell = (void*)nvme_regs + queue->completion_doorbell_offset;
+
+	if(completion_queue[queue->cq_head].status >> 1) {
+		print("command error: status [%x]\n", completion_queue[queue->cq_head].status);
+		return 0;
+	}
+
+	queue->cq_head++;
+	if(queue->cq_head == queue->entry_cnt) queue->cq_head = 0;
+
+	*completion_doorbell = queue->cq_head;
+
+	return 0;
 }
-
-void panic(const char *str, ...) {
-	print("PANIC [ ");
-
-	va_list arg;
-	va_start(arg, str);
-
-	stream_print(&print_stream, str, arg);
-
-	va_end(arg);
-
-	print(" ]\n");
-
-	for(;;);
-}
-
-struct address_space address_space = {
-	.current = 0xa0000000,
-	.base = 0xa0000000,
-	.limit = 0x0000fffffffff0ff
-};

@@ -8,8 +8,11 @@
 #include <fayt/slab.h>
 #include <fayt/rb_tree.h>
 #include <fayt/pci.h>
+#include <fayt/irq.h>
 
 #include <nvme.h>
+
+#include "../common.h"
 
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
@@ -92,6 +95,14 @@ int main(struct pci_info *pci_info) {
 	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
 	if(syscall_response.ret == -1 || portal_resp.base != addr ||
 		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
+
+	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
+		"nvme_irq", pci_info->irq_vector);
+	if(syscall_response.ret == -1) return -1;
+
+	struct anchor anchor = { .identifier = NVME_IRQ_MMIO, .paddr = nbar->bar.base };
+	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
+	if(syscall_response.ret == -1) return -1;
 
 	ret = nvme(pci_info, (volatile struct nvme_regs*)addr);
 	if(ret == -1) { print("ERROR: internal critical failure\n"); goto failure; }

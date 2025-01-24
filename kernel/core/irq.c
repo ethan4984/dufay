@@ -10,6 +10,8 @@
 
 #include <fayt/debug.h>
 #include <fayt/compiler.h>
+#include <fayt/string.h>
+#include <fayt/hash.h>
 
 static struct aslr aslr_irq = {
 	.layout = NULL,
@@ -17,7 +19,7 @@ static struct aslr aslr_irq = {
 	.maximum_vaddr = 0xfffff00000000000
 };
 
-static VECTOR(struct irq_cortex*) cortex_table;
+static struct hash_table cortex_table;
 
 int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code) {
 	if((error_code & X86_FLAGS_P) != 0) return -1;
@@ -31,7 +33,7 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code) {
 	if(unlikely(page_table == NULL)) return -1;
 
 	struct irq_cortex *cortex;
-	for(int i = 0; i < cortex_table.length; i++) {
+	for(int i = 0; i < cortex_table.capacity; i++) {
 		cortex = cortex_table.data[i];
 		if(cortex == NULL) continue;
 		if(faulting_address >= cortex->aslr_layout->lower_bound &&
@@ -64,6 +66,8 @@ static int irq_cortex_instantiate(const char *identifier, int vector) {
 	cortex->elf->data.length = module->size;
 	cortex->elf->page_table = &kernel_mappings;
 	cortex->elf->aslr = &aslr_irq;
+	cortex->identifier = alloc(strlen(identifier) + 1);
+	strcpy((void*)cortex->identifier, identifier);
 
 	int ret = elf64_file_init(cortex->elf);
 	if(ret == -1) RETURN_ERROR;
@@ -76,15 +80,44 @@ static int irq_cortex_instantiate(const char *identifier, int vector) {
 	ret = elf64_file_load(cortex->elf);
 	if(ret == -1) RETURN_ERROR;
 
-	VECTOR_PUSH(cortex_table, cortex);
-
-	ret = idt_instantiate_vector(vector, (void*)cortex->elf->aux.at_entry, NULL);
+	ret = hash_table_push(&cortex_table, (void*)cortex->identifier, cortex, strlen(cortex->identifier));
 	if(ret == -1) RETURN_ERROR;
+
+	ret = idt_instantiate_vector(vector, (void*)cortex->elf->aux.at_entry, (void*)&cortex->anchor_root, cortex);
+	if(ret == -1) RETURN_ERROR;
+
+	return 0;
+}
+
+static int irq_cortex_anchor(const char *identifier, struct anchor *anchor) {
+	if(identifier == NULL || anchor == NULL) RETURN_ERROR;
+
+	struct irq_cortex *cortex = NULL;
+	int ret = hash_table_search(&cortex_table, (void*)identifier, strlen(identifier), (void**)&cortex);
+	if(ret == -1 || cortex == NULL) RETURN_ERROR;
+
+	cortex->flush = true;
+
+	{
+		struct anchor *tmp = anchor;
+		anchor = alloc(sizeof(struct anchor));
+		*anchor = *tmp;
+	}
+
+	anchor->next = cortex->anchor_root;
+	anchor->last = NULL;
+	if(cortex->anchor_root) cortex->anchor_root->last = anchor;
+	cortex->anchor_root = anchor;
 
 	return 0;
 }
 
 SYSCALL_DEFINE2(irq_cortex_instantiate, const char*, identifier, int, vector, {
 	int ret = irq_cortex_instantiate(identifier, vector);
+	if(ret == -1) return -1;
+})
+
+SYSCALL_DEFINE2(irq_cortex_anchor, const char*, identifier, struct anchor*, anchor, {
+	int ret = irq_cortex_anchor(identifier, anchor);
 	if(ret == -1) return -1;
 })
