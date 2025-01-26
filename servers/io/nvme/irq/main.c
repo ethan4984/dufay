@@ -46,21 +46,20 @@ int nvme_irq_handle(struct irq_state *state, struct anchor **private) {
 			break;
 		}
 	}
-
 	if(queue == NULL) RETURN_ERROR;
 
 	volatile struct nvme_completion *completion_queue = (void*)queue->completion_queue_paddr + 0xffff800000000000;
 	volatile uint32_t *completion_doorbell = (void*)nvme_regs + queue->completion_doorbell_offset;
+	struct nvme_queue_entry *queue_entry = (struct nvme_queue_entry*)(queue->queue_entry_paddr +
+		0xffff800000000000) + completion_queue[queue->cq_head].cid;
 
-	if(completion_queue[queue->cq_head].status >> 1) {
-		print("command error: status [%x]\n", completion_queue[queue->cq_head].status);
-		return 0;
-	}
+	queue_entry->cid = completion_queue[queue->cq_head].cid;
+	queue_entry->completion = completion_queue[queue->cq_head];
+	queue_entry->response = true;
+	queue_entry->etrigger = NULL;
 
-	queue->cq_head++;
+	*completion_doorbell = ++queue->cq_head;
 	if(queue->cq_head == queue->entry_cnt) queue->cq_head = 0;
-
-	*completion_doorbell = queue->cq_head;
 
 	return 0;
 }

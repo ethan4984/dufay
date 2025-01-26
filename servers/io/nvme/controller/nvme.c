@@ -41,6 +41,10 @@ static int nvme_send_command(struct nvme_queue_pair *queue_pair, struct nvme_com
 	int cid, ret = bitmap_alloc(&queue_pair->cid_bitmap, &cid);
 	if(ret == -1) RETURN_ERROR;
 
+	struct nvme_queue_entry *queue_entry = &queue_pair->queue_entry[submission->cid];
+	*queue_entry = (struct nvme_queue_entry) { 0 };
+
+	if(cid > queue_pair->queue_entry_cnt) RETURN_ERROR;
 	submission->cid = cid;
 
 	queue_pair->submission_queue[queue_pair->sq_tail++] = *submission;
@@ -50,13 +54,29 @@ static int nvme_send_command(struct nvme_queue_pair *queue_pair, struct nvme_com
 	return 0;
 }
 
-static int nvme_send_command_and_block(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
+static int nvme_send_command_and_poll(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
 	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
 
 	int ret = nvme_send_command(queue_pair, submission);
 	if(ret == -1) RETURN_ERROR;
 
+	struct nvme_queue_entry *queue_entry = &queue_pair->queue_entry[submission->cid];
+	for(; !queue_entry->response;);
+
+	if(queue_entry->completion.status >> 1) {
+		print("command error: status [%x]\n", queue_entry->completion.status);
+		return -1;
+	}
+
+	ret = bitmap_free(&queue_pair->cid_bitmap, queue_entry->cid);
+	if(ret == -1) RETURN_ERROR;
+
 	return 0;
+}
+
+static int nvme_send_command_and_block(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
+	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
+	return nvme_send_command_and_poll(queue_pair, submission);
 }
 
 static int nvme_fetch_controller_id(struct nvme_controller *controller) {
@@ -74,6 +94,64 @@ static int nvme_fetch_controller_id(struct nvme_controller *controller) {
 
 	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
 	if(ret == -1) RETURN_ERROR;
+
+	controller->controller_id = (void*)portal_resp.base;
+
+	return 0;
+}
+
+static int nvme_fetch_namespaces(struct nvme_controller *controller) {
+	if(controller == NULL) RETURN_ERROR;
+
+	struct portal_resp portal_resp;
+	int ret = DUFAY_ALLOCATE_UNBROKEN(controller->controller_id->nn * sizeof(int), &portal_resp);
+	if(ret == -1) RETURN_ERROR;
+
+	struct nvme_command identify_command = {
+		.opcode = nvme_op_identify,
+		.private.identify.cns = 2,
+		.private.identify.prp1 = portal_resp.morphology.paddr
+	};
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
+	if(ret == -1) RETURN_ERROR;
+
+	int *nsid = (void*)portal_resp.base;
+	for(size_t i = 0; i < controller->controller_id->nn; i++) {
+		if(!nsid[i]) continue;
+
+		struct portal_resp portal_resp;
+		int ret = DUFAY_ALLOCATE_UNBROKEN(sizeof(struct nvme_namespace_id), &portal_resp);
+		if(ret == -1) RETURN_ERROR;
+
+		struct nvme_command identify_command = {
+			.opcode = nvme_op_identify,
+			.private.identify.cns = 0,
+			.private.identify.nsid = nsid[i],
+			.private.identify.prp1 = portal_resp.morphology.paddr
+		};
+
+		ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
+		if(ret == -1) RETURN_ERROR;
+
+		struct nvme_namespace *namespace = alloc(sizeof(struct nvme_namespace_id));
+		VECTOR_PUSH(controller->namespace, namespace);
+
+		memcpy(&namespace->identity, (void*)portal_resp.base, sizeof(struct nvme_namespace_id));
+
+		namespace->nsid = nsid[i];
+		namespace->max_prps = ({
+			int lba_shift = namespace->identity.lbaf_list[namespace->identity.flbas & 0b1111].ds;
+			int shift = 12 + ((controller->regs->cap >> 48) & 0b1111);
+			int max_transfer_shift = controller->controller_id->mdts ?
+				shift + controller->controller_id->mdts : 20;
+			int max_lbas = 1 << (max_transfer_shift - lba_shift);
+			(max_lbas * (1 << lba_shift)) / 0x1000;
+		});
+		namespace->lba_cnt = namespace->identity.nsze;
+		namespace->lba_size = 1 <<
+			(namespace->identity.lbaf_list[namespace->identity.flbas & 0b11111].ds);
+	}
 
 	return 0;
 }
@@ -113,6 +191,13 @@ static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
 	if(admin) controller->regs->asq = portal_resp.morphology.paddr;
 	queue_pair->completion_queue_paddr = portal_resp.morphology.paddr;
 	queue_pair->submission_queue = (void*)portal_resp.base;
+
+	queue_pair->queue_entry_cnt = 128;
+	ret = DUFAY_ALLOCATE_UNBROKEN(sizeof(struct nvme_queue_entry) * queue_pair->queue_entry_cnt, &portal_resp);
+	if(ret == -1) RETURN_ERROR;
+
+	queue_pair->queue_entry_paddr = portal_resp.morphology.paddr;
+	queue_pair->queue_entry = (void*)portal_resp.base;
 
 	ret = DUFAY_ALLOCATE_UNBROKEN(queue_pair->entry_cnt * sizeof(struct nvme_command), &portal_resp);
 	if(ret == -1) RETURN_ERROR;
@@ -211,6 +296,22 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 
 	ret = nvme_fetch_controller_id(controller);
 	if(ret == -1) RETURN_ERROR;
+
+	print("Vendor ID: [%x]\n", controller->controller_id->vid);
+	print("Subsystem vendor ID: [%x]\n", controller->controller_id->ssvid);
+
+	ret = nvme_fetch_namespaces(controller);
+	if(ret == -1) RETURN_ERROR;
+
+	for(size_t i = 0; i < controller->namespace.length; i++) {
+		struct nvme_namespace *namespace = controller->namespace.data[i];
+		if(namespace == NULL) continue;
+
+		print("nsid: [%x]\n", namespace->nsid);
+		print("\tlba cnt: [%x]\n", namespace->lba_cnt);
+		print("\tlba size: [%x]\n", namespace->lba_size);
+		print("\tmax prps: [%x]\n", namespace->max_prps);
+	}
 
 	return 0;
 }

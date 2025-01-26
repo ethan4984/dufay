@@ -3,6 +3,7 @@
 
 #include <fayt/pci.h>
 #include <fayt/bitmap.h>
+#include <fayt/vector.h>
 
 #include <stdint.h>
 #include <stddef.h>
@@ -206,7 +207,7 @@ struct [[gnu::packed]] nvme_lbaf {
 	uint8_t rp;
 };
 
-struct [[gnu::packed]] nvme_ns_id {
+struct [[gnu::packed]] nvme_namespace_id {
 	uint64_t nsze;
 	uint64_t ncap;
 	uint64_t nuse;
@@ -236,6 +237,13 @@ struct [[gnu::packed]] nvme_ns_id {
 	uint8_t vs[3712];
 };
 
+struct nvme_queue_entry {
+	int response;
+	struct nvme_completion completion;
+	int cid;
+	struct etrigger *etrigger;
+};
+
 struct nvme_controller;
 
 struct nvme_queue_pair {
@@ -261,10 +269,23 @@ struct nvme_queue_pair {
 	int submission_doorbell_offset;
 	volatile uint32_t *submission_doorbell;
 
-	volatile uint32_t *completion_doorbell;
 	int completion_doorbell_offset;
+	volatile uint32_t *completion_doorbell;
+
+	uint64_t queue_entry_paddr;
+	struct nvme_queue_entry *queue_entry;
+	int queue_entry_cnt;
 
 	struct bitmap cid_bitmap;
+};
+
+struct nvme_namespace {
+	int nsid;
+	struct nvme_namespace_id identity;
+
+	int max_prps;
+	int lba_cnt;
+	int lba_size;
 };
 
 struct nvme_controller {
@@ -286,8 +307,10 @@ struct nvme_controller {
 	int strides;
 
 	struct bitmap qid_bitmap;
-
 	struct nvme_queue_pair *admin_queue;
+
+	struct nvme_controller_id *controller_id;
+	VECTOR(struct nvme_namespace*) namespace;
 
 	int nvme_queue_pair_cnt;
 	struct nvme_queue_pair nvme_queue_pair[];
