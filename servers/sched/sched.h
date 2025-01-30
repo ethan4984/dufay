@@ -33,8 +33,6 @@ struct thread {
 	uint64_t weight;
 	uint64_t vruntime;
 
-	void *private;
-
 	RB_META(struct thread);
 };
 

@@ -46,8 +46,13 @@ static int sched_flush_queue(void) {
 				RB_GENERIC_DELETE(thread_tree, vruntime, thread);
 				RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 
+				struct sched_queue_entry queue_entry = {
+					.cid = thread->cid,
+					.asid = 0
+				};
+
 				ret = circular_queue_push((void*)sched_queue_link +
-					sched_queue_link->data_offset, &thread->private);
+					sched_queue_link->data_offset, &queue_entry);
 				ret;
 			})
 		);
@@ -61,6 +66,12 @@ static int sched_flush_queue(void) {
 	}
 
 	return 0;
+}
+
+static void notify_clone(struct notification_info*, void *data, int) {
+	if(data == NULL) goto finish;
+finish:
+	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
@@ -129,18 +140,12 @@ exit:
 		struct thread *thread = alloc(sizeof(struct thread));
 		if(thread == NULL) { }
 		
-		void *private;
-		struct syscall_response response = SYSCALL2(SYSCALL_CONTEXT, config->cid, &private);
-		if(response.ret == -1) {
-			print("ERROR: unable to get context private address\n");
-			continue;
-		}
-
 		thread->cid = config->cid;
 		thread->cgroup = config->cgroup;
 		thread->weight = weight_set_nice(config->nice);
 		thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
-		thread->private = private;
+
+		sched_desc->load++;
 
 		int ret = hash_table_push(&thread_table, &thread->cid, thread, sizeof(thread->cid));
 		if(ret == -1) {
@@ -206,6 +211,8 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 		{ .handler = notify_enqueue_thread };
 	struct notification_action dequeue_action =
 		{ .handler = notify_dequeue_thread };
+	struct notification_action clone_action =
+		{ .handler = notify_clone };
 
 	struct syscall_response response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION,
 		NOT_SCHED_ENQUEUE, &enqueue_action, NULL);

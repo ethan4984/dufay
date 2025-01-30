@@ -65,7 +65,7 @@ int main(struct sched_descriptor *desc) {
 		.length = sizeof(struct portal_req),
 		.share = {
 			.identifier = "SCHEDULER CORE0",
-			.length = sizeof(void*),
+			.length = sizeof(struct sched_queue_entry),
 			.create = 0,
 			.type = LINK_CIRCULAR
 		},

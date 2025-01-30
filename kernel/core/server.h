@@ -9,33 +9,6 @@
 
 #include <limine.h>
 
-extern struct hash_table context_table;
-extern struct bitmap cid_bitmap;
-
-#define SEARCH_CONTEXT(CID, CONTEXT) ({ \
-	__label__ finish; \
-	int ret = -1; \
-	if((CONTEXT) == NULL) goto finish; \
-	ret = hash_table_search(&context_table, &(CID), sizeof((CID)), (void**)CONTEXT); \
-finish: \
-	ret; \
-})
-
-#define NEW_CONTEXT(CONTEXT) ({ \
-	__label__ finish; \
-	int ret = -1; \
-	if((CONTEXT) == NULL) goto finish; \
-	int cid; \
-	ret = bitmap_alloc(&cid_bitmap, &cid); \
-	if(ret == -1) goto finish; \
-	(CONTEXT)->comms.cid = cid; \
-	ret = hash_table_push(&context_table, &(CONTEXT)->comms.cid, \
-		(CONTEXT), sizeof((CONTEXT)->comms.cid)); \
-finish: \
-	ret; \
-})
-
-
 #define SERVER_DEFAULT_STACK_LOCATION 0x20000
 #define SERVER_DEFAULT_STACK_SIZE CONTEXT_DEFAULT_STACK_SIZE
 #define SERVER_MAX_NAME_LENGTH 64
@@ -70,6 +43,7 @@ struct server_env {
 };
 
 extern struct server *master_scheduler;
+extern struct hash_table context_table;
 
 int launch_servers(void);
 int create_server(const char*, const char*, struct server*);

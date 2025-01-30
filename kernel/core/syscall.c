@@ -27,7 +27,6 @@ extern int syscall_notification_unmute(struct registers*);
 extern int syscall_notification_mute(struct registers*);
 extern int syscall_notification_build(struct registers*);
 extern int syscall_notification_broadcast(struct registers*);
-extern int syscall_context(struct registers*);
 extern int syscall_sched_acquire(struct registers*);
 extern int syscall_sched_release(struct registers*);
 extern int syscall_server_activate(struct registers*);
@@ -47,14 +46,13 @@ static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_notification_unmute }, // 7
 	{ .handler = syscall_notification_build }, // 8
 	{ .handler = syscall_notification_broadcast }, // 9
-	{ .handler = syscall_context }, // 10
-	{ .handler = syscall_sched_acquire }, // 11
-	{ .handler = syscall_sched_release }, // 12
-	{ .handler = syscall_server_activate }, // 13
-	{ .handler = syscall_notification_wait }, // 14
-	{ .handler = syscall_notification_destroy }, // 15
-	{ .handler = syscall_irq_cortex_instantiate }, // 16
-	{ .handler = syscall_irq_cortex_anchor } // 17
+	{ .handler = syscall_sched_acquire }, // 10
+	{ .handler = syscall_sched_release }, // 11
+	{ .handler = syscall_server_activate }, // 12
+	{ .handler = syscall_notification_wait }, // 13
+	{ .handler = syscall_notification_destroy }, // 14
+	{ .handler = syscall_irq_cortex_instantiate }, // 15
+	{ .handler = syscall_irq_cortex_anchor } // 16
 };
 
 void syscall_handler(struct registers *regs, void*) {

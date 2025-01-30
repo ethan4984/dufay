@@ -49,7 +49,7 @@ isr_handler:
 	add rsp, 16
 	iretq
 
-	%macro isr 1
+%macro isr 1
 
 global isr%1
 isr%1:

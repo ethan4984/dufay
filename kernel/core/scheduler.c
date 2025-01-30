@@ -16,19 +16,26 @@
 #include <fayt/compiler.h>
 #include <fayt/portal.h>
 #include <fayt/debug.h>
+#include <fayt/hash.h>
 
-int create_blank_context(struct context *context) { 
+int create_blank_context(int cid, struct context **context) {
 	if(unlikely(context == NULL)) RETURN_ERROR;
 
-	context->page_table = alloc(sizeof(struct page_table));
-	vmm_default_table(context->page_table);
+	*context = alloc(sizeof(struct context));
+	if(unlikely(*context == NULL)) RETURN_ERROR;
 
-	context->comms.sysperm = 0;
-	
-	context->notification.actions = alloc(sizeof(struct notification_action) * NOTIFICATION_MAX);
-	context->notification.queue = alloc(sizeof(struct notification_queue));
+	(*context)->page_table = alloc(sizeof(struct page_table));
+	vmm_default_table((*context)->page_table);
 
-	int ret = NEW_CONTEXT(context);
+	(*context)->notification.actions = alloc(sizeof(struct notification_action) * NOTIFICATION_MAX);
+	if(unlikely((*context)->notification.actions == NULL)) RETURN_ERROR;
+
+	(*context)->notification.queue = alloc(sizeof(struct notification_queue));
+	if(unlikely((*context)->notification.queue== NULL)) RETURN_ERROR;
+
+	(*context)->comms.cid = cid; \
+	int ret = hash_table_push(&context_table, &(*context)->comms.cid, \
+		(*context), sizeof((*context)->comms.cid)); \
 	if(ret == -1) RETURN_ERROR;
 
 	return 0;
@@ -90,7 +97,7 @@ int sched_establish_shared_link(struct context *scheduler_context,
 		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
 		.share = {
 			.identifier = identifier,
-			.length = sizeof(void*),
+			.length = sizeof(struct sched_queue_entry),
 			.create = 1,
 			.type = LINK_CIRCULAR, 
 		}
@@ -120,6 +127,7 @@ int sched_establish_shared_link(struct context *scheduler_context,
 
 static int fetch_context(struct context **context, struct ucontext **ucontext) {
 	struct context *next_context = NULL;
+	struct sched_queue_entry queue_entry;
 
 	bool found = false;
 	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
@@ -128,7 +136,7 @@ find_context:
 	found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
 		({
 			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
-				CORE_LOCAL->thread_queue_link->data_offset, &next_context);
+				CORE_LOCAL->thread_queue_link->data_offset, &queue_entry);
 		})
 	);
 	
@@ -140,6 +148,17 @@ find_context:
 	next_context = scheduling_server->context;
 	if(next_context == NULL) panic("DUFAY: SCHEDULING SERVER DOWN");
 find_ucontext:
+	if(next_context == NULL) {
+		if(queue_entry.cid == -1) { // CREATE A NEW CONTEXT GIVEN ASID
+			panic("DUFAY: this is a reminder to implement this");
+		} else {
+			ret = hash_table_search(&context_table, &queue_entry.cid,
+				sizeof(queue_entry.cid), (void**)&next_context);
+			if(ret == -1 || next_context == NULL)
+				panic("DUFAY: context table corrupt (or invalid paramater)");
+		}
+	}
+
 	notification_dispatch(next_context);
 
 	struct ucontext *next_ucontext = ({

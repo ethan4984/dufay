@@ -26,7 +26,11 @@ static struct hash_table namespace_table;
 static struct bitmap nid_bitmap;
 
 struct hash_table context_table;
-struct bitmap cid_bitmap;
+static struct bitmap cid_bitmap = {
+	.data = NULL,
+	.size = DIV_ROUNDUP(SCHED_RESERVED_CID, 8),
+	.resizable = false
+};
 
 static volatile struct limine_module_request limine_module_request = {
 	.id = LIMINE_MODULE_REQUEST,
@@ -246,10 +250,13 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	ret = elf64_file_aux(elf, &elf->aux);
 	if(ret == -1) RETURN_ERROR;
 
-	struct context *context = alloc(sizeof(struct context));
-
-	ret = create_blank_context(context); 
+	int cid;
+	ret = bitmap_alloc(&cid_bitmap, &cid);
 	if(ret == -1) RETURN_ERROR;
+
+	struct context *context = NULL;
+	ret = create_blank_context(cid, &context); 
+	if(ret == -1 || context == NULL) RETURN_ERROR;
 
 	context->comms.server = server->name;
 
@@ -388,12 +395,3 @@ static int launch_schedulers(struct limine_file *file) {
 
 	return 0;
 }
-
-SYSCALL_DEFINE2(context, int, cid, void**, private, {
-	struct context *context;
-
-	int ret = SEARCH_CONTEXT(cid, &context);
-	if(ret == -1) RETURN_ERROR;
-
-	*private = context;	
-})
