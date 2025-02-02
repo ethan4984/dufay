@@ -3,20 +3,46 @@
 
 #include <core/virtual.h>
 #include <core/physical.h>
+#include <core/debug.h>
 
 #include <fayt/string.h>
-#include <core/debug.h>
+#include <fayt/hash.h>
+#include <fayt/debug.h>
 
 #include <limine.h>
 
+static struct hash_table as_table;
 static volatile struct limine_kernel_address_request limine_kernel_address_request = {
 	.id = LIMINE_KERNEL_ADDRESS_REQUEST,
 	.revision = 0
 };
+static int asid_bump;
 
 struct page_table kernel_mappings;
 
-void vmm_default_table(struct page_table *page_table) {
+int vmm_as_find(int asid, struct page_table **page_table) {
+	if(page_table == NULL) RETURN_ERROR;
+
+	int ret = hash_table_search(&as_table, &asid, sizeof(asid), (void**)page_table);
+	if(ret == -1) RETURN_ERROR;
+
+	return 0;
+}
+
+int vmm_as_push(struct page_table *page_table) {
+	if(page_table == NULL) RETURN_ERROR;
+
+	page_table->asid = asid_bump++;
+
+	int ret = hash_table_push(&as_table, &page_table->asid, page_table, sizeof(page_table->asid));
+	if(ret == -1) RETURN_ERROR; 
+
+	return 0;
+}
+
+int vmm_default_table(struct page_table *page_table) {
+	if(page_table == NULL) RETURN_ERROR;
+
 	x86_paging_init();
 
 	page_table->map_page = x86_map_page;
@@ -51,9 +77,13 @@ void vmm_default_table(struct page_table *page_table) {
 			phys += 0x200000;
 		}
 	}
+
+	return 0;
 }
 
-void vmm_map_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt, uint64_t flags) {
+int vmm_map_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt, uint64_t flags) {
+	if(page_table == NULL) RETURN_ERROR;
+
 	if(flags & X86_FLAGS_PS) {
 		for(size_t i = 0; i < cnt; i++) {
 			page_table->map_page(page_table, vaddr, pmm_alloc(1, 0x200), flags);
@@ -65,20 +95,28 @@ void vmm_map_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt, 
 			vaddr += 0x1000;
 		}
 	}
+
+	return 0;
 }
 
-void vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt) {
+int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt) {
+	if(page_table == NULL) RETURN_ERROR;
+
 	for(size_t i = 0; i < cnt; i++) {
 		size_t page_size = page_table->unmap_page(page_table, vaddr);
-		if(page_size == 0) {
-			return;
-		}
+		if(!page_size) return -1;
 
 		vaddr += page_size;
 	}
+
+	return 0;
 }
 
-void vmm_init(void) {
-	vmm_default_table(&kernel_mappings);
+int vmm_init(void) {
+	int ret = vmm_default_table(&kernel_mappings);
+	if(ret == -1) RETURN_ERROR;
+
 	x86_swap_tables(&kernel_mappings);
+
+	return 0;
 }

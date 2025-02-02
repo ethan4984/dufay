@@ -25,7 +25,11 @@ int create_blank_context(int cid, struct context **context) {
 	if(unlikely(*context == NULL)) RETURN_ERROR;
 
 	(*context)->page_table = alloc(sizeof(struct page_table));
-	vmm_default_table((*context)->page_table);
+	int ret = vmm_default_table((*context)->page_table);
+	if(unlikely(ret == -1)) RETURN_ERROR;
+
+	ret = vmm_as_push((*context)->page_table);
+	if(unlikely(ret == -1)) RETURN_ERROR;
 
 	(*context)->notification.actions = alloc(sizeof(struct notification_action) * NOTIFICATION_MAX);
 	if(unlikely((*context)->notification.actions == NULL)) RETURN_ERROR;
@@ -34,7 +38,7 @@ int create_blank_context(int cid, struct context **context) {
 	if(unlikely((*context)->notification.queue== NULL)) RETURN_ERROR;
 
 	(*context)->comms.cid = cid; \
-	int ret = hash_table_push(&context_table, &(*context)->comms.cid, \
+	ret = hash_table_push(&context_table, &(*context)->comms.cid, \
 		(*context), sizeof((*context)->comms.cid)); \
 	if(ret == -1) RETURN_ERROR;
 
@@ -149,7 +153,12 @@ find_context:
 	if(next_context == NULL) panic("DUFAY: SCHEDULING SERVER DOWN");
 find_ucontext:
 	if(next_context == NULL) {
-		if(queue_entry.cid == -1) { // CREATE A NEW CONTEXT GIVEN ASID
+		if(queue_entry.cid == -1) {
+			struct context *current_context = CORE_LOCAL->current_context;
+			if(unlikely(current_context == NULL)) panic("DUFAY: core local corrupt");
+
+			int asid = (queue_entry.asid == -1) ? current_context->page_table->asid : queue_entry.asid;
+
 			panic("DUFAY: this is a reminder to implement this");
 		} else {
 			ret = hash_table_search(&context_table, &queue_entry.cid,

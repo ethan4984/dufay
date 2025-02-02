@@ -39,7 +39,6 @@ void dufay_entry(void) {
 	x86_system_init();
 
 	pmm_init();
-	vmm_init();
 
 	struct slab_pool pool = {
 		.page_size = PAGE_SIZE,
@@ -60,6 +59,8 @@ void dufay_entry(void) {
 	slab_cache_create(&pool, "CACHE32768", 32768);
 	slab_cache_create(&pool, "CACHE65536", 65536);
 	slab_cache_create(&pool, "CACHE131072", 131072);
+
+	vmm_init();
 
 	rsdp = limine_rsdp_request.response->address;
 
