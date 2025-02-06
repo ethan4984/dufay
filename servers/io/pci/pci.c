@@ -76,11 +76,14 @@ static int pci_device_bar(volatile union pci_config *config, struct pci_bar *bar
 	config->device.bar[index] = 0xffffffff;
 	uint64_t bar_size_low = config->device.bar[index];
 
-	config->device.bar[index + 1] = 0xffffffff;
-	uint64_t bar_size_high = config->device.bar[index + 1];
+	uint64_t bar_size_high = 0;
+	if(is_64_bits) {
+		config->device.bar[index + 1] = 0xffffffff;
+		bar_size_high = config->device.bar[index + 1];
+	}	
 
 	config->device.bar[index] = bar_low;
-	config->device.bar[index + 1] = bar_high;
+	if(is_64_bits) config->device.bar[index + 1] = bar_high;
 
 	uint64_t limit = bar_size_high << 32 | bar_size_low;
 	limit = is_mmio ? limit & ~0xf : limit & ~0x3;

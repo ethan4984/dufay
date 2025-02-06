@@ -18,7 +18,10 @@
 #include <fayt/debug.h>
 #include <fayt/hash.h>
 
-int create_blank_context(int cid, struct context **context) {
+static struct bitmap cgroup_bitmap;
+static struct hash_table cgroup_table;
+
+int create_context(int cgid, struct context **context) {
 	if(unlikely(context == NULL)) RETURN_ERROR;
 
 	*context = alloc(sizeof(struct context));
@@ -37,9 +40,33 @@ int create_blank_context(int cid, struct context **context) {
 	(*context)->notification.queue = alloc(sizeof(struct notification_queue));
 	if(unlikely((*context)->notification.queue== NULL)) RETURN_ERROR;
 
-	(*context)->comms.cid = cid; \
-	ret = hash_table_push(&context_table, &(*context)->comms.cid, \
-		(*context), sizeof((*context)->comms.cid)); \
+	struct sched_cgroup *cgroup = NULL;
+	ret = cgroup_search(cgid, &cgroup);
+	if(ret == -1 || cgroup == NULL) RETURN_ERROR;
+
+	int cid;
+	ret = bitmap_alloc(&cgroup->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	(*context)->comms.proc_id = (struct sched_proc_id) {
+		.cgid = cgid,
+		.cid = cid
+	};
+	ret = hash_table_push(&cgroup->cid_table, &(*context)->comms.proc_id.cid,
+		(*context), sizeof((*context)->comms.proc_id.cid));
+	if(ret == -1) RETURN_ERROR;
+
+	return 0;
+}
+
+int search_context(struct sched_proc_id proc_id, struct context **context) {
+	if(unlikely(context == NULL)) RETURN_ERROR;
+
+	struct sched_cgroup *cgroup;
+	int ret = cgroup_search(proc_id.cgid, &cgroup);
+	if(ret == -1) RETURN_ERROR;
+
+	ret = hash_table_search(&cgroup->cid_table, &proc_id.cid, sizeof(proc_id.cid), (void**)context);
 	if(ret == -1) RETURN_ERROR;
 
 	return 0;
@@ -153,7 +180,7 @@ find_context:
 	if(next_context == NULL) panic("DUFAY: SCHEDULING SERVER DOWN");
 find_ucontext:
 	if(next_context == NULL) {
-		if(queue_entry.cid == -1) {
+		if(queue_entry.proc_id.cid == -1) {
 			struct context *current_context = CORE_LOCAL->current_context;
 			if(unlikely(current_context == NULL)) panic("DUFAY: core local corrupt");
 
@@ -161,9 +188,8 @@ find_ucontext:
 
 			panic("DUFAY: this is a reminder to implement this");
 		} else {
-			ret = hash_table_search(&context_table, &queue_entry.cid,
-				sizeof(queue_entry.cid), (void**)&next_context);
-			if(ret == -1 || next_context == NULL)
+			ret = search_context(queue_entry.proc_id, &next_context);
+			if(ret == -1 || next_context == NULL) 
 				panic("DUFAY: context table corrupt (or invalid paramater)");
 		}
 	}
@@ -308,6 +334,40 @@ int sched_enqueue_context(struct server *scheduling_server, struct context *cont
 	if(ret == -1) RETURN_ERROR;
 
 	pmm_free((uintptr_t)config - HIGH_VMA, 1);
+
+	return 0;
+}
+
+int cgroup_search(int cgid, struct sched_cgroup **cgroup) {
+	if(unlikely(cgroup == NULL)) RETURN_ERROR;
+
+	int ret = hash_table_search(&cgroup_table, &cgid, sizeof(cgid), (void**)cgroup);
+	if(ret == -1) RETURN_ERROR;
+
+	return 0;
+}
+
+int cgroup_insert(struct sched_cgroup *cgroup) {
+	if(unlikely(cgroup == NULL)) RETURN_ERROR;
+
+	int ret = bitmap_alloc(&cgroup_bitmap, &cgroup->cgid);
+	if(ret == -1) RETURN_ERROR;
+
+	cgroup->cid_bitmap = (struct bitmap) {
+		.data = NULL,
+		.size = 1,
+		.resizable = true
+	};
+
+	ret = hash_table_push(&cgroup_table, &cgroup->cgid, cgroup, sizeof(cgroup->cgid));
+	if(ret == -1) RETURN_ERROR;
+
+	return 0;
+}
+
+int cgroup_remove(int cgid) {
+	int ret = hash_table_delete(&cgroup_table, &cgid, sizeof(cgid));
+	if(ret == -1) RETURN_ERROR;
 
 	return 0;
 }

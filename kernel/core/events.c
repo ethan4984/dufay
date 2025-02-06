@@ -50,7 +50,7 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 		if(context == NULL) continue;
 
 		queue_set->config[i] = (struct sched_queue_config) {
-			.cid = context->comms.cid
+			.proc_id = context->comms.proc_id
 		};
 
 		queue_set->cnt++;
@@ -84,7 +84,7 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
 
 	queue_set->cnt = 1;
 	*queue_set->config = (struct sched_queue_config) {
-		.cid = context->comms.cid
+		.proc_id = context->comms.proc_id
 	};
 
 	ucontext->blocking = true;

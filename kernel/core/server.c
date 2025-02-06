@@ -25,17 +25,12 @@
 static struct hash_table namespace_table;
 static struct bitmap nid_bitmap;
 
-struct hash_table context_table;
-static struct bitmap cid_bitmap = {
-	.data = NULL,
-	.size = DIV_ROUNDUP(SCHED_RESERVED_CID, 8),
-	.resizable = false
-};
-
 static volatile struct limine_module_request limine_module_request = {
 	.id = LIMINE_MODULE_REQUEST,
 	.revision = 0
 };
+
+struct sched_cgroup cgroup_system;
 
 static int launch_schedulers(struct limine_file*);
 static int launch_server(struct server*, void*, int);
@@ -109,7 +104,7 @@ int spawn_server(const char *namespace, const char *identifier) {
 
 	queue_set->cnt = 1;
 	*queue_set->config = (struct sched_queue_config) {
-		.cid = server->context->comms.cid
+		.proc_id = server->context->comms.proc_id
 	};
 
 	int ret = sched_enqueue_context(master_scheduler, 
@@ -162,6 +157,9 @@ int launch_servers(void) {
 		RETURN_ERROR;
 	}
 
+	int ret = cgroup_insert(&cgroup_system);
+	if(ret == -1) RETURN_ERROR;
+
 	struct limine_file **modules = limine_module_request.response->modules;
 	uint64_t module_count = limine_module_request.response->module_count;
 
@@ -173,7 +171,7 @@ int launch_servers(void) {
 		}
 	}
 
-	int ret = create_namespace("IO");
+	ret = create_namespace("IO");
 	if(ret == -1) RETURN_ERROR;
 
 	for(uint64_t i = 0; i < module_count; i++) {
@@ -250,12 +248,8 @@ static int launch_server(struct server *server, void *arg, int arg_length) {
 	ret = elf64_file_aux(elf, &elf->aux);
 	if(ret == -1) RETURN_ERROR;
 
-	int cid;
-	ret = bitmap_alloc(&cid_bitmap, &cid);
-	if(ret == -1) RETURN_ERROR;
-
 	struct context *context = NULL;
-	ret = create_blank_context(cid, &context); 
+	ret = create_context(cgroup_system.cgid, &context); 
 	if(ret == -1 || context == NULL) RETURN_ERROR;
 
 	context->comms.server = server->name;

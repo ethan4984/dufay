@@ -43,11 +43,12 @@ struct server_env {
 };
 
 extern struct server *master_scheduler;
-extern struct hash_table context_table;
 
 int launch_servers(void);
 int create_server(const char*, const char*, struct server*);
 int create_namespace(const char*);
+
+extern struct sched_cgroup cgroup_system;
 
 struct server *find_server(const char*, const char*);
 struct limine_file *limine_search_module(const char*);

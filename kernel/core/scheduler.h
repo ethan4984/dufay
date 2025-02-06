@@ -118,7 +118,7 @@ struct context {
 		const char *namespace;
 		const char *server;
 
-		int cid;
+		struct sched_proc_id proc_id;
 	} comms;
 
 	struct page_table *page_table;
@@ -128,10 +128,15 @@ struct context {
 
 void reschedule(struct registers*, void*);
 
-int create_blank_context(int, struct context**);
+int create_context(int, struct context**);
+int search_context(struct sched_proc_id proc_id, struct context**);
 int destroy_ucontext(struct context*, struct ucontext*);
 int sched_establish_shared_link(struct context*, struct cpu_local*, const char*);
 int sched_dequeue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
 int sched_enqueue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
+
+int cgroup_search(int, struct sched_cgroup**);
+int cgroup_insert(struct sched_cgroup*);
+int cgroup_remove(int);
 
 #endif

@@ -25,8 +25,8 @@ constexpr int nice_to_weight[40] = {
 #define VRUNTIME(W, S) (((S) * (W)) / 1024)
 
 struct thread {
-	int cid;
-	int cgroup;
+	struct sched_proc_id proc_id;
+	int asid;
 
 	struct time epoch;
 

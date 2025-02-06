@@ -69,8 +69,9 @@ static int bridge_to_destination(struct comm_bridge *bridge, struct context **de
 
 		*dest = server->context;
 	} else {
-		int ret = hash_table_search(&context_table, &bridge->cid, sizeof(bridge->cid), (void**)dest);
-		if(ret == -1) RETURN_ERROR;
+		*dest = NULL;
+		int ret = search_context(bridge->proc_id, dest);
+		if(ret == -1 || *dest == NULL) RETURN_ERROR;
 	}
 
 	return 0;
