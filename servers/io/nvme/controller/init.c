@@ -54,10 +54,8 @@ int main(struct pci_info *pci_info) {
 	}
 
 	struct comm_bridge bridge = {
-		.not = NOT_PCI_BAR,
-		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-		.namespace = "IO",
-		.destination = "pci"
+		.not = NOT_PCI_BAR, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+		.namespace = "IO", .destination = "pci"
 	};
 
 	bridge.data.limit = sizeof(struct pci_nbar);
@@ -96,15 +94,44 @@ int main(struct pci_info *pci_info) {
 	if(syscall_response.ret == -1 || portal_resp.base != addr ||
 		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
 
+	int irq_vector;
+	syscall_response = SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_RESERVE_IRQ, &irq_vector);
+	if(syscall_response.ret == -1) RETURN_ERROR;
+
+	struct pci_nmsi nmsi = {
+		.descriptor = pci_info->descriptor,
+		.irq_vector = irq_vector
+	};
+
+	if(pci_info->msix_capable) {
+		print("Device is MSIX capable\n");
+		nmsi.msix = true;
+	} else if(pci_info->msi_capable) {
+		print("Device is MSI capable\n");
+		nmsi.msix = false;
+	} else {
+		print("Device is neither MSI or MSIX capable\n");
+		return -1;
+	}
+
+	bridge = (struct comm_bridge) {
+		.not = NOT_PCI_MSI, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+		.namespace = "IO", .destination = "pci",
+		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
+	};
+
+	ret = notify(&bridge);
+	if(ret == -1) return -1;
+
 	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
-		"nvme_irq", pci_info->irq_vector);
+		"nvme_irq", irq_vector);
 	if(syscall_response.ret == -1) return -1;
 
 	struct anchor anchor = { .identifier = NVME_IRQ_MMIO, .paddr = nbar->bar.base };
 	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
 	if(syscall_response.ret == -1) return -1;
 
-	ret = nvme(pci_info, (volatile struct nvme_regs*)addr);
+	ret = nvme(pci_info, (volatile struct nvme_regs*)addr,irq_vector);
 	if(ret == -1) { print("ERROR: internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

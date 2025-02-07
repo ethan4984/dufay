@@ -167,7 +167,7 @@ static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
 	if(admin) controller->admin_queue = queue_pair;
 
 	int ret = bitmap_alloc(&controller->qid_bitmap, &queue_pair->qid);
-	if(ret == -1 || queue_pair->qid) RETURN_ERROR;
+	if(ret == -1 || (admin && queue_pair->qid)) RETURN_ERROR;
 
 	queue_pair->controller = controller;
 	queue_pair->entry_cnt = controller->queue_entries;
@@ -210,12 +210,71 @@ static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
 			(queue_pair->entry_cnt - 1);
 		goto finish;
 	}
+
+	struct nvme_command create_cq_command = {
+		.opcode = nvme_op_create_cq,
+		.private.create_cq.prp1 = queue_pair->completion_queue_paddr,
+		.private.create_cq.cqid = queue_pair->qid,
+		.private.create_cq.qsize = queue_pair->entry_cnt - 1,
+		.private.create_cq.irq_vector = 0,
+		.private.create_cq.cq_flags = (1 << 0) | (1 << 1)
+	};
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &create_cq_command);
+	if(ret == -1) RETURN_ERROR;
+
+	struct nvme_command create_sq_command = {
+		.opcode = nvme_op_create_sq,
+		.private.create_sq.prp1 = queue_pair->submission_queue_paddr,
+		.private.create_sq.cqid = queue_pair->qid,
+		.private.create_sq.sqid = queue_pair->qid,
+		.private.create_sq.qsize = queue_pair->entry_cnt - 1,
+		.private.create_sq.sq_flags = (1 << 0) | (1 << 1)
+	};
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &create_sq_command);
+	if(ret == -1) RETURN_ERROR;
+	print("io queue-pair created [%x]\n", queue_pair->qid);
 finish:
 	if(queue) *queue = queue_pair;
 	return 0;
 }
 
-int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
+static int nvme_initialise_irq(struct pci_info *pci_info, int *irq) {
+	if(pci_info == NULL || irq == NULL) RETURN_ERROR;
+
+	struct syscall_response syscall_response = SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_RESERVE_IRQ, irq);
+	if(syscall_response.ret == -1) RETURN_ERROR;
+
+	struct pci_nmsi nmsi = {
+		.descriptor = pci_info->descriptor,
+		.irq_vector = *irq 
+	};
+
+	if(pci_info->msix_capable) nmsi.msix = true;
+	else if(pci_info->msi_capable) nmsi.msix = false;
+	else {
+		print("Device is neither MSI or MSIX capable\n");
+		return -1;
+	}
+
+	struct comm_bridge bridge = {
+		.not = NOT_PCI_MSI, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
+		.namespace = "IO", .destination = "pci",
+		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
+	};
+
+	int ret = notify(&bridge);
+	if(ret == -1) return -1;
+
+	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
+		"nvme_irq", *irq);
+	if(syscall_response.ret == -1) return -1;
+
+	return 0;
+}
+
+int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs, int admin_irq) {
 	if(pci_info == NULL || regs == NULL) return -1;
 	
 	struct portal_resp portal_resp;
@@ -246,35 +305,6 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 
 	print("Controller reset\n");
 
-	struct pci_nmsi nmsi = {
-		.descriptor = pci_info->descriptor,
-		.irq_vector = pci_info->irq_vector
-	};
-
-	if(pci_info->msix_capable) {
-		print("Device is MSIX capable\n");
-		nmsi.msix = true;
-	} else if(pci_info->msi_capable) {
-		print("Device is MSI capable\n");
-		nmsi.msix = false;
-	} else {
-		print("Device is neither MSI or MSIX capable\n");
-		return -1;
-	}
-
-	struct comm_bridge bridge = {
-		.not = NOT_PCI_MSI, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-		.namespace = "IO", .destination = "pci",
-		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
-	};
-
-	ret = notify(&bridge);
-	if(ret == -1) return -1;
-
-	anchor = (struct anchor) { .identifier = NVME_IRQ_CONTROLLER, .paddr = 0 };
-	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
-	if(syscall_response.ret == -1) return -1;
-
 	controller->queue_entries = controller->regs->cap & 0xffff;
 	controller->strides = (controller->regs->cap >> 32) & 0xf;
 	controller->qid_bitmap = (struct bitmap) {
@@ -283,7 +313,7 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 		.resizable = false
 	};
 
-	ret = nvme_queue_pair_instantiate(controller, NULL, 1, pci_info->irq_vector);
+	ret = nvme_queue_pair_instantiate(controller, NULL, 1, admin_irq);
 	if(ret == -1) RETURN_ERROR;
 
 	controller->regs->cc = (1 << 0) | (0 << 4) | (0 << 11) | (0 << 14) | (6 << 16) | (4 << 20);
@@ -311,6 +341,16 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs) {
 		print("\tlba cnt: [%x]\n", namespace->lba_cnt);
 		print("\tlba size: [%x]\n", namespace->lba_size);
 		print("\tmax prps: [%x]\n", namespace->max_prps);
+		
+		int irq;
+		ret = nvme_initialise_irq(pci_info, &irq);
+		if(ret == -1) RETURN_ERROR;
+
+		struct nvme_queue_pair *queue_pair = NULL;
+		ret = nvme_queue_pair_instantiate(controller, &queue_pair, false, irq);
+		if(ret == -1 || queue_pair == NULL) RETURN_ERROR;
+
+		namespace->queue_pair = queue_pair;
 	}
 
 	return 0;

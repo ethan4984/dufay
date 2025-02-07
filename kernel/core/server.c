@@ -122,11 +122,6 @@ SYSCALL_DEFINE4(server_activate, const char*, namespace, const char*, identifier
 	struct server *server = find_server(namespace, identifier);
 	if(server == NULL) return -1;
 
-	if(strcmp(namespace, "IO") == 0) {
-		struct pci_info *info = arg;
-		info->irq_vector = idt_reserve_vector();
-	}
-
 	int ret = launch_server(server, arg, length);
 	if(ret == -1) {
 		print("ERROR: failed to launch server {%s}\n", server->name);

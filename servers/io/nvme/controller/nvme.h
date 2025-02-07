@@ -286,6 +286,8 @@ struct nvme_namespace {
 	int max_prps;
 	int lba_cnt;
 	int lba_size;
+
+	struct nvme_queue_pair *queue_pair;
 };
 
 struct nvme_controller {
@@ -316,6 +318,6 @@ struct nvme_controller {
 	struct nvme_queue_pair nvme_queue_pair[];
 };
 
-int nvme(struct pci_info*, volatile struct nvme_regs*);
+int nvme(struct pci_info*, volatile struct nvme_regs*, int);
 
 #endif

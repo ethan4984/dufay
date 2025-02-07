@@ -2,6 +2,7 @@
 #include <arch/x86/cpu.h>
 #include <arch/x86/apic.h> 
 #include <arch/x86/smp.h>
+#include <arch/x86/idt.h>
 
 #include <core/scheduler.h>
 #include <core/virtual.h>
@@ -372,14 +373,27 @@ int cgroup_remove(int cgid) {
 	return 0;
 }
 
-SYSCALL_DEFINE0(yield, {
-	yield();
-})
-
-SYSCALL_DEFINE0(sched_acquire, {
-	spinlock(&CORE_LOCAL->sched_lock);
-})
-
-SYSCALL_DEFINE0(sched_release, {
-	spinrelease(&CORE_LOCAL->sched_lock);
-})
+SYSCALL_DEFINE2(archctl, int, request, int*, data, {
+	switch(request) {
+		case ARCHCTL_SCHED_ACQUIRE:
+			spinlock(&CORE_LOCAL->sched_lock);
+			break;
+		case ARCHCTL_SCHED_RELEASE:
+			spinrelease(&CORE_LOCAL->sched_lock);
+			break;
+		case ARCHCTL_RESERVE_IRQ:
+			if(data == NULL) RETURN_ERROR;
+			*data = idt_reserve_vector();
+			break;
+		case ARCHCTL_RELEASE_IRQ:
+			if(data == NULL) RETURN_ERROR;
+			print("remember ARCHCTL_RELEASE_IRQ is not implemented\n");
+			break;
+		case ARCHCTL_YIELD:
+			yield();
+			break;
+		default:
+			print("archctl: unknown request [%x]\n", request);
+			RETURN_ERROR;
+	}
+});

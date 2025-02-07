@@ -23,6 +23,7 @@ constexpr int nice_to_weight[40] = {
 #define NICE_MIN (-20)
 #define NICE_MAX (19)
 #define VRUNTIME(W, S) (((S) * (W)) / 1024)
+#define SCHED_DEFAULT_NICE 0
 
 struct thread {
 	struct sched_proc_id proc_id;
@@ -32,6 +33,7 @@ struct thread {
 
 	uint64_t weight;
 	uint64_t vruntime;
+	int active;
 
 	RB_META(struct thread);
 };
