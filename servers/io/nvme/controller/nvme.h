@@ -4,6 +4,7 @@
 #include <fayt/pci.h>
 #include <fayt/bitmap.h>
 #include <fayt/vector.h>
+#include <fayt/portal.h>
 
 #include <stdint.h>
 #include <stddef.h>
