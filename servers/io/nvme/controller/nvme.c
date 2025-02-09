@@ -13,33 +13,9 @@
 
 #include "../common.h"
 
-#define DUFAY_ALLOCATE_UNBROKEN(SIZE, RESP) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	uintptr_t address; \
-	ret = as_address(&address_space, &address, (SIZE)); \
-	if(ret == -1) { ret = -1; goto finish; } \
-	struct portal_req portal_req = { \
-		.type = PORTAL_REQ_ANON | PORTAL_REQ_CONTINUOUS | PORTAL_REQ_PEEK, \
-		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE, \
-		.morphology = { \
-			.addr = address, \
-			.length = ALIGN_UP((SIZE), PAGE_SIZE), \
-			.pcnt = DIV_ROUNDUP((SIZE), PAGE_SIZE) \
-		} \
-	}; \
-	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, (RESP)); \
-	if(syscall_response.ret == -1 || (RESP)->base != address || (RESP)->limit != \
-		ALIGN_UP((SIZE), PAGE_SIZE)) { ret = -1; goto finish; } \
-finish: \
-	ret; \
-})
-
-static int nvme_send_command(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
+static int nvme_send_command(struct nvme_queue_pair *queue_pair,
+	struct nvme_command *submission, int cid) {
 	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
-
-	int cid, ret = bitmap_alloc(&queue_pair->cid_bitmap, &cid);
-	if(ret == -1) RETURN_ERROR;
 
 	struct nvme_queue_entry *queue_entry = &queue_pair->queue_entry[submission->cid];
 	*queue_entry = (struct nvme_queue_entry) { 0 };
@@ -54,10 +30,11 @@ static int nvme_send_command(struct nvme_queue_pair *queue_pair, struct nvme_com
 	return 0;
 }
 
-static int nvme_send_command_and_poll(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
+static int nvme_send_command_and_poll(struct nvme_queue_pair *queue_pair,
+	struct nvme_command *submission, int cid) {
 	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
 
-	int ret = nvme_send_command(queue_pair, submission);
+	int ret = nvme_send_command(queue_pair, submission, cid);
 	if(ret == -1) RETURN_ERROR;
 
 	struct nvme_queue_entry *queue_entry = &queue_pair->queue_entry[submission->cid];
@@ -74,9 +51,10 @@ static int nvme_send_command_and_poll(struct nvme_queue_pair *queue_pair, struct
 	return 0;
 }
 
-static int nvme_send_command_and_block(struct nvme_queue_pair *queue_pair, struct nvme_command *submission) {
+static int nvme_send_command_and_block(struct nvme_queue_pair *queue_pair,
+	struct nvme_command *submission, int cid) {
 	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
-	return nvme_send_command_and_poll(queue_pair, submission);
+	return nvme_send_command_and_poll(queue_pair, submission, cid);
 }
 
 static int nvme_fetch_controller_id(struct nvme_controller *controller) {
@@ -92,7 +70,11 @@ static int nvme_fetch_controller_id(struct nvme_controller *controller) {
 		.private.identify.prp1 = portal_resp.morphology.paddr
 	};
 
-	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
+	int cid;
+	ret = bitmap_alloc(&controller->admin_queue->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command, cid);
 	if(ret == -1) RETURN_ERROR;
 
 	controller->controller_id = (void*)portal_resp.base;
@@ -113,7 +95,11 @@ static int nvme_fetch_namespaces(struct nvme_controller *controller) {
 		.private.identify.prp1 = portal_resp.morphology.paddr
 	};
 
-	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
+	int cid;
+	ret = bitmap_alloc(&controller->admin_queue->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &identify_command, cid);
 	if(ret == -1) RETURN_ERROR;
 
 	int *nsid = (void*)portal_resp.base;
@@ -131,7 +117,11 @@ static int nvme_fetch_namespaces(struct nvme_controller *controller) {
 			.private.identify.prp1 = portal_resp.morphology.paddr
 		};
 
-		ret = nvme_send_command_and_block(controller->admin_queue, &identify_command);
+		int cid;
+		ret = bitmap_alloc(&controller->admin_queue->cid_bitmap, &cid);
+		if(ret == -1) RETURN_ERROR;
+
+		ret = nvme_send_command_and_block(controller->admin_queue, &identify_command, cid);
 		if(ret == -1) RETURN_ERROR;
 
 		struct nvme_namespace *namespace = alloc(sizeof(struct nvme_namespace_id));
@@ -140,7 +130,7 @@ static int nvme_fetch_namespaces(struct nvme_controller *controller) {
 		memcpy(&namespace->identity, (void*)portal_resp.base, sizeof(struct nvme_namespace_id));
 
 		namespace->nsid = nsid[i];
-		namespace->max_prps = ({
+		namespace->max_prp = ({
 			int lba_shift = namespace->identity.lbaf_list[namespace->identity.flbas & 0b1111].ds;
 			int shift = 12 + ((controller->regs->cap >> 48) & 0b1111);
 			int max_transfer_shift = controller->controller_id->mdts ?
@@ -152,6 +142,44 @@ static int nvme_fetch_namespaces(struct nvme_controller *controller) {
 		namespace->lba_size = 1 <<
 			(namespace->identity.lbaf_list[namespace->identity.flbas & 0b11111].ds);
 	}
+
+	return 0;
+}
+
+int nvme_lba_rw(struct nvme_namespace *namespace, int base, int cnt, int rw, void *buffer) {
+	if(namespace == NULL || buffer == NULL) RETURN_ERROR;
+
+	int cid, ret = bitmap_alloc(&namespace->queue_pair->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	struct nvme_command command = { };
+
+	if(cnt * namespace->lba_size > PAGE_SIZE) {
+		if(cnt * namespace->lba_size > PAGE_SIZE * 2) {
+			int prp_cnt = (cnt - 1) * namespace->lba_size / PAGE_SIZE;
+			if(prp_cnt > namespace->max_prp) RETURN_ERROR;
+
+			for(int i = 0; i < prp_cnt; i++) {
+				namespace->prp_list[i + cid * namespace->max_prp] = (uint64_t)buffer +
+					PAGE_SIZE + i * PAGE_SIZE;
+			}
+
+			command.private.rw.prp2 = namespace->prp_list[cid * namespace->max_prp];
+		} else {
+			command.private.rw.prp2 = (uint64_t)buffer + PAGE_SIZE;
+		}
+	}
+
+	if(rw) command.opcode = 0x1;
+	else command.opcode = 0x2;
+
+	command.private.rw.nsid = namespace->nsid;
+	command.private.rw.slba = base;
+	command.private.rw.length = cnt - 1;
+	command.private.rw.prp1 = (uint64_t)buffer;
+
+	ret = nvme_send_command_and_block(namespace->queue_pair, &command, cid);
+	if(ret == -1) RETURN_ERROR;
 
 	return 0;
 }
@@ -220,7 +248,11 @@ static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
 		.private.create_cq.cq_flags = (1 << 0) | (1 << 1)
 	};
 
-	ret = nvme_send_command_and_block(controller->admin_queue, &create_cq_command);
+	int cid;
+	ret = bitmap_alloc(&queue_pair->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &create_cq_command, cid);
 	if(ret == -1) RETURN_ERROR;
 
 	struct nvme_command create_sq_command = {
@@ -232,7 +264,10 @@ static int nvme_queue_pair_instantiate(struct nvme_controller *controller,
 		.private.create_sq.sq_flags = (1 << 0) | (1 << 1)
 	};
 
-	ret = nvme_send_command_and_block(controller->admin_queue, &create_sq_command);
+	ret = bitmap_alloc(&queue_pair->cid_bitmap, &cid);
+	if(ret == -1) RETURN_ERROR;
+
+	ret = nvme_send_command_and_block(controller->admin_queue, &create_sq_command, cid);
 	if(ret == -1) RETURN_ERROR;
 	print("io queue-pair created [%x]\n", queue_pair->qid);
 finish:
@@ -340,17 +375,22 @@ int nvme(struct pci_info *pci_info, volatile struct nvme_regs *regs, int admin_i
 		print("nsid: [%x]\n", namespace->nsid);
 		print("\tlba cnt: [%x]\n", namespace->lba_cnt);
 		print("\tlba size: [%x]\n", namespace->lba_size);
-		print("\tmax prps: [%x]\n", namespace->max_prps);
+		print("\tmax prps: [%x]\n", namespace->max_prp);
 		
 		int irq;
 		ret = nvme_initialise_irq(pci_info, &irq);
 		if(ret == -1) RETURN_ERROR;
 
 		struct nvme_queue_pair *queue_pair = NULL;
-		ret = nvme_queue_pair_instantiate(controller, &queue_pair, false, irq);
+		int ret = nvme_queue_pair_instantiate(controller, &queue_pair, false, irq);
 		if(ret == -1 || queue_pair == NULL) RETURN_ERROR;
 
 		namespace->queue_pair = queue_pair;
+
+		ret = DUFAY_ALLOCATE_UNBROKEN(namespace->max_prp *
+			namespace->queue_pair->entry_cnt * sizeof(uint64_t), &namespace->portal_resp_prp);
+		if(ret == -1) RETURN_ERROR;
+		namespace->prp_list = (uint64_t*)namespace->portal_resp_prp.base;
 	}
 
 	return 0;

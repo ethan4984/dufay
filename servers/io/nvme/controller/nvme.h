@@ -283,9 +283,12 @@ struct nvme_namespace {
 	int nsid;
 	struct nvme_namespace_id identity;
 
-	int max_prps;
+	int max_prp;
 	int lba_cnt;
 	int lba_size;
+
+	struct portal_resp portal_resp_prp;
+	uint64_t *prp_list;
 
 	struct nvme_queue_pair *queue_pair;
 };
@@ -305,7 +308,7 @@ struct nvme_controller {
 	int page_size_min;
 	int page_size;
 	int max_transfer_shift;
-	int max_prps;
+	int max_prp;
 	int strides;
 
 	struct bitmap qid_bitmap;
