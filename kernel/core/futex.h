@@ -8,10 +8,10 @@ struct futex {
 	struct etrigger etrigger;
 
 	uint64_t paddr;
-
-	int locked;
 	int expected;
-	int operation;
+
+	struct spinlock lock;
+	int refcnt;
 };
 
 #endif

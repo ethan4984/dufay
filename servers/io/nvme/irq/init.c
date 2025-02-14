@@ -43,6 +43,6 @@ void panic(const char *str, ...) {
 
 struct address_space address_space = {
 	.current = 0xa0000000,
-	.base = 0xa0000000,
+	.base = 0xf0000000,
 	.limit = 0x0000fffffffff0ff
 };

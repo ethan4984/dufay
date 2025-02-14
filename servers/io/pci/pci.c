@@ -338,13 +338,12 @@ int pci(struct pci_server_meta *server_meta) {
 						.device = device, .func = func
 					};
 
-					int ret = pci_device_spawn(pci_device);
-					if(ret == -1) RETURN_ERROR;
-
 					ret = hash_table_push(&device_tree, &pci_device->descriptor, pci_device,
 						sizeof(struct pci_descriptor));
 					if(ret == -1) RETURN_ERROR;
-					if(func == 0 && (config->device.header_type & (1 << 7)) == 0x0) break;
+
+					int ret = pci_device_spawn(pci_device);
+					if(ret == -1) RETURN_ERROR;
 				}
 			}
 		}

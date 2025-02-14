@@ -38,7 +38,7 @@ int main(struct pci_info *pci_info) {
 	print("Slab cache directory initialised\n");
 
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
-	for(int i = 0; i < 4; i++) {
+	for(int i = 0; i < 16; i++) {
 		uintptr_t addr;
 		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
 		if(ret == -1) { print("ERROR: failed to allocate address for stack\n"); goto failure; }
@@ -46,9 +46,7 @@ int main(struct pci_info *pci_info) {
 		struct syscall_response response = SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
 			addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
 
-		if(response.ret == -1) print("ERROR: failed to allocate notification stack\n");
-		else print("Allocated notificaton stack #%d [%x:%x]\n",
-			i, addr, NOTIFICATION_STACK_SIZE);
+		if(response.ret == -1) { print("ERROR: failed to allocate notification stack\n"); }
 	}
 
 	int ret = fs(pci_info);

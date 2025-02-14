@@ -57,11 +57,13 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext) {
 	}
 
 	VECTOR_CLEAR(context_unblocked);
-	spinrelease_irqsave(&etrigger->lock);
+	if(queue_set->cnt == 0) return 0;
 
 	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_server, 
 		CORE_LOCAL->current_context, queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
 	if(ret == -1) RETURN_ERROR;
+
+	spinrelease_irqsave(&etrigger->lock);
 
 	return 0;
 }
@@ -87,14 +89,13 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object) {
 		.proc_id = context->comms.proc_id
 	};
 
-	ucontext->blocking = true;
-
 	spinrelease_irqsave(&equeue->lock);
 
 	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
 		queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
 	if(ret == -1) RETURN_ERROR;
 
+	ucontext->blocking = true;
 	for(; ucontext->blocking;) yield();
 
 	if(waking_object) *waking_object = ucontext->last_etrigger;

@@ -212,10 +212,10 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req, str
 
 	uint64_t permissions = portal_translate_protections(req->prot) & ~(X86_FLAGS_P);
 	uintptr_t vaddr = req->morphology.addr;
+	uint64_t paddr = req->type & PORTAL_REQ_CONTINUOUS ?
+		pmm_alloc(req->morphology.pcnt, 1) : 0;
 
-	if(req->type & PORTAL_REQ_CONTINUOUS) {
-		uint64_t paddr = pmm_alloc(req->morphology.pcnt, 1);
-
+	if(paddr) {
 		permissions |= X86_FLAGS_P;
 
 		for(size_t i = 0; i < req->morphology.pcnt; i++) {
@@ -234,10 +234,8 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req, str
 	for(size_t i = 0; i < req->morphology.pcnt; i++) {	
 		struct page *page = alloc(sizeof(struct page));
 
-		if((req->type & PORTAL_REQ_CONTINUOUS) != PORTAL_REQ_CONTINUOUS)
-			portal->page_table->map_page(portal->page_table, vaddr + i * PAGE_SIZE, 0, permissions);
-
 		page->vaddr = vaddr;
+		if(paddr) page->paddr = paddr + i * PAGE_SIZE;
 		page->flags = permissions;
 		page->frame = NULL;
 		page->pmle = portal->page_table->page_entry(portal->page_table, vaddr + i * PAGE_SIZE);

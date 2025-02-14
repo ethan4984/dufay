@@ -26,6 +26,7 @@ struct notification {
 	int refcnt;
 	int notnum;
 	int weight;
+	int done;
 
 	struct notification_parameter parameter;
 
@@ -33,6 +34,7 @@ struct notification {
 	struct notification_queue *queue;
 
 	VECTOR(struct etrigger*) etrigger;
+	struct context *source;
 
 	bool active;
 };

@@ -82,6 +82,16 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 	if(ucontext->last) ucontext->last->next = ucontext->next;
 	if(ucontext->next) ucontext->next->last = ucontext->last;
 
+	pmm_free(ucontext->stack->kernel_stack.sp - HIGH_VMA - ucontext->stack->kernel_stack.size,
+		DIV_ROUNDUP(ucontext->stack->kernel_stack.size, PAGE_SIZE));
+
+	if(ucontext->stack->last) {
+		ucontext->stack->last->next = ucontext->stack->next;
+		if(ucontext->stack->next) ucontext->stack->next->last = ucontext->stack->last;
+	}
+
+	ucontext->stack->active = false;
+
 	struct notification *notification = ucontext->notification;
 	if(notification) {
 		struct context *current_context = CORE_LOCAL->current_context; 
@@ -98,17 +108,6 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext) {
 			if(ret == -1) RETURN_ERROR;
 		}
 	}
-
-	pmm_free(ucontext->stack->kernel_stack.sp - HIGH_VMA - ucontext->stack->kernel_stack.size,
-		DIV_ROUNDUP(ucontext->stack->kernel_stack.size, PAGE_SIZE));
-
-	if(ucontext->stack->last) {
-		ucontext->stack->last->next = ucontext->stack->next;
-		if(ucontext->stack->next) ucontext->stack->next->last = ucontext->stack->last;
-	}
-
-	free(ucontext->stack);
-	free(ucontext);
 
 	return 0;
 }
@@ -274,7 +273,7 @@ void reschedule(struct registers *regs, void*) {
 
 	CORE_LOCAL->current_context = next_context;
 
-	//print("rescheduling to: rip=%x on cid=%x [%s]\n", r->rip, next_context->comms.cid, next_context->comms.server ? next_context->comms.server : "NULL");
+	//print("rescheduling to: rip=%x on cid=%x [%s] with [%x]\n", r->rip, next_context->comms.proc_id.cid, next_context->comms.server ? next_context->comms.server : "NULL", r->rflags);
 
 	if(next_ucontext->notification) next_ucontext->delivered = 1;
 
@@ -310,11 +309,13 @@ void reschedule(struct registers *regs, void*) {
 int sched_dequeue_context(struct server *scheduling_server, struct context *context, struct sched_queue_config_set *config_set,int weight) {
 	if(scheduling_server == NULL || context == NULL || config_set == NULL) RETURN_ERROR; 
 
+	//if(CORE_LOCAL->current_context) print("denqueueing context [%s] from [%s]\n", CORE_LOCAL->current_context->comms.server ? CORE_LOCAL->current_context->comms.server : "NULL", context->comms.server ? context->comms.server : "NULL");
+
 	struct sched_queue_config_set *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
 	memcpy(config, config_set, sizeof(struct sched_queue_config_set) +
 		config_set->cnt * sizeof(struct sched_queue_config));
 
-	int ret = notification_queue(context, scheduling_server->context,
+	int ret = notification_queue(CORE_LOCAL->current_context, scheduling_server->context,
 		NOT_SCHED_DEQUEUE, weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if(ret == -1) RETURN_ERROR;
 
@@ -326,11 +327,13 @@ int sched_dequeue_context(struct server *scheduling_server, struct context *cont
 int sched_enqueue_context(struct server *scheduling_server, struct context *context, struct sched_queue_config_set *config_set, int weight) {
 	if(scheduling_server == NULL || context == NULL || config_set == NULL) RETURN_ERROR;
 
+	//if(CORE_LOCAL->current_context) print("enqueueing context [%s] from [%s]\n", CORE_LOCAL->current_context->comms.server ? CORE_LOCAL->current_context->comms.server : "NULL", context->comms.server ? context->comms.server : "NULL");
+
 	struct sched_queue_config_set *config = (void*)(pmm_alloc(1, 1) + HIGH_VMA);
 	memcpy(config, config_set, sizeof(struct sched_queue_config_set) +
 		config_set->cnt * sizeof(struct sched_queue_config));
 
-	int ret = notification_queue(context, scheduling_server->context,
+	int ret = notification_queue(CORE_LOCAL->current_context, scheduling_server->context,
 		NOT_SCHED_ENQUEUE, weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if(ret == -1) RETURN_ERROR;
 
@@ -373,7 +376,7 @@ int cgroup_remove(int cgid) {
 	return 0;
 }
 
-SYSCALL_DEFINE2(archctl, int, request, int*, data, {
+int archctl(int request, int *data) {
 	switch(request) {
 		case ARCHCTL_SCHED_ACQUIRE:
 			spinlock(&CORE_LOCAL->sched_lock);
@@ -396,4 +399,10 @@ SYSCALL_DEFINE2(archctl, int, request, int*, data, {
 			print("archctl: unknown request [%x]\n", request);
 			RETURN_ERROR;
 	}
+
+	return 0;
+}
+
+SYSCALL_DEFINE2(archctl, int, request, int*, data, {
+	return archctl(request, data);
 });

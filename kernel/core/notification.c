@@ -5,6 +5,7 @@
 #include <core/syscall.h>
 #include <core/scheduler.h>
 #include <core/physical.h>
+#include <core/lock.h>
 #include <core/debug.h>
 #include <core/server.h>
 
@@ -108,7 +109,7 @@ static int notification_ucontext_instantiate(struct context *context, struct uco
 
 	ucontext->regs.ss = 0x3b;
 	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
-	ucontext->regs.rflags = 0x202;
+	ucontext->regs.rflags = 0x202 & ~(1 << 9);
 	ucontext->regs.cs = 0x43;
 	ucontext->regs.rip = (uintptr_t)action->handler;
 
@@ -162,6 +163,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 	notification->weight = weight;
 	notification->info = alloc(sizeof(struct notification_info));
 	notification->queue = queue;
+	notification->source = sender;
 
 	if(page_cnt && paddr) {
 		if(vaddr) notification->parameter.vaddr = vaddr;
@@ -225,6 +227,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge*, bridge, {
 	notification->info = alloc(sizeof(struct notification_info));
 	notification->queue = queue;
 	notification->active = false;
+	notification->source = context;
 
 	ret = notification_push(queue, notification);
 	if(ret == -1) return -1;
@@ -263,9 +266,11 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge*, bridge, {
 		if(ret == -1) RETURN_ERROR;
 
 		for(;;) {
+			//print("broadcast: blocking on %s\n", context->comms.server);
 			int ret = equeue_block(&equeue, NULL);
 			if(ret == -1) RETURN_ERROR;
-			if(!ucontext->blocking) break;
+			//print("broadcast: unblocking on %s\n", context->comms.server);
+			if(!ucontext->blocking && notification->done) break; // think of a better way to solve this
 		}
 	}
 })
@@ -294,6 +299,12 @@ int notification_dispatch(struct context *context) {
 		if(ret == -1) {
 			print("ERROR: failed to initialise ucontext\n");
 			spinrelease(&queue->lock); RETURN_ERROR;
+		}
+
+		for(int i = 0; i < NOTIFICATION_PENDING_CAPACITY; i++) {
+			if(queue->queue[NOTIFICATION_INDEX(top->notification->notnum)][i] == top->notification) {
+				queue->queue[NOTIFICATION_INDEX(top->notification->notnum)][i] = NULL;
+			}
 		}
 
 		spinrelease(&queue->lock); return 0;
@@ -397,54 +408,86 @@ SYSCALL_DEFINE1(notification_destroy, struct comm_bridge*, bridge, {
 	if(ret == -1) return -1;
 })
 
+//	IF THE NOTIFICATION WAS WEIGHTED INSTANTANEOUS OR TICK, IT WILL RETURN DIRECTLY TO THE CALLER
+//	THIS BEHAVIOUR IS LOGICAL BECAUSE FOR AN INSTANTEANOUS NOTIFICATION WE WISH FOR CONTINUITY, AND
+//	FOR A TICKED NOTIFICATION WE DO NOT WANT TO DISTURB THE SCHEDULING QUEUE. FOR A SCHEDULED
+//	NOTIFICATION, IT WILL FIND THE NEXT SCHEDULABLE UCONTEXT.
+
 SYSCALL_DEFINE0(notification_return, {
-	struct context *context = CORE_LOCAL->current_context; 
-	if(context == NULL) RETURN_ERROR;
+	struct context *current_context = CORE_LOCAL->current_context; 
+	if(unlikely(current_context == NULL)) RETURN_ERROR;
 
-	context->ucontext_active->stack->active = 0;
+	struct ucontext *current_ucontext = current_context->ucontext_active;
+	if(unlikely(current_ucontext == NULL)) RETURN_ERROR;
 
-	struct ucontext *rcontext = ({
+	spinlock_irqsave(&CORE_LOCAL->sched_lock);
+
+	struct context *rcontext = (current_ucontext->notification->weight == NOTIFY_WEIGHT_INSTANTANEOUS) ?
+		current_ucontext->notification->source : current_context;
+	struct ucontext *rucontext = ({
 		__label__ finish;
-		struct ucontext *rcontext = context->ucontext_active->last;
+		struct ucontext *rucontext = rcontext->ucontext_top;
 	
-		for(; rcontext;) {
-			if(rcontext->notification && !rcontext->delivered) {
-				if(rcontext->notification->weight == NOTIFY_WEIGHT_INSTANTANEOUS) goto finish;
-				rcontext = rcontext->last;
+		for(; rucontext;) {
+			if(rucontext == current_ucontext) {
+				rucontext = rucontext->last;
+				continue;
+			} 
+			if(rucontext->notification && !rucontext->delivered) {
+				if(rucontext->notification->weight == NOTIFY_WEIGHT_INSTANTANEOUS) goto finish;
+				rucontext = rucontext->last;
 				continue;
 			}
 			goto finish;
 		}
-		rcontext = NULL;	
+		rucontext = NULL;	
 finish:
-		rcontext;
+		rucontext;
 	});
-	if(rcontext == NULL) panic("rcontext is null\n");
+	if(rcontext == NULL || rucontext == NULL) RETURN_ERROR;
 
-	if(rcontext->notification) {
-		struct notification_action *action = &context->notification.actions[rcontext->notification->notnum - 1];
-		int ret = notification_ucontext_instantiate(context, rcontext,
-			rcontext->notification, action);	
-		if(ret == -1) panic("unable to instantiate ucontetx");
+	current_ucontext->stack->active = false;
+	current_ucontext->notification->done = true;
+	int ret = destroy_ucontext(current_context, current_ucontext);
+	if(ret == -1) RETURN_ERROR;
 
-		rcontext->delivered = 1;
+	if(rucontext->notification) {
+		struct notification_action *action =
+			&rcontext->notification.actions[NOTIFICATION_INDEX(rucontext->notification->notnum)];
+		int ret = notification_ucontext_instantiate(rcontext, rucontext,
+			rucontext->notification, action);	
+		if(ret == -1) RETURN_ERROR;
+
+		rucontext->delivered = 1; // streamline
 	}
 
-	rcontext->blocking = false;
-	int ret = destroy_ucontext(context, context->ucontext_active);
-	if(ret == -1) panic("failed to kill active ucontext\n");
+	rcontext->ucontext_active = rucontext;
 
-	context->ucontext_active = rcontext;
+	if(rcontext != current_context) {
+		x86_swap_tables(rcontext->page_table);
 
-	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
-	CORE_LOCAL->fpu_rstor(rcontext->fpu_context);
+		set_user_fs(rcontext->user_fs_base);
+		set_user_gs(rcontext->user_gs_base);
 
-	CORE_LOCAL->user_stack = rcontext->sysctx.user_stack;
-	CORE_LOCAL->error = rcontext->sysctx.user_stack;
+		CORE_LOCAL->current_context = rcontext;
+	}
 
-	SWAP_TLS(&rcontext->regs);
+	CORE_LOCAL->kernel_stack = rucontext->stack->kernel_stack.sp;
+	CORE_LOCAL->fpu_rstor(rucontext->fpu_context);
 
-	//print("notification_return: going to rip=%x cid=%x\n", rcontext->regs.rip, rcontext->context->comms.cid);
+	CORE_LOCAL->user_stack = rucontext->sysctx.user_stack;
+	CORE_LOCAL->error = rucontext->sysctx.user_stack;
+
+	rucontext->blocking = false;
+
+	/*print("notification_return: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
+		current_context->comms.server, rcontext->comms.server, rucontext->regs.rip,
+		rucontext->notification ? 'T' : 'F',
+		current_ucontext->notification ? 'T' : 'F');*/
+
+	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
+
+	SWAP_TLS(&rucontext->regs);
 
 	__asm__ volatile (
 		"mov %0, %%rsp\n\t"
@@ -465,7 +508,7 @@ finish:
 		"pop %%rax\n\t"
 		"addq $16, %%rsp\n\t"
 		"iretq\n\t"
-		:: "r" (&rcontext->regs)
+		:: "r" (&rucontext->regs)
 	);
 })
 

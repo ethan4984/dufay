@@ -1,6 +1,9 @@
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
 #include <fayt/irq.h>
+#include <fayt/address_space.h>
+#include <fayt/sched.h>
+#include <fayt/syscall.h>
 
 #include <nvme.h>
 
@@ -31,6 +34,7 @@ static int nvme_anchor_flush(struct anchor *root) {
 
 int nvme_irq_handle(struct irq_state *state, struct anchor **private) {
 	if(private == NULL) RETURN_ERROR;
+
 	struct anchor *anchor_root = *private; 
 	if(anchor_root == NULL) RETURN_ERROR;
 
@@ -55,11 +59,16 @@ int nvme_irq_handle(struct irq_state *state, struct anchor **private) {
 
 	queue_entry->cid = completion_queue[queue->cq_head].cid;
 	queue_entry->completion = completion_queue[queue->cq_head];
-	queue_entry->response = true;
-	queue_entry->etrigger = NULL;
 
 	*completion_doorbell = ++queue->cq_head;
 	if(queue->cq_head == queue->entry_cnt) queue->cq_head = 0;
+
+	if(!queue_entry->blocking) queue_entry->response = true;
+	else {
+		struct syscall_response response = SYSCALL4(SYSCALL_FUTEX,
+			(uintptr_t)&queue_entry->response - 0xffff800000000000, FUTEX_WAKE, true, false);
+		if(response.ret == -1) RETURN_ERROR;
+	}
 
 	return 0;
 }

@@ -24,7 +24,8 @@ INTERNALCFLAGS := \
 	-mno-3dnow \
 	-mno-sse \
 	-mno-sse2 \
-	-fPIC
+	-fPIC \
+	-fno-stack-protector
 
 CFILES := $(shell find ./ -type f -name '*.c')
 OBJ := $(CFILES:.c=.o)

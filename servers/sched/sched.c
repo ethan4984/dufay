@@ -80,6 +80,8 @@ static int sched_flush_queue(void) {
 static void notify_clone(struct notification_info*, void *data, int) {
 	if(data == NULL) goto finish;
 
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_ACQUIRE, NULL);
+
 	struct thread *thread = alloc(sizeof(struct thread));
 	if(thread == NULL) panic("heap depleted");
 
@@ -107,12 +109,15 @@ static void notify_clone(struct notification_info*, void *data, int) {
 	}
 	sched_desc->load++;
 finish:
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 
 static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 	struct sched_queue_config_set *config_set = data;
 	if(config_set == NULL) { print("ERROR: config set is null\n"); goto finish; }
+
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_ACQUIRE, NULL);
 
 	for(int i = 0; i < config_set->cnt; i++) {
 		struct sched_queue_config *config = config_set->config + i;
@@ -198,12 +203,15 @@ exit:
 	int ret = sched_flush_queue();
 	if(ret == -1) { print("ERROR: failed to flush queue\n"); goto finish; }
 finish:
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 
 static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 	struct sched_queue_config_set *config_set = data;
 	if(config_set == NULL) goto finish;
+
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_ACQUIRE, NULL);
 
 	for(int i = 0; i < config_set->cnt; i++) {
 		struct sched_queue_config *config = config_set->config + i;
@@ -223,6 +231,7 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 	int ret = sched_flush_queue();
 	if(ret == -1) { print("ERROR: failed to activate notification queue\n"); goto finish; }
 finish:
+	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
 	SYSCALL0(SYSCALL_NOTIFICATION_RETURN);
 }
 

@@ -40,7 +40,7 @@ int main(struct pci_info *pci_info) {
 	print("Slab cache directory initialised\n");
 
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
-	for(int i = 0; i < 4; i++) {
+	for(int i = 0; i < 16; i++) {
 		uintptr_t addr;
 		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
 		if(ret == -1) { print("ERROR: failed to allocate address for stack\n"); goto failure; }
@@ -48,90 +48,10 @@ int main(struct pci_info *pci_info) {
 		struct syscall_response response = SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
 			addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
 
-		if(response.ret == -1) print("ERROR: failed to allocate notification stack\n");
-		else print("Allocated notificaton stack #%d [%x:%x]\n",
-			i, addr, NOTIFICATION_STACK_SIZE);
+		if(response.ret == -1) { print("ERROR: failed to allocate notification stack\n"); goto failure; }
 	}
 
-	struct comm_bridge bridge = {
-		.not = NOT_PCI_BAR, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-		.namespace = "IO", .destination = "pci"
-	};
-
-	bridge.data.limit = sizeof(struct pci_nbar);
-	uintptr_t vaddr;
-	int ret = as_allocate(&address_space, &vaddr,
-		DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE) * PAGE_SIZE);
-	if(ret == -1) return -1;
-	bridge.data.base = (void*)vaddr;
-
-	struct syscall_response response = SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
-	if(response.ret == -1) return -1;
-
-	struct pci_nbar *nbar = (void*)vaddr;
-	nbar->descriptor = pci_info->descriptor;
-	nbar->bar_index = NVME_PCI_BAR;
-
-	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
-	if(response.ret == -1) return -1;
-
-	uintptr_t addr;
-	ret = as_address(&address_space, &addr, nbar->bar.limit);
-	if(ret == -1) RETURN_ERROR;
-
-	struct portal_req portal_req = {
-		.type = PORTAL_REQ_DIRECT,
-		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.length = sizeof(struct portal_req),
-		.morphology = {
-			.addr = addr, .length = nbar->bar.limit,
-			.paddr = nbar->bar.base, .pcnt = DIV_ROUNDUP(nbar->bar.limit, PAGE_SIZE)
-		}
-	};
-
-	struct portal_resp portal_resp;
-	struct syscall_response syscall_response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
-	if(syscall_response.ret == -1 || portal_resp.base != addr ||
-		portal_resp.limit != nbar->bar.limit) RETURN_ERROR;
-
-	int irq_vector;
-	syscall_response = SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_RESERVE_IRQ, &irq_vector);
-	if(syscall_response.ret == -1) RETURN_ERROR;
-
-	struct pci_nmsi nmsi = {
-		.descriptor = pci_info->descriptor,
-		.irq_vector = irq_vector
-	};
-
-	if(pci_info->msix_capable) {
-		print("Device is MSIX capable\n");
-		nmsi.msix = true;
-	} else if(pci_info->msi_capable) {
-		print("Device is MSI capable\n");
-		nmsi.msix = false;
-	} else {
-		print("Device is neither MSI or MSIX capable\n");
-		return -1;
-	}
-
-	bridge = (struct comm_bridge) {
-		.not = NOT_PCI_MSI, .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-		.namespace = "IO", .destination = "pci",
-		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
-	};
-
-	ret = notify(&bridge);
-	if(ret == -1) return -1;
-
-	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_INSTANTIATE,
-		"nvme_irq", irq_vector);
-	if(syscall_response.ret == -1) return -1;
-
-	struct anchor anchor = { .identifier = NVME_IRQ_MMIO, .paddr = nbar->bar.base };
-	syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
-	if(syscall_response.ret == -1) return -1;
-
-	ret = nvme(pci_info, (volatile struct nvme_regs*)addr,irq_vector);
+	int ret = nvme(pci_info);
 	if(ret == -1) { print("ERROR: internal critical failure\n"); goto failure; }
 failure:
 	for(;;);

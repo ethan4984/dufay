@@ -239,14 +239,15 @@ struct [[gnu::packed]] nvme_namespace_id {
 };
 
 struct nvme_queue_entry {
-	int response;
 	struct nvme_completion completion;
 	int cid;
-	struct etrigger *etrigger;
+	int response;
+	int blocking;
 };
 
-struct nvme_controller;
+#define NVME_QUEUE_NAME_LENGTH 16
 
+struct nvme_controller;
 struct nvme_queue_pair {
 	int qid;
 	int entry_cnt;
@@ -272,6 +273,8 @@ struct nvme_queue_pair {
 
 	int completion_doorbell_offset;
 	volatile uint32_t *completion_doorbell;
+
+	char name[NVME_QUEUE_NAME_LENGTH];
 
 	uint64_t queue_entry_paddr;
 	struct nvme_queue_entry *queue_entry;
@@ -322,6 +325,6 @@ struct nvme_controller {
 	struct nvme_queue_pair nvme_queue_pair[];
 };
 
-int nvme(struct pci_info*, volatile struct nvme_regs*, int);
+int nvme(struct pci_info*);
 
 #endif

@@ -101,7 +101,7 @@ const char *exception_messages[] = {
 };
 
 extern void isr_handler_main(struct registers *regs) {
-	if((regs->cs & 0x3) == 0x3) swapgs();
+	SWAP_TLS(regs); 
 
 	if(regs->isr_number < 32) {
 		static struct spinlock exception_lock;
@@ -154,10 +154,7 @@ extern void isr_handler_main(struct registers *regs) {
 		}
 	}
 done:
-
-	if((regs->cs & 0x3) == 0x3) {
-		swapgs();
-	}
+	SWAP_TLS(regs);
 
 	xapic_write(XAPIC_EOI_OFF, 0);
 }
