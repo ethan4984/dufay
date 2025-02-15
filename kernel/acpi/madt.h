@@ -11,7 +11,7 @@ struct madt_hdr {
 } __attribute__((packed));
 
 struct madt_ent0 {
-	uint8_t acpi_id; 
+	uint8_t acpi_id;
 	uint8_t apic_id;
 	uint32_t flags;
 } __attribute__((packed));
@@ -32,7 +32,7 @@ struct madt_ent2 {
 
 struct madt_ent4 {
 	uint8_t acpi_id;
-	uint16_t flags; 
+	uint16_t flags;
 	uint8_t lint;
 } __attribute__((packed));
 

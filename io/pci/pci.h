@@ -1,5 +1,5 @@
 #ifndef PCI_H_
-#define PCI_H_ 
+#define PCI_H_
 
 #include <fayt/pci.h>
 #include <fayt/bitmap.h>
@@ -16,7 +16,7 @@ struct pci_segment {
 struct pci_device {
 	struct pci_descriptor descriptor;
 
-	bool msi_capable;	
+	bool msi_capable;
 	int msi_offset;
 
 	bool msix_capable;
@@ -29,10 +29,12 @@ struct pci_device {
 	volatile union pci_config *config;
 };
 
-#define PCI_CONFIG(BASE, BUS, DEVICE, FUNC) ({ \
-	(void*)((uintptr_t)(BASE) + ((BUS) * 256 + (DEVICE) * 8 + (FUNC)) * 4096); \
-})
+#define PCI_CONFIG(BASE, BUS, DEVICE, FUNC)                     \
+	({                                                          \
+		(void *)((uintptr_t)(BASE) +                            \
+				 ((BUS) * 256 + (DEVICE) * 8 + (FUNC)) * 4096); \
+	})
 
-int pci(struct pci_server_meta*);
+int pci(struct pci_server_meta *);
 
 #endif

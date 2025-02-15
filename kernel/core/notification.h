@@ -33,7 +33,7 @@ struct notification {
 	struct notification_info *info;
 	struct notification_queue *queue;
 
-	VECTOR(struct etrigger*) etrigger;
+	VECTOR(struct etrigger *) etrigger;
 	struct context *source;
 
 	bool active;
@@ -49,7 +49,8 @@ struct notification_queue {
 	struct spinlock lock;
 };
 
-int notification_queue(struct context*, struct context*, int, int, int, uintptr_t, uint64_t, int);
-int notification_dispatch(struct context*);
+int notification_queue(struct context *, struct context *, int, int, int,
+					   uintptr_t, uint64_t, int);
+int notification_dispatch(struct context *);
 
 #endif

@@ -5,6 +5,7 @@
 *.elf
 .cache
 build
+limine
 sched/sched
 sys/init/init
 io/pci/pci

@@ -23,11 +23,12 @@
 #define X86_PAT_WB 6
 #define X86_PAT_UCM 7
 
-extern uint64_t *(*x86_map_page)(struct page_table*, uint64_t, uint64_t, uint64_t);
-extern uint64_t *(*x86_page_entry)(struct page_table*, uint64_t);
-extern uint64_t (*x86_unmap_page)(struct page_table*, uint64_t); 
+extern uint64_t *(*x86_map_page)(struct page_table *, uint64_t, uint64_t,
+								 uint64_t);
+extern uint64_t *(*x86_page_entry)(struct page_table *, uint64_t);
+extern uint64_t (*x86_unmap_page)(struct page_table *, uint64_t);
 
 void x86_paging_init();
-void x86_swap_tables(struct page_table*);
+void x86_swap_tables(struct page_table *);
 
 #endif

@@ -8,7 +8,7 @@ struct ucontext;
 
 struct equeue;
 struct etrigger {
-	VECTOR(struct equeue*) equeue;
+	VECTOR(struct equeue *) equeue;
 
 	struct ucontext *ucontext;
 	int fired;
@@ -18,7 +18,7 @@ struct etrigger {
 };
 
 struct equeue {
-	VECTOR(struct ucontext*) ucontext;
+	VECTOR(struct ucontext *) ucontext;
 
 	struct spinlock lock;
 };

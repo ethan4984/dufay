@@ -1,6 +1,6 @@
 #pragma once
 
-#include <acpi/rsdp.h> 
+#include <acpi/rsdp.h>
 
 struct hpet_table {
 	struct acpi_hdr acpi_hdr;

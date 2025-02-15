@@ -22,7 +22,7 @@ struct idt_descriptor {
 } __attribute__((packed));
 
 struct vector {
-	void (*handler)(struct registers*, void*);
+	void (*handler)(struct registers *, void *);
 	void *ptr;
 	int reserved;
 	struct irq_cortex *irq_cortex;
@@ -31,8 +31,10 @@ struct vector {
 static struct vector interrupt_vectors[256];
 static struct idt_descriptor idt[256];
 
-static void set_idt_descriptor(uint16_t cs, uint8_t ist, uint8_t attributes, uint64_t offset, uint8_t index) {
-	idt[index] = (struct idt_descriptor) {
+static void set_idt_descriptor(uint16_t cs, uint8_t ist, uint8_t attributes,
+							   uint64_t offset, uint8_t index)
+{
+	idt[index] = (struct idt_descriptor){
 		.offset_low = offset & 0xffff,
 		.cs = cs,
 		.ist = ist,
@@ -42,9 +44,10 @@ static void set_idt_descriptor(uint16_t cs, uint8_t ist, uint8_t attributes, uin
 	};
 }
 
-int idt_reserve_vector(void) {
-	for(size_t i = 0; i < 256; i++) {
-		if(!interrupt_vectors[i].reserved) {
+int idt_reserve_vector(void)
+{
+	for (size_t i = 0; i < 256; i++) {
+		if (!interrupt_vectors[i].reserved) {
 			interrupt_vectors[i].reserved = true;
 			return i;
 		}
@@ -53,7 +56,10 @@ int idt_reserve_vector(void) {
 	return -1;
 }
 
-int idt_instantiate_vector(uint8_t vector, void (*handler)(struct registers*, void*), void *ptr, struct irq_cortex *irq_cortex) {
+int idt_instantiate_vector(uint8_t vector,
+						   void (*handler)(struct registers *, void *),
+						   void *ptr, struct irq_cortex *irq_cortex)
+{
 	interrupt_vectors[vector].handler = handler;
 	interrupt_vectors[vector].ptr = ptr;
 	interrupt_vectors[vector].reserved = 1;
@@ -62,95 +68,106 @@ int idt_instantiate_vector(uint8_t vector, void (*handler)(struct registers*, vo
 	return 0;
 }
 
-const char *exception_messages[] = {
-	"Divide by zero",
-	"Debug",
-	"NMI",
-	"Breakpoint",
-	"Overflow",
-	"Bound Range Exceeded",
-	"Invaild Opcode",
-	"Device Not Available", 
-	"Double fault", 
-	"Co-processor Segment Overrun",
-	"Invaild TSS",
-	"Segment not present",
-	"Stack-Segment Fault",
-	"GPF",
-	"Page Fault",
-	"Reserved",
-	"x87 Floating Point Exception",
-	"allignement check",
-	"Machine check",
-	"SIMD floating-point exception",
-	"Virtualization Excpetion",
-	"Deadlock",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Security Exception",
-	"Reserved",
-	"Triple Fault",
-	"FPU error"
-};
+const char *exception_messages[] = { "Divide by zero",
+									 "Debug",
+									 "NMI",
+									 "Breakpoint",
+									 "Overflow",
+									 "Bound Range Exceeded",
+									 "Invaild Opcode",
+									 "Device Not Available",
+									 "Double fault",
+									 "Co-processor Segment Overrun",
+									 "Invaild TSS",
+									 "Segment not present",
+									 "Stack-Segment Fault",
+									 "GPF",
+									 "Page Fault",
+									 "Reserved",
+									 "x87 Floating Point Exception",
+									 "allignement check",
+									 "Machine check",
+									 "SIMD floating-point exception",
+									 "Virtualization Excpetion",
+									 "Deadlock",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Reserved",
+									 "Security Exception",
+									 "Reserved",
+									 "Triple Fault",
+									 "FPU error" };
 
-extern void isr_handler_main(struct registers *regs) {
-	SWAP_TLS(regs); 
+extern void isr_handler_main(struct registers *regs)
+{
+	SWAP_TLS(regs);
 
-	if(regs->isr_number < 32) {
+	if (regs->isr_number < 32) {
 		static struct spinlock exception_lock;
 
 		uint64_t cr2;
-		__asm__ volatile ("mov %%cr2, %0" : "=a"(cr2));
+		__asm__ volatile("mov %%cr2, %0" : "=a"(cr2));
 
 		uint64_t cr3;
-		__asm__ volatile ("mov %%cr3, %0" : "=a"(cr3));
+		__asm__ volatile("mov %%cr3, %0" : "=a"(cr3));
 
-		if(regs->isr_number == 0xe) {
+		if (regs->isr_number == 0xe) {
 			uint64_t faulting_address;
-			__asm__ volatile ("mov %%cr2, %0" : "=a"(faulting_address));
+			__asm__ volatile("mov %%cr2, %0" : "=a"(faulting_address));
 
-			int ret = irq_cortex_resolve_fault(faulting_address, regs->error_code);
-			if(ret == 0) goto done;
+			int ret =
+				irq_cortex_resolve_fault(faulting_address, regs->error_code);
+			if (ret == 0)
+				goto done;
 
 			ret = portal_resolve_fault(faulting_address, regs->error_code);
-			if(ret == 0) goto done;
+			if (ret == 0)
+				goto done;
 		}
 
 		spinlock(&exception_lock);
 
 		print("DEBUG: Kowalski analysis: \"%s\" with error code: %x\n",
-			exception_messages[regs->isr_number], regs->error_code);
-		print("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
-		print("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n", regs->rsi, regs->rdi, regs->rbp, regs->rsp);
-		print("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8, regs->r9, regs->r10, regs->r11);
-		print("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n", regs->r12, regs->r13, regs->r14, regs->r15); 
-		print("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs, regs->ss, cr2, regs->rip);
+			  exception_messages[regs->isr_number], regs->error_code);
+		print("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n", regs->rax,
+			  regs->rbx, regs->rcx, regs->rdx);
+		print("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n", regs->rsi,
+			  regs->rdi, regs->rbp, regs->rsp);
+		print("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8,
+			  regs->r9, regs->r10, regs->r11);
+		print("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n", regs->r12,
+			  regs->r13, regs->r14, regs->r15);
+		print("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs,
+			  regs->ss, cr2, regs->rip);
 		print("DEBUG: cr3: %x\n", cr3);
 
 		spinrelease(&exception_lock);
 
-		for(;;) {
-			__asm__ ("hlt");
+		for (;;) {
+			__asm__("hlt");
 		}
 	}
 
-	if(interrupt_vectors[regs->isr_number].handler != NULL) {
-		struct irq_cortex *cortex = interrupt_vectors[regs->isr_number].irq_cortex;
-		if(cortex) {
+	if (interrupt_vectors[regs->isr_number].handler != NULL) {
+		struct irq_cortex *cortex =
+			interrupt_vectors[regs->isr_number].irq_cortex;
+		if (cortex) {
 			uint64_t error_code = regs->error_code;
 			regs->error_code = cortex->flush;
-			interrupt_vectors[regs->isr_number].handler(regs, interrupt_vectors[regs->isr_number].ptr);
+			interrupt_vectors[regs->isr_number].handler(
+				regs, interrupt_vectors[regs->isr_number].ptr);
 			regs->error_code = error_code;
-			if(cortex->flush) cortex->flush = false;
+			if (cortex->flush)
+				cortex->flush = false;
 		} else {
-			interrupt_vectors[regs->isr_number].handler(regs, interrupt_vectors[regs->isr_number].ptr);
+			interrupt_vectors[regs->isr_number].handler(
+				regs, interrupt_vectors[regs->isr_number].ptr);
 		}
 	}
 done:
@@ -159,10 +176,11 @@ done:
 	xapic_write(XAPIC_EOI_OFF, 0);
 }
 
-void syscall_handler(struct registers*, void*);
+void syscall_handler(struct registers *, void *);
 
-void idt_init() {
-	for(int i = 0; i < 48; i++) {
+void idt_init()
+{
+	for (int i = 0; i < 48; i++) {
 		interrupt_vectors[i].reserved = 1;
 	}
 
@@ -689,10 +707,8 @@ void idt_init() {
 	set_idt_descriptor(0x28, 0, 0x8e, (uintptr_t)isr254, 254);
 	set_idt_descriptor(0x28, 0, 0x8e, (uintptr_t)isr255, 255);
 
-	volatile struct idtr idtr = {
-		.limit = sizeof(idt) - 1,
-		.offset = (uintptr_t)idt
-	};
+	volatile struct idtr idtr = { .limit = sizeof(idt) - 1,
+								  .offset = (uintptr_t)idt };
 
-	__asm__ volatile ("lidtq %0" : "=m"(idtr));
+	__asm__ volatile("lidtq %0" : "=m"(idtr));
 }

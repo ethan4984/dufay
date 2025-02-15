@@ -19,7 +19,7 @@ struct rsdp {
 	char signature[8];
 	uint8_t checksum;
 	char OEMID[6];
-	uint8_t revision; 
+	uint8_t revision;
 	uint32_t rsdt_addr;
 	uint32_t length;
 	uint64_t xsdt_addr;

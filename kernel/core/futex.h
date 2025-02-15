@@ -1,4 +1,4 @@
-#ifndef FUTEX_H_ 
+#ifndef FUTEX_H_
 #define FUTEX_H_
 
 #include <core/events.h>

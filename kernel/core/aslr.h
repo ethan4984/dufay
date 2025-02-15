@@ -19,6 +19,7 @@ struct aslr {
 	uintptr_t maximum_vaddr;
 };
 
-int aslr_generate_layout(struct aslr *aslr, struct aslr_layout **ret, size_t length);
+int aslr_generate_layout(struct aslr *aslr, struct aslr_layout **ret,
+						 size_t length);
 
 #endif

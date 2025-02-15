@@ -30,7 +30,7 @@ struct tss {
 	uint32_t reserved1;
 	uint32_t reserved2;
 	uint64_t ist1;
-	uint64_t ist2; 
+	uint64_t ist2;
 	uint64_t ist3;
 	uint64_t ist4;
 	uint64_t ist5;
@@ -38,7 +38,7 @@ struct tss {
 	uint64_t ist7;
 	uint64_t reserved3;
 	uint16_t reserved4;
-	uint16_t iopb; 
+	uint16_t iopb;
 } __attribute__((packed));
 
 struct gdtr {
@@ -59,7 +59,8 @@ struct gdt {
 	struct tss_descriptor tss_descriptor; // 0x48
 } __attribute__((packed));
 
-void gdt_init(void) {
+void gdt_init(void)
+{
 	struct gdt *gdt = alloc(sizeof(struct gdt));
 
 	gdt->code16.limit = 0xffff;
@@ -77,7 +78,7 @@ void gdt_init(void) {
 	gdt->data32.limit = 0xffff;
 	gdt->data32.access = 0b10010010;
 	gdt->data32.granularity = 0b11001111;
-	
+
 	gdt->kernel_code64.access = 0b10011000;
 	gdt->kernel_code64.granularity = 0b00100000;
 
@@ -103,26 +104,22 @@ void gdt_init(void) {
 	gdt->tss_descriptor.base_high = (uintptr_t)tss >> 24 & 0xff;
 	gdt->tss_descriptor.base_high32 = (uintptr_t)tss >> 32 & 0xffffffff;
 
-	struct gdtr gdtr = {
-		.limit = sizeof(struct gdt) - 1,
-		.offset = (uintptr_t)gdt
-	};
-							
-	__asm__ volatile (	
-		"lgdtq %0\n\t"
-		"lea 1f(%%rip), %%rax\n\t"
-		"push $0x28\n\t"
-		"push %%rax\n\t"
-		"lretq\n\t"
-		"1:\n\t"
-		"mov $0x30, %%ax\n\t"
-		"mov %%ax, %%ds\n\t"
-		"mov %%ax, %%ss\n\t"
-		"mov %%ax, %%es\n\t"
-		"mov %%ax, %%gs\n\t"
-		"mov %%ax, %%fs\n\t"
-		"mov $0x48, %%ax\n\t"
-		"ltr %%ax\n\t"
-		:: "m"(gdtr) : "rax", "memory"
-	);
+	struct gdtr gdtr = { .limit = sizeof(struct gdt) - 1,
+						 .offset = (uintptr_t)gdt };
+
+	__asm__ volatile("lgdtq %0\n\t"
+					 "lea 1f(%%rip), %%rax\n\t"
+					 "push $0x28\n\t"
+					 "push %%rax\n\t"
+					 "lretq\n\t"
+					 "1:\n\t"
+					 "mov $0x30, %%ax\n\t"
+					 "mov %%ax, %%ds\n\t"
+					 "mov %%ax, %%ss\n\t"
+					 "mov %%ax, %%es\n\t"
+					 "mov %%ax, %%gs\n\t"
+					 "mov %%ax, %%fs\n\t"
+					 "mov $0x48, %%ax\n\t"
+					 "ltr %%ax\n\t" ::"m"(gdtr)
+					 : "rax", "memory");
 }

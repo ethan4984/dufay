@@ -47,6 +47,7 @@ build_servers: $(BUILD)
 	cd io/nvme/controller && make && cp nvme ../../../build/system-root/servers/nvme
 	cd io/nvme/irq && make && cp nvme_irq ../../../build/system-root/servers/nvme_irq
 	cd io/pci && make && cp pci ../../build/system-root/servers/pci
+	cd sys/init && make && cp init ../../build/system-root/servers/init
 
 .PHONY: clean_servers
 clean_servers:
@@ -54,6 +55,7 @@ clean_servers:
 	cd io/nvme/controller && make clean
 	cd io/nvme/irq && make clean
 	cd io/pci && make clean
+	cd sys/init && make clean
 
 limine:
 	git clone https://github.com/limine-bootloader/limine.git --branch=v7.x-binary --depth=1
@@ -115,6 +117,10 @@ rebuild_mlibc:
 clean:
 	rm -rf $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) disk_image disk.img serial.log qemu.log
 	$(MAKE) -C kernel clean
+
+.PHONY: format
+format:
+	find kernel fs io sys sched -iname '*.h' -o -iname '*.c' | xargs clang-format -i
 
 .PHONY: distclean
 distclean: clean

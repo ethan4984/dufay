@@ -12,19 +12,19 @@ struct cpu_local {
 	uintptr_t kernel_stack;
 	uintptr_t user_stack;
 	uint64_t error;
-// EVERYTHING ABOVE MUST REMAIN IN ORDER
+	// EVERYTHING ABOVE MUST REMAIN IN ORDER
 
 	struct server *scheduling_server;
 	struct portal_link *thread_enqueue_link;
 	struct portal_link *thread_baqueue_link;
-	VECTOR(struct context*) delivery_stack;
+	VECTOR(struct context *) delivery_stack;
 	struct spinlock sched_lock;
 
 	struct context *current_context;
 
 	int fpu_context_size;
-	void (*fpu_save)(void*);
-	void (*fpu_rstor)(void*);
+	void (*fpu_save)(void *);
+	void (*fpu_rstor)(void *);
 
 	int apic_id;
 };
