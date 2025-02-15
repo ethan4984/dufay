@@ -5,9 +5,9 @@
 *.elf
 .cache
 build
-servers/sched/sched
-servers/sys/init/init
-servers/io/pci/pci
-servers/io/nvme/controller/nvme
-servers/io/nvme/irq/nvme_irq
+sched/sched
+sys/init/init
+io/pci/pci
+io/nvme/controller/nvme
+io/nvme/irq/nvme_irq
 compile_commands.json
