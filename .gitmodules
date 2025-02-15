@@ -1,34 +1,21 @@
+[submodule "sched/fayt"]
+	path = sched/fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "io/nvme/fayt"]
+	path = io/nvme/fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "io/pci/fayt"]
+	path = io/pci/fayt
+	url = https://github.com/ethan4984/fayt
+[submodule "fs/fayt"]
+	path = fs/fayt
+	url = https://github.com/ethan4984/fayt
 [submodule "kernel/fayt"]
 	path = kernel/fayt
 	url = https://github.com/ethan4984/fayt
-[submodule "servers/scheduler/fayt"]
-	path = servers/scheduler/fayt
-	url = https://github.com/ethan4984/fayt.git
-	branch = cpp
-[submodule "servers/sched/fayt"]
-	path = servers/sched/fayt
+[submodule "io/nvme/controller/fayt"]
+	path = io/nvme/controller/fayt
 	url = https://github.com/ethan4984/fayt
-[submodule "servers/fs/vfs/fayt"]
-	path = servers/fs/vfs/fayt
+[submodule "io/nvme/irq/fayt"]
+	path = io/nvme/irq/fayt
 	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/nvme/fayt"]
-	path = servers/io/nvme/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "fayt"]
-	path = fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/fayt"]
-	path = servers/io/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/pci/fayt"]
-	path = servers/io/pci/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/nvme/irq/fayt"]
-	path = servers/io/nvme/irq/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/nvme/controller/fayt"]
-	path = servers/io/nvme/controller/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/fs/fayt"]
-	path = servers/fs/fayt
-	url = https://github.com/ethan4984/fayt/

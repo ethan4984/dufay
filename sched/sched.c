@@ -17,19 +17,21 @@ static struct thread *thread_tree;
 static struct hash_table thread_table;
 
 static struct sched_descriptor *sched_desc;
+
 static struct portal_link *sched_meta_link;
-static struct portal_link *sched_queue_link;
+static struct portal_link *sched_enqueue_link;
+static struct portal_link *sched_baqueue_link;
 
 static struct bitmap cid_bitmap;
 
 static int traverse_and_queue(struct thread**);
 
-static int sched_flush_queue(void) {
+static int sched_flush_enqueue(void) {
 	struct time epoch = sched_desc->timer.read(&sched_desc->timer);
 
-	int ret = OPERATE_LINK(sched_queue_link, LINK_CIRCULAR,
+	int ret = OPERATE_LINK(sched_enqueue_link, LINK_CIRCULAR,
 		({
-			circular_queue_flush((void*)sched_queue_link + sched_queue_link->data_offset);
+			circular_queue_flush((void*)sched_enqueue_link + sched_enqueue_link->data_offset);
 			0;
 		})
 	);
@@ -41,7 +43,7 @@ static int sched_flush_queue(void) {
 		if(ret == -1) return -1;
 		if(thread == NULL) break;
 
-		ret = OPERATE_LINK(sched_queue_link, LINK_CIRCULAR,
+		ret = OPERATE_LINK(sched_enqueue_link, LINK_CIRCULAR,
 			({
 				thread->vruntime += VRUNTIME(thread->weight, time_to_ns(sched_desc->slice));
 				thread->epoch = epoch;
@@ -51,17 +53,18 @@ static int sched_flush_queue(void) {
 
 				struct sched_queue_entry queue_entry = {
 					.proc_id = thread->proc_id,
-					.asid = thread->asid
+					.asid = thread->asid,
+					.birth = {
+						.active = !thread->active,
+						.asid = thread->asid,
+						.fork = true
+					}
 				};
-				if(thread->active == false) {
-					queue_entry.birth.active = true;
-					queue_entry.birth.asid = thread->asid;
-					queue_entry.birth.fork = true;
-					thread->active = true;
-				}
 
-				ret = circular_queue_push((void*)sched_queue_link +
-					sched_queue_link->data_offset, &queue_entry);
+				thread->active = true;
+
+				ret = circular_queue_push((void*)sched_enqueue_link +
+					sched_enqueue_link->data_offset, &queue_entry);
 				ret;
 			})
 		);
@@ -74,6 +77,10 @@ static int sched_flush_queue(void) {
 		}
 	}
 
+	return 0;
+}
+
+static int sched_flush_baqueue(void) {
 	return 0;
 }
 
@@ -178,16 +185,20 @@ static void notify_enqueue_thread(struct notification_info*, void *data, int) {
 			} else continue;
 		}
 exit:
-		struct thread *thread = alloc(sizeof(struct thread));
-		if(thread == NULL) panic("heap depleted");
+		struct thread *thread = NULL;
+		int ret = hash_table_search(&thread_table, &config->proc_id, sizeof(config->proc_id), (void**)&thread);
+		if(ret == -1 || thread == NULL) {
+			thread = alloc(sizeof(struct thread));
+			if(thread == NULL) panic("heap depleted");
 		
-		thread->proc_id = config->proc_id;
-		thread->weight = weight_set_nice(config->nice);
-		thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
+			thread->proc_id = config->proc_id;
+			thread->weight = weight_set_nice(config->nice);
+			thread->vruntime = VRUNTIME(thread->weight, config->phantom_runtime);
+		}
 
 		sched_desc->load++;
 
-		int ret = hash_table_push(&thread_table, &thread->proc_id, thread, sizeof(thread->proc_id));
+		ret = hash_table_push(&thread_table, &thread->proc_id, thread, sizeof(thread->proc_id));
 		if(ret == -1) {
 			print("ERROR: unable to push thread onto thread_table\n");
 			continue;
@@ -200,7 +211,7 @@ exit:
 		}
 	}
 
-	int ret = sched_flush_queue();
+	int ret = sched_flush_enqueue();
 	if(ret == -1) { print("ERROR: failed to flush queue\n"); goto finish; }
 finish:
 	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
@@ -228,7 +239,7 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int) {
 		thread->vruntime -= VRUNTIME(thread->weight, time_to_ns(delta));
 	}
 
-	int ret = sched_flush_queue();
+	int ret = sched_flush_enqueue();
 	if(ret == -1) { print("ERROR: failed to activate notification queue\n"); goto finish; }
 finish:
 	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
@@ -245,11 +256,12 @@ static int traverse_and_queue(struct thread **thread) {
 	return 0;
 }
 
-int sched(struct portal_link *link, struct sched_descriptor *desc) {
-	if(link == NULL || desc == NULL) return -1;
+int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link, struct sched_descriptor *desc) {
+	if(enqueue_link == NULL ||  baqueue_link == NULL || desc == NULL) return -1;
 
-	sched_queue_link = link;
 	sched_desc = desc;
+	sched_enqueue_link = enqueue_link;
+	sched_baqueue_link = baqueue_link;
 
 	struct notification_action enqueue_action =
 		{ .handler = notify_enqueue_thread };
@@ -303,8 +315,11 @@ int sched(struct portal_link *link, struct sched_descriptor *desc) {
 	for(;;) {
 		SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_ACQUIRE, NULL);
 
-		int ret = sched_flush_queue();
+		int ret = sched_flush_enqueue();
 		if(ret == -1) { print("ERROR: critical failure to refill queue\n"); return -1; }
+
+		ret = sched_flush_baqueue();
+		if(ret == -1) { print("ERROR: critical failure to flush baqueue\n"); return -1; }
 
 		SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
 		SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_YIELD, NULL);

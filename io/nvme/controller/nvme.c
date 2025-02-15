@@ -8,10 +8,52 @@
 #include <fayt/pci.h>
 #include <fayt/bitmap.h>
 #include <fayt/irq.h>
+#include <fayt/compiler.h>
 
 #include <nvme.h>
 
 #include "../common.h"
+
+static int nvme_nread(struct notification_info*, void *private, int) {
+	struct nblkread *nblkread = private;
+	if(unlikely(nblkread == NULL)) RETURN_ERROR;
+	return 0;
+
+/*	struct nvme_namespace *namespace;
+	if(nblkread->location % namespace->blksize ||
+		nblkread->count % namespace->blksize) RETURN_ERROR;
+
+	int blk_start = nblkread->location / namespace->blksize;
+	int blk_cnt = namespace->count / namespace->blksize;
+
+	int ret = nvme_lba_rw(namespace, blk_start, blk_cnt, false, private);
+	if(ret == -1) RETURN_ERROR;
+
+	return ret;*/
+}
+
+static int nvme_nwrite(struct notification_info*, void *private, int) {
+	struct nblkread *nblkwrite = private;
+	if(unlikely(nblkwrite == NULL)) RETURN_ERROR;
+	return 0;
+/*	struct nvme_namespace *namespace;
+	if(nblkwrite->location % namespace->blksize ||
+		nblkwrite->count % namespace->blksize) RETURN_ERROR;
+
+	int blk_start = nblkwrite->location / namespace->blksize;
+	int blk_cnt = namespace->count / namespace->blksize;
+
+	int ret = nvme_lba_rw(namespace, blk_start, blk_cnt, false, private);
+	if(ret == -1) RETURN_ERROR;
+
+	return ret;*/
+}
+
+static int nvme_nioctl(struct notification_info*, void *private, int) {
+	struct nblkioctl *nblkioctl = private;
+	if(unlikely(nblkioctl == NULL)) RETURN_ERROR;
+	return 0;
+}
 
 static int nvme_send_command(struct nvme_queue_pair *queue_pair,
 	struct nvme_command *submission, int cid, int blocking) {
@@ -54,7 +96,6 @@ static int nvme_send_command_and_poll(struct nvme_queue_pair *queue_pair,
 static int nvme_send_command_and_block(struct nvme_queue_pair *queue_pair,
 	struct nvme_command *submission, int cid) {
 	if(queue_pair == NULL || submission == NULL) RETURN_ERROR;
-	//return nvme_send_command_and_poll(queue_pair, submission, cid);
 
 	int ret = nvme_send_command(queue_pair, submission, cid, true);
 	if(ret == -1) RETURN_ERROR;
@@ -463,95 +504,3 @@ int nvme(struct pci_info *pci_info) {
 
 	return 0;
 }
-
-/*int nvme(struct pci_info *pci_info, struct nbar *bar, int admin_irq) {
-	if(pci_info == NULL || regs == NULL) return -1;
-
-	volatile struct nvme_regs *regs = (void*)bar->base);
-
-	struct portal_resp portal_resp;
-	int ret = DUFAY_ALLOCATE_UNBROKEN(sizeof(struct nvme_controller), &portal_resp);
-	if(ret == -1) RETURN_ERROR;
-
-	struct anchor anchor = (struct anchor) {
-		.identifier = NVME_IRQ_CONTROLLER, .paddr = portal_resp.morphology.paddr
-	};
-	struct syscall_response syscall_response = SYSCALL2(SYSCALL_IRQ_CORTEX_ANCHOR, "nvme_irq", &anchor);
-	if(syscall_response.ret == -1) return -1;
-
-	struct nvme_controller *controller = (void*)portal_resp.base;
-
-	controller->regs = regs;
-	controller->version.major = (controller->regs->vs >> 16) & 0xffff;
-	controller->version.minor = (controller->regs->vs >> 8) & 0xff;
-	controller->version.tertiary = (controller->regs->vs >> 0) & 0xff;
-
-	print("Version detected %d:%d:%d\n", controller->version.major,
-		controller->version.minor, controller->version.tertiary);
-
-	controller->page_size_max = 1 << (12 + (controller->regs->cap >> 52 & 0xf));
-	controller->page_size_min = 1 << (12 + (controller->regs->cap >> 48 & 0xf));
-
-	if(controller->regs->cc & (1 << 0)) controller->regs->cc &= ~(1 << 0);
-	for(; controller->regs->cc & (1 << 0););
-
-	print("Controller reset\n");
-
-	controller->queue_entries = controller->regs->cap & 0xffff;
-	controller->strides = (controller->regs->cap >> 32) & 0xf;
-	controller->qid_bitmap = (struct bitmap) {
-		.data = alloc(NVME_QID_MAX / 8),
-		.size = NVME_QID_MAX,
-		.resizable = false
-	};
-
-	ret = nvme_queue_pair_instantiate(controller, NULL, 1, admin_irq, "admin");
-	if(ret == -1) RETURN_ERROR;
-
-	controller->regs->cc = (1 << 0) | (0 << 4) | (0 << 11) | (0 << 14) | (6 << 16) | (4 << 20);
-	for(;;) {
-		if(controller->regs->cc & (1 << 0)) break;
-		else if(controller->regs->csts & (1 << 1)) RETURN_ERROR;
-	}
-
-	print("Controller enabled\n");
-
-	ret = nvme_fetch_controller_id(controller);
-	if(ret == -1) RETURN_ERROR;
-
-	print("Vendor ID: [%x]\n", controller->controller_id->vid);
-	print("Subsystem vendor ID: [%x]\n", controller->controller_id->ssvid);
-
-	ret = nvme_fetch_namespaces(controller);
-	if(ret == -1) RETURN_ERROR;
-
-	for(size_t i = 0; i < controller->namespace.length; i++) {
-		struct nvme_namespace *namespace = controller->namespace.data[i];
-		if(namespace == NULL) continue;
-
-		print("nsid: [%x]\n", namespace->nsid);
-		print("\tlba cnt: [%x]\n", namespace->lba_cnt);
-		print("\tlba size: [%x]\n", namespace->lba_size);
-		print("\tmax prps: [%x]\n", namespace->max_prp);
-
-		char name[NVME_QUEUE_NAME_LENGTH] = { };
-		sprint(name, "io%d", i);
-
-		int irq;
-		ret = nvme_initialise_irq(pci_info, &irq, name);
-		if(ret == -1) RETURN_ERROR;
-
-		struct nvme_queue_pair *queue_pair = NULL;
-		int ret = nvme_queue_pair_instantiate(controller, &queue_pair, false, irq, name);
-		if(ret == -1 || queue_pair == NULL) RETURN_ERROR;
-
-		namespace->queue_pair = queue_pair;
-
-		ret = DUFAY_ALLOCATE_UNBROKEN(namespace->max_prp *
-			namespace->queue_pair->entry_cnt * sizeof(uint64_t), &namespace->portal_resp_prp);
-		if(ret == -1) RETURN_ERROR;
-		namespace->prp_list = (uint64_t*)namespace->portal_resp_prp.base;
-	}
-
-	return 0;
-}*/

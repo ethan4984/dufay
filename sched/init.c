@@ -11,13 +11,13 @@
 static void *spalloc(void*, uint64_t);
 static void spfree(void*, uint64_t, uint64_t);
 
-int main(struct sched_descriptor *desc) {
-	print("Booting server [processor_id=%x]\n", desc->processor_id);
+int main(struct sched_descriptor *sched_desc) {
+	print("Booting server [processor_id=%x]\n", sched_desc->processor_id);
 
-	if(desc->timer.source == TIME_SOURCE_INVARIANT_TSC) {
-		print("Using invariant TSC as timer [freq: %d]\n", desc->timer.freq);
-		desc->timer.read = invariant_tsc_read;
-	} else if(desc->timer.source == TIME_SOURCE_HPET) {
+	if(sched_desc->timer.source == TIME_SOURCE_INVARIANT_TSC) {
+		print("Using invariant TSC as timer [freq: %d]\n", sched_desc->timer.freq);
+		sched_desc->timer.read = invariant_tsc_read;
+	} else if(sched_desc->timer.source == TIME_SOURCE_HPET) {
 		print("Using HPET as timer [unsupported]\n");
 		goto failure;
 	} else {
@@ -62,24 +62,43 @@ int main(struct sched_descriptor *desc) {
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
 		.share = {
-			.identifier = "SCHEDULER CORE0",
-			.length = sizeof(struct sched_queue_entry),
-			.create = 0,
-			.type = LINK_CIRCULAR
+			.identifier = "ENQUEUE SCHEDULER CORE0", .length = sizeof(struct sched_queue_entry),
+			.create = 0, .type = LINK_CIRCULAR
 		},
 		.morphology = {
-			.addr = addr,
-			.length = 0x10000 
+			.addr = addr, .length = 0x10000 
 		}
 	};
 
 	struct syscall_response response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
 	if(response.ret == -1) { print("ERROR: failed to estabilish link with kernel\n"); goto failure; }
 
-	struct portal_link *link = (void*)portal_resp.base;
-	print("Link with kernel has been stablished [%x]\n", link);
+	struct portal_link *enqueue_link = (void*)portal_resp.base;
+	print("Enqueue link with kernel has been stablished [%x]\n", enqueue_link);
 
-	ret = sched(link, desc);
+	ret = as_allocate(&address_space, &addr, 0x10000);
+	if(ret == -1) { print("ERROR: failed to allocate address\n"); goto failure; }
+
+	portal_req = (struct portal_req) {
+		.type = PORTAL_REQ_SHARE,
+		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+		.length = sizeof(struct portal_req),
+		.share = {
+			.identifier = "BACKQUEUE SCHEDULER CORE0", .length = sizeof(struct sched_queue_entry),
+			.create = 0, .type = LINK_CIRCULAR
+		},
+		.morphology = {
+			.addr = addr, .length = 0x10000 
+		}
+	};
+
+	response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
+	if(response.ret == -1) { print("ERROR: failed to estabilish link with kernel\n"); goto failure; }
+
+	struct portal_link *baqueue_link = (void*)portal_resp.base;
+	print("Baqueue link with kernel has been stablished [%x]\n", baqueue_link);
+
+	ret = sched(enqueue_link, baqueue_link, sched_desc);
 	if(ret == -1) { print("ERROR: critical failure\n"); goto failure; }
 failure:
 	for(;;);

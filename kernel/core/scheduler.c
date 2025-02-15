@@ -119,32 +119,53 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	uint64_t physical_base = pmm_alloc(page_cnt, 1);
 	uint64_t virtual_base = physical_base + HIGH_VMA;
 
-	struct portal_resp resp;
-	struct portal_req *req = alloc(sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt);
+	char *enqueue_identifier = alloc(strlen(identifier) + strlen("ENQUEUE ") + 1);
+	sprint(enqueue_identifier, "ENQUEUE %s", identifier);
 
-	*req = (struct portal_req) {
+	struct portal_resp resp;
+	struct portal_req req = {
 		.type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT, 
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
 		.share = {
-			.identifier = identifier,
-			.length = sizeof(struct sched_queue_entry),
-			.create = 1,
-			.type = LINK_CIRCULAR, 
+			.identifier = enqueue_identifier, .length = sizeof(struct sched_queue_entry),
+			.create = 1, .type = LINK_CIRCULAR, 
+		},
+		.morphology = {
+			.addr = virtual_base, .length = page_cnt * PAGE_SIZE,
+			.pcnt = page_cnt, .paddr = physical_base
 		}
 	};
 
-	req->morphology.addr = virtual_base;
-	req->morphology.length = page_cnt * PAGE_SIZE;
-	req->morphology.pcnt = page_cnt;
-	req->morphology.paddr = physical_base;
-
-	int ret = portal(req, &resp);
+	int ret = portal(&req, &resp);
 	if(ret == -1) RETURN_ERROR;
 
-	cpu_local->thread_queue_link = (void*)(physical_base + HIGH_VMA);
+	cpu_local->thread_enqueue_link = (void*)(physical_base + HIGH_VMA);
 
-	free(req);
+	physical_base = pmm_alloc(page_cnt, 1);
+	virtual_base = physical_base + HIGH_VMA;
+
+	char *backqueue_identifier = alloc(strlen(identifier) + strlen("BACKQUEUE ") + 1);
+	sprint(backqueue_identifier, "BACKQUEUE %s", identifier);
+
+	req = (struct portal_req) {
+		.type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT, 
+		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
+		.share = {
+			.identifier = backqueue_identifier, .length = sizeof(struct sched_queue_entry),
+			.create = 1, .type = LINK_CIRCULAR, 
+		},
+		.morphology = {
+			.addr = virtual_base, .length = page_cnt * PAGE_SIZE,
+			.pcnt = page_cnt, .paddr = physical_base
+		}
+	};
+
+	ret = portal(&req, &resp);
+	if(ret == -1) RETURN_ERROR;
+
+	cpu_local->thread_baqueue_link = (void*)(physical_base + HIGH_VMA);
 
 	return 0;
 }
@@ -164,10 +185,10 @@ static int fetch_context(struct context **context, struct ucontext **ucontext) {
 	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
 	if(ret == 0) { goto find_ucontext; }
 find_context:
-	found = OPERATE_LINK(CORE_LOCAL->thread_queue_link, LINK_CIRCULAR,
+	found = OPERATE_LINK(CORE_LOCAL->thread_enqueue_link, LINK_CIRCULAR,
 		({
-			circular_queue_pop((void*)CORE_LOCAL->thread_queue_link +
-				CORE_LOCAL->thread_queue_link->data_offset, &queue_entry);
+			circular_queue_pop((void*)CORE_LOCAL->thread_enqueue_link +
+				CORE_LOCAL->thread_enqueue_link->data_offset, &queue_entry);
 		})
 	);
 	

@@ -44,6 +44,6 @@ static inline uint64_t weight_set_nice(int nice) {
 	return nice_to_weight[nice + 20];
 }
 
-int sched(struct portal_link*, struct sched_descriptor*);
+int sched(struct portal_link*, struct portal_link*, struct sched_descriptor*);
 
 #endif
