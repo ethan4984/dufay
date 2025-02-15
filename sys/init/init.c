@@ -5,19 +5,10 @@
 #include <fayt/slab.h>
 #include <fayt/stream.h>
 #include <fayt/syscall.h>
+#include <fayt/message.h>
 
 static void *spalloc(void *, uint64_t);
 static void spfree(void *, uint64_t, uint64_t);
-
-struct message_header {
-	uint32_t destination; // Whom to send the message to
-	uint32_t reply; // A SEND or SEND-ONCE right that is sent along with the
-		// message, to allow for reply
-
-	size_t size;
-
-	// `size` bytes of data...
-};
 
 int main()
 {
