@@ -52,7 +52,7 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 }
 
 __asm__(".global smp_init_begin\n\t"
-		"smp_init_begin: .incbin \"arch/x86/smp.bin\"\n\t"
+		"smp_init_begin: .incbin \"build/arch/x86/smp.real.bin\"\n\t"
 		".global smp_init_end\n\t"
 		"smp_init_end:\n\t");
 

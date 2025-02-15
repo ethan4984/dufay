@@ -49,6 +49,11 @@ $(KERNEL): $(BINS) $(OBJ)
 
 -include $(HEADER_DEPS)
 
+$(BUILD)/%.real.bin: %.real
+	mkdir -p $(dir $@)
+	@echo "NASM $<"
+	nasm -fbin $< -o $@
+
 $(BUILD)/%.c.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "CC $<"
@@ -58,11 +63,6 @@ $(BUILD)/%.asm.o: %.asm
 	mkdir -p $(dir $@)
 	@echo "NASM $<"
 	nasm -felf64 $< -o $@
-
-$(BUILD)/%.real.bin: %.real
-	mkdir -p $(dir $@)
-	@echo "NASM $<"
-	nasm -fbin $< -o $@
 
 .PHONY: clean
 clean:
