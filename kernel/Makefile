@@ -1,4 +1,5 @@
-KERNEL := dufay.elf
+BUILD = build
+KERNEL := $(BUILD)/dufay.elf
 
 CC ?= gcc
 LD ?= ld
@@ -32,9 +33,9 @@ INTERNALCFLAGS := \
 CFILES := $(shell find ./ -type f -name '*.c')
 ASMFILES := $(shell find ./ -type f -name '*.asm')
 REALFILES := $(shell find ./ -type f -name '*.real')
-OBJ := $(CFILES:.c=.o) $(ASMFILES:.asm=.o)
-BINS := $(REALFILES:.real=.bin)
-HEADER_DEPS := $(CFILES:.c=.d)
+OBJ := $(CFILES:%=$(BUILD)/%.o) $(ASMFILES:%=$(BUILD)/%.o)
+BINS := $(REALFILES:%=$(BUILD)/%.bin)
+HEADER_DEPS := $(CFILES:%=$(BUILD)/%.d)
 
 .PHONY: all
 all: $(KERNEL)
@@ -43,19 +44,26 @@ limine.h:
 	curl -Lo $@ https://github.com/limine-bootloader/limine/raw/trunk/limine.h
 
 $(KERNEL): $(BINS) $(OBJ)
-	$(LD) $(OBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
+	@echo "LD $@"
+	@$(LD) $(OBJ) $(LDFLAGS) $(INTERNALLDFLAGS) -o $@
 
 -include $(HEADER_DEPS)
 
-%.o: %.c
-	$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
+$(BUILD)/%.c.o: %.c
+	@mkdir -p $(dir $@)
+	@echo "CC $<"
+	@$(CC) $(CFLAGS) $(INTERNALCFLAGS) -c $< -o $@
 
-%.o: %.asm
+$(BUILD)/%.asm.o: %.asm
+	mkdir -p $(dir $@)
+	@echo "NASM $<"
 	nasm -felf64 $< -o $@
 
-%.bin: %.real
+$(BUILD)/%.real.bin: %.real
+	mkdir -p $(dir $@)
+	@echo "NASM $<"
 	nasm -fbin $< -o $@
 
 .PHONY: clean
 clean:
-	rm -rf $(KERNEL) $(OBJ) $(HEADER_DEPS) $(BINS)
+	rm -rf $(BUILD)
