@@ -19,3 +19,6 @@
 [submodule "io/nvme/irq/fayt"]
 	path = io/nvme/irq/fayt
 	url = https://github.com/ethan4984/fayt
+[submodule "sys/init/fayt"]
+	path = sys/init/fayt
+	url = https://github.com/ethan4984/fayt

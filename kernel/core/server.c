@@ -1,4 +1,6 @@
+#include <core/handle.h>
 #include <arch/x86/paging.h>
+#include <core/message.h>
 #include <arch/x86/smp.h> 
 #include <arch/x86/idt.h>
 
@@ -172,7 +174,7 @@ int launch_servers(void) {
 	for(uint64_t i = 0; i < module_count; i++) {
 		if(strcmp(modules[i]->cmdline, "pci") != 0 &&
 			strcmp(modules[i]->cmdline, "ahci") != 0 && 
-			strcmp(modules[i]->cmdline, "nvme") != 0) continue;
+			strcmp(modules[i]->cmdline, "nvme") != 0 && strcmp(modules[i]->cmdline, "init")) continue;
 
 		print("launching IO server [%s]\n", modules[i]->cmdline);
 
@@ -209,9 +211,20 @@ int launch_servers(void) {
 				RETURN_ERROR;
 			}
 		}
+
+		if(strcmp(modules[i]->cmdline, "init") == 0) {
+			int ret = launch_server(server, NULL, 0);
+			if(ret == -1) {
+				print("ERROR: failed to launch server {%s}\n", modules[i]->cmdline);
+				RETURN_ERROR;
+			}
+		}
 	}
 	
 	ret = spawn_server("IO", "pci");
+	if(ret == -1) RETURN_ERROR;
+
+	ret = spawn_server("IO", "init");
 	if(ret == -1) RETURN_ERROR;
 
 	return 0;

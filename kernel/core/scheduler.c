@@ -1,3 +1,4 @@
+#include "core/handle.h"
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 #include <arch/x86/apic.h> 
@@ -56,6 +57,10 @@ int create_context(int cgid, struct context **context) {
 	ret = hash_table_push(&cgroup->cid_table, &(*context)->comms.proc_id.cid,
 		(*context), sizeof((*context)->comms.proc_id.cid));
 	if(ret == -1) RETURN_ERROR;
+
+	(*context)->handles = alloc(sizeof(struct handle_table));
+
+	handle_table_init((*context)->handles);
 
 	return 0;
 }
