@@ -68,10 +68,13 @@ void apic_init();
 void apic_timer_init(uint32_t ms);
 uint32_t ioapic_read(struct ioapic *ioapic, uint8_t reg);
 void ioapic_write(struct ioapic *ioapic, uint32_t reg, uint32_t data);
-void ioapic_write_redirection_table(struct ioapic *ioapic, uint32_t redirection_entry, uint64_t data);
+void ioapic_write_redirection_table(struct ioapic *ioapic,
+									uint32_t redirection_entry, uint64_t data);
 void xapic_write(uint32_t reg, uint32_t data);
 uint32_t xapic_read(uint32_t reg);
-uint64_t ioapic_read_redirection_table(struct ioapic *ioapic, uint8_t redirection_entry);
-int ioapic_set_irq_redirection(uint32_t lapic_id, uint8_t vector, uint8_t irq, bool bask);
+uint64_t ioapic_read_redirection_table(struct ioapic *ioapic,
+									   uint8_t redirection_entry);
+int ioapic_set_irq_redirection(uint32_t lapic_id, uint8_t vector, uint8_t irq,
+							   bool bask);
 
 extern VECTOR(struct ioapic) ioapic_list;

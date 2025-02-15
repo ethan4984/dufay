@@ -1,19 +1,18 @@
 #include <fayt/address_space.h>
-#include <fayt/syscall.h>
 #include <fayt/debug.h>
 #include <fayt/portal.h>
-#include <fayt/stream.h>
-#include <fayt/slab.h>
 #include <fayt/rb_tree.h>
-
-#include <pci.h>
+#include <fayt/slab.h>
+#include <fayt/stream.h>
+#include <fayt/syscall.h>
+#include <fayt/message.h>
 
 static void *spalloc(void *, uint64_t);
 static void spfree(void *, uint64_t, uint64_t);
 
-int main(struct pci_server_meta *server_meta)
+int main()
 {
-	print("Booting PCI server\n");
+	print("Hello from INIT!!\n");
 
 	struct slab_pool pool = { .page_size = PAGE_SIZE,
 							  .page_alloc = spalloc,
@@ -30,30 +29,47 @@ int main(struct pci_server_meta *server_meta)
 
 	print("Slab cache directory initialised\n");
 
-	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
-	for (int i = 0; i < 16; i++) {
-		uintptr_t addr;
-		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
-		if (ret == -1) {
-			print("ERROR: failed to allocate address for stack\n");
-			goto failure;
-		}
+	struct msg {
+		struct message_header hdr;
+		char str[16];
+	};
 
-		struct syscall_response response =
-			SYSCALL2(SYSCALL_NOTIFICATION_DEFINE_STACK,
-					 addr + NOTIFICATION_STACK_SIZE, NOTIFICATION_STACK_SIZE);
+	struct msg *msg = alloc(sizeof(*msg));
 
-		if (response.ret == -1) {
-			print("ERROR: failed to allocate notification stack\n");
-			goto failure;
-		}
-	}
+	// Create port obj with recv and send
+	struct syscall_response response = SYSCALL2(18, 0, (1 << 0) | (1 << 1));
 
-	int ret = pci(server_meta);
-	if (ret == -1) {
-		print("ERROR: internal critical failure\n");
+	if (response.ret == -1) {
+		print("create failed");
 		goto failure;
 	}
+
+	uint32_t port = response.code;
+
+	print("Created port %d\n", response.code);
+
+	struct msg *omsg = alloc(sizeof(*msg));
+
+	omsg->str[0] = 'h';
+	omsg->hdr.destination = port;
+	omsg->hdr.size = sizeof(*msg);
+	omsg->hdr.reply = port;
+
+	// send
+	response = SYSCALL1(17, (uintptr_t)omsg);
+
+	// recv
+	response = SYSCALL2(16, port, (uintptr_t)msg);
+
+	if (response.ret == -1) {
+		print("recv failed!");
+	}
+
+	print("got: %c\n", msg->str[0]);
+
+	// destroy port
+	SYSCALL1(20, port);
+
 failure:
 	for (;;)
 		;
@@ -72,7 +88,7 @@ void print(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
-	const char *prefix = "DUFAY: [PCI] ";
+	const char *prefix = "DUFAY: [INIT] ";
 	for (; *prefix;) {
 		print_stream.write(&print_stream, *prefix);
 		prefix++;

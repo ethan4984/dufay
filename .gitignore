@@ -1,0 +1,14 @@
+*.o
+*.d
+*.img
+*.bin
+*.elf
+.cache
+build
+limine
+sched/sched
+sys/init/init
+io/pci/pci
+io/nvme/controller/nvme
+io/nvme/irq/nvme_irq
+compile_commands.json

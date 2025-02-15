@@ -1,0 +1,121 @@
+#include "handle.h"
+#include <arch/x86/cpu.h>
+#include <arch/x86/smp.h>
+#include <core/obj.h>
+#include <core/scheduler.h>
+#include <core/syscall.h>
+#include <fayt/debug.h>
+#include <fayt/string.h>
+#include <fayt/vector.h>
+
+void handle_table_init(struct handle_table *table)
+{
+	VECTOR_INIT(table->values, 1);
+	table->bitmap.resizable = true;
+	table->bitmap.size = 64;
+}
+
+struct handle_binding *handle_lookup(struct handle_table *table,
+									 handle_t handle)
+{
+	if (table->bitmap.size < handle || !table->bitmap.data) {
+		return NULL;
+	}
+
+	// Corresponding bit is set, we got a handle
+	if (BIT_SET(table->bitmap.data, handle)) {
+		return &table->values.data[handle];
+	}
+
+	return NULL;
+}
+
+int handle_create(struct handle_table *table, void *obj, uint8_t access,
+				  handle_t *out_handle)
+{
+	size_t i;
+	int free_bit = -1;
+	uint64_t *bitmap = NULL;
+
+	if (bitmap_alloc(&table->bitmap, &free_bit) == -1)
+		return -1;
+
+	*out_handle = free_bit;
+
+	VECTOR_INDEX(table->values, (struct handle_binding){}, *out_handle);
+
+	table->values.data[free_bit].access = access;
+	table->values.data[free_bit].obj = obj;
+
+	object_retain(obj);
+
+	return 0;
+}
+
+int handle_destroy(struct handle_table *table, handle_t handle)
+{
+	struct handle_binding *binding;
+
+	// This handle doesn't exist
+	if ((binding = handle_lookup(table, handle)) == NULL)
+		return -1;
+
+	bitmap_free(&table->bitmap, handle);
+
+	object_release(binding->obj);
+
+	return 0;
+}
+
+// Creates an object and returns an handle to it
+SYSCALL_DEFINE2(create_obj, uint8_t, class, uint8_t, access, {
+	void *obj;
+	handle_t out_handle;
+
+	if (object_new(&obj, class) == -1)
+		RETURN_ERROR;
+
+	if (handle_create(CORE_LOCAL->current_context->handles, obj, access,
+					  &out_handle) == -1)
+		RETURN_ERROR;
+
+	return out_handle;
+});
+
+// Duplicates an handle with new permissions
+SYSCALL_DEFINE2(duplicate_obj, handle_t, handle, uint8_t, access, {
+	struct handle_binding *binding =
+		handle_lookup(CORE_LOCAL->current_context->handles, handle);
+	handle_t out_handle;
+
+	if (!binding)
+		RETURN_ERROR;
+
+	// FIXME: handle the case where we try creating SEND-ONCE when we have SEND
+	// rights
+	if (!(binding->access & access))
+		RETURN_ERROR;
+
+	object_retain(binding->obj);
+
+	if (handle_create(CORE_LOCAL->current_context->handles, binding->obj,
+					  access, &out_handle) == -1)
+		RETURN_ERROR;
+
+	return out_handle;
+});
+
+// Destroys an handle
+SYSCALL_DEFINE1(destroy_obj, handle_t, handle, {
+	struct handle_binding *binding =
+		handle_lookup(CORE_LOCAL->current_context->handles, handle);
+	handle_t out_handle;
+
+	if (!binding)
+		RETURN_ERROR;
+
+	if (handle_destroy(CORE_LOCAL->current_context->handles, handle) == -1)
+		RETURN_ERROR;
+
+	return 0;
+});

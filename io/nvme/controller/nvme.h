@@ -20,16 +20,16 @@ constexpr size_t nvme_version_1_3_0_id = (1 << 8 | 3) << 8 | 0;
 constexpr size_t nvme_version_1_4_0_id = (1 << 8 | 4) << 8 | 0;
 
 struct [[gnu::packed]] nvme_regs {
-	uint64_t cap;   
-	uint32_t vs;  
+	uint64_t cap;
+	uint32_t vs;
 	uint32_t intms;
 	uint32_t intmc;
-	uint32_t cc; 
-	uint32_t rsvd1; 
+	uint32_t cc;
+	uint32_t rsvd1;
 	uint32_t csts;
 	uint32_t rsvd2;
-	uint32_t aqa; 
-	uint64_t asq; 
+	uint32_t aqa;
+	uint64_t asq;
 	uint64_t acq;
 };
 
@@ -319,12 +319,12 @@ struct nvme_controller {
 	struct nvme_queue_pair *admin_queue;
 
 	struct nvme_controller_id *controller_id;
-	VECTOR(struct nvme_namespace*) namespace;
+	VECTOR(struct nvme_namespace *) namespace;
 
 	int nvme_queue_pair_cnt;
 	struct nvme_queue_pair nvme_queue_pair[];
 };
 
-int nvme(struct pci_info*);
+int nvme(struct pci_info *);
 
 #endif

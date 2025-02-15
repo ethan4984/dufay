@@ -2,13 +2,14 @@
 #define SCHEDULE_H_
 
 #include <arch/x86/cpu.h>
+#include <core/handle.h>
 
 #include <core/events.h>
 #include <core/server.h>
 
-#include <fayt/vector.h>
 #include <fayt/lock.h>
 #include <fayt/sched.h>
+#include <fayt/vector.h>
 
 #define CONTEXT_DEFAULT_STACK_SIZE 0x200000
 #define SCHEDULER_DEFAULT_QUEUE_SIZE 0x10000
@@ -29,31 +30,43 @@ struct ustack {
 	struct ustack *last;
 };
 
-#define USTACK_CLAIM(CONTEXT, USTACK) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	if((CONTEXT) == NULL) { ret = -1; goto finish; } \
-	(USTACK) = (CONTEXT)->stack_tree; \
-	for(; (USTACK);) { \
-		if(!(USTACK)->active) break; \
-		else (USTACK) = (USTACK)->next; \
-	} \
-	if((USTACK)) (USTACK)->active = 1; \
-finish: \
-	ret; \
-})
+#define USTACK_CLAIM(CONTEXT, USTACK)      \
+	({                                     \
+		__label__ finish;                  \
+		int ret = 0;                       \
+		if ((CONTEXT) == NULL) {           \
+			ret = -1;                      \
+			goto finish;                   \
+		}                                  \
+		(USTACK) = (CONTEXT)->stack_tree;  \
+		for (; (USTACK);) {                \
+			if (!(USTACK)->active)         \
+				break;                     \
+			else                           \
+				(USTACK) = (USTACK)->next; \
+		}                                  \
+		if ((USTACK))                      \
+			(USTACK)->active = 1;          \
+finish:                                    \
+		ret;                               \
+	})
 
-#define USTACK_PUSH(CONTEXT, USTACK) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	if((CONTEXT) == NULL || (USTACK) == NULL) { ret = -1; goto finish; } \
-	(USTACK)->next = (CONTEXT)->stack_tree; \
-	(USTACK)->last = NULL; \
-	if((CONTEXT)->stack_tree) (CONTEXT)->stack_tree->last = (USTACK); \
-	(CONTEXT)->stack_tree = (USTACK); \
-finish: \
-	ret; \
-})
+#define USTACK_PUSH(CONTEXT, USTACK)                 \
+	({                                               \
+		__label__ finish;                            \
+		int ret = 0;                                 \
+		if ((CONTEXT) == NULL || (USTACK) == NULL) { \
+			ret = -1;                                \
+			goto finish;                             \
+		}                                            \
+		(USTACK)->next = (CONTEXT)->stack_tree;      \
+		(USTACK)->last = NULL;                       \
+		if ((CONTEXT)->stack_tree)                   \
+			(CONTEXT)->stack_tree->last = (USTACK);  \
+		(CONTEXT)->stack_tree = (USTACK);            \
+finish:                                              \
+		ret;                                         \
+	})
 
 struct context;
 struct ucontext {
@@ -77,21 +90,26 @@ struct ucontext {
 
 	struct context *context;
 
-	struct ucontext *next; 
+	struct ucontext *next;
 	struct ucontext *last;
 };
 
-#define UCONTEXT_PUSH(CONTEXT, UCONTEXT) ({ \
-	__label__ finish; \
-	int ret = 0; \
-	if((CONTEXT) == NULL || (UCONTEXT) == NULL) { ret = -1; goto finish; } \
-	(UCONTEXT)->next = NULL; \
-	(UCONTEXT)->last = (CONTEXT)->ucontext_top; \
-	if((CONTEXT)->ucontext_top) (CONTEXT)->ucontext_top->next = (UCONTEXT); \
-	(CONTEXT)->ucontext_top = (UCONTEXT); \
-finish: \
-	ret; \
-})
+#define UCONTEXT_PUSH(CONTEXT, UCONTEXT)                \
+	({                                                  \
+		__label__ finish;                               \
+		int ret = 0;                                    \
+		if ((CONTEXT) == NULL || (UCONTEXT) == NULL) {  \
+			ret = -1;                                   \
+			goto finish;                                \
+		}                                               \
+		(UCONTEXT)->next = NULL;                        \
+		(UCONTEXT)->last = (CONTEXT)->ucontext_top;     \
+		if ((CONTEXT)->ucontext_top)                    \
+			(CONTEXT)->ucontext_top->next = (UCONTEXT); \
+		(CONTEXT)->ucontext_top = (UCONTEXT);           \
+finish:                                                 \
+		ret;                                            \
+	})
 
 struct context {
 	struct spinlock lock;
@@ -122,22 +140,27 @@ struct context {
 	} comms;
 
 	struct page_table *page_table;
+
+	struct handle_table *handles;
 };
 
 #define yield() __asm__("int $32");
 
-void reschedule(struct registers*, void*);
+void reschedule(struct registers *, void *);
 
-int create_context(int, struct context**);
-int search_context(struct sched_proc_id proc_id, struct context**);
-int destroy_ucontext(struct context*, struct ucontext*);
-int sched_establish_shared_link(struct context*, struct cpu_local*, const char*);
-int sched_dequeue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
-int sched_enqueue_context(struct server*, struct context*, struct sched_queue_config_set*, int);
-int archctl(int, int*);
+int create_context(int, struct context **);
+int search_context(struct sched_proc_id proc_id, struct context **);
+int destroy_ucontext(struct context *, struct ucontext *);
+int sched_establish_shared_link(struct context *, struct cpu_local *,
+								const char *);
+int sched_dequeue_context(struct server *, struct context *,
+						  struct sched_queue_config_set *, int);
+int sched_enqueue_context(struct server *, struct context *,
+						  struct sched_queue_config_set *, int);
+int archctl(int, int *);
 
-int cgroup_search(int, struct sched_cgroup**);
-int cgroup_insert(struct sched_cgroup*);
+int cgroup_search(int, struct sched_cgroup **);
+int cgroup_insert(struct sched_cgroup *);
 int cgroup_remove(int);
 
 #endif

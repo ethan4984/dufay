@@ -1,38 +1,45 @@
 #include <arch/x86/cpu.h>
 
+#include <core/aslr.h>
+#include <core/debug.h>
+#include <core/message.h>
 #include <core/physical.h>
-#include <core/virtual.h>
 #include <core/scheduler.h>
 #include <core/server.h>
-#include <core/debug.h>
-#include <core/aslr.h>
+#include <core/virtual.h>
 
-#include <acpi/rsdp.h> 
 #include <acpi/madt.h>
+#include <acpi/rsdp.h>
 
-#include <fayt/string.h>
 #include <fayt/slab.h>
+#include <fayt/string.h>
 
 #include <limine.h>
 
-struct limine_hhdm_request limine_hhdm_request = {
-	.id = LIMINE_HHDM_REQUEST,
-	.revision = 0
-};
+struct limine_hhdm_request limine_hhdm_request = { .id = LIMINE_HHDM_REQUEST,
+												   .revision = 0 };
 
 static volatile struct limine_rsdp_request limine_rsdp_request = {
 	.id = LIMINE_RSDP_REQUEST,
 	.revision = 0
 };
 
-static void *spalloc(void*, uint64_t s) { return (void*)pmm_alloc(s, 1) + HIGH_VMA; }
-static void spfree(void *addr, uint64_t s, uint64_t) { pmm_free((uint64_t)addr - HIGH_VMA, s); }
+static void *spalloc(void *, uint64_t s)
+{
+	return (void *)pmm_alloc(s, 1) + HIGH_VMA;
+}
+static void spfree(void *addr, uint64_t s, uint64_t)
+{
+	pmm_free((uint64_t)addr - HIGH_VMA, s);
+}
 
-#include <fayt/time.h>
 #include <arch/x86/hpet.h>
+#include <fayt/time.h>
 
-void dufay_entry(void) {
-	if(limine_hhdm_request.response) HIGH_VMA = limine_hhdm_request.response->offset;
+void dufay_entry(void)
+{
+	if (limine_hhdm_request.response)
+		HIGH_VMA = limine_hhdm_request.response->offset;
 
 	print("welcome\n");
 
@@ -40,11 +47,9 @@ void dufay_entry(void) {
 
 	pmm_init();
 
-	struct slab_pool pool = {
-		.page_size = PAGE_SIZE,
-		.page_alloc = spalloc,
-		.page_free = spfree
-	};
+	struct slab_pool pool = { .page_size = PAGE_SIZE,
+							  .page_alloc = spalloc,
+							  .page_free = spfree };
 
 	slab_cache_create(&pool, "CACHE32", 32);
 	slab_cache_create(&pool, "CACHE64", 64);
@@ -64,11 +69,11 @@ void dufay_entry(void) {
 
 	rsdp = limine_rsdp_request.response->address;
 
-	if(rsdp->xsdt_addr) {
-		xsdt = (struct xsdt*)(rsdp->xsdt_addr + HIGH_VMA);
+	if (rsdp->xsdt_addr) {
+		xsdt = (struct xsdt *)(rsdp->xsdt_addr + HIGH_VMA);
 		print("ACPI: xsdt found at %x\n", (uintptr_t)xsdt);
 	} else {
-		rsdt = (struct rsdt*)(rsdp->rsdt_addr + HIGH_VMA);
+		rsdt = (struct rsdt *)(rsdp->rsdt_addr + HIGH_VMA);
 		print("ACPI: rsdt found at %x\n", (uintptr_t)rsdt);
 	}
 
@@ -76,9 +81,11 @@ void dufay_entry(void) {
 
 	x86_system_tables();
 
+	message_init();
 	launch_servers();
 
-	__asm__ ("sti"); 
+	__asm__("sti");
 
-	for(;;) __asm__ ("hlt");
+	for (;;)
+		__asm__("hlt");
 }

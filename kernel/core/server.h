@@ -18,7 +18,8 @@ struct server_id {
 	int sid;
 };
 
-struct namespace {
+struct namespace
+{
 	const char *name;
 
 	int nid;
@@ -38,19 +39,19 @@ struct server {
 	struct spinlock lock;
 };
 
-struct server_env { 
+struct server_env {
 	const char *name;
 };
 
 extern struct server *master_scheduler;
 
 int launch_servers(void);
-int create_server(const char*, const char*, struct server*);
-int create_namespace(const char*);
+int create_server(const char *, const char *, struct server *);
+int create_namespace(const char *);
 
 extern struct sched_cgroup cgroup_system;
 
-struct server *find_server(const char*, const char*);
-struct limine_file *limine_search_module(const char*);
+struct server *find_server(const char *, const char *);
+struct limine_file *limine_search_module(const char *);
 
 #endif

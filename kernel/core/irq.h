@@ -9,9 +9,7 @@
 #include <fayt/pci.h>
 #include <fayt/irq.h>
 
-struct irq_family {
-	
-};
+struct irq_family {};
 
 struct irq_cortex {
 	const char *identifier;
