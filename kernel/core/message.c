@@ -1,13 +1,16 @@
-#include "arch/x86/smp.h"
-#include "core/syscall.h"
-#include "fayt/debug.h"
+#include <arch/x86/smp.h>
+
+#include <core/syscall.h>
 #include <core/debug.h>
 #include <core/events.h>
 #include <core/handle.h>
 #include <core/message.h>
-#include <core/obj.h>
+#include <core/object.h>
+
+#include <fayt/debug.h>
 #include <fayt/slab.h>
 #include <fayt/string.h>
+
 #include <sys/queue.h>
 
 static struct port *lookup_port(handle_t port, struct context *ctx,

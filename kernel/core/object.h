@@ -1,5 +1,6 @@
-#ifndef OBJ_H_
-#define OBJ_H_
+#ifndef OBJECT_H_
+#define OBJECT_H_
+
 #include <stddef.h>
 #include <stdint.h>
 

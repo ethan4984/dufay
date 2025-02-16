@@ -1,4 +1,5 @@
-#include <core/obj.h>
+#include <core/object.h>
+
 #include <fayt/debug.h>
 #include <fayt/slab.h>
 

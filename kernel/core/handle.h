@@ -1,10 +1,9 @@
 #ifndef HANDLE_H_
 #define HANDLE_H_
+
 #include <fayt/bitmap.h>
 #include <fayt/vector.h>
-#include <stdint.h>
-
-typedef uint32_t handle_t;
+#include <fayt/handle.h>
 
 struct handle_binding {
 	uint8_t access;

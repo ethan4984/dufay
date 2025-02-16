@@ -1,9 +1,11 @@
-#include "handle.h"
 #include <arch/x86/cpu.h>
 #include <arch/x86/smp.h>
-#include <core/obj.h>
+
+#include <core/object.h>
 #include <core/scheduler.h>
 #include <core/syscall.h>
+#include <core/handle.h>
+
 #include <fayt/debug.h>
 #include <fayt/string.h>
 #include <fayt/vector.h>
