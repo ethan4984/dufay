@@ -220,7 +220,7 @@ static int fetch_context(struct context **context, struct ucontext **ucontext)
 	struct sched_queue_entry queue_entry;
 
 	bool found = false;
-	int ret = VECTOR_POP(CORE_LOCAL->delivery_stack, next_context);
+	int ret = VECTOR_PEEK_BEGINNING(CORE_LOCAL->delivery_stack, next_context);
 	if (ret == 0) {
 		goto find_ucontext;
 	}

@@ -544,6 +544,8 @@ finish:
 	if (rcontext == NULL || rucontext == NULL)
 		RETURN_ERROR;
 
+	VECTOR_REMOVE_BY_VALUE(CORE_LOCAL->delivery_stack, current_context);
+
 	current_ucontext->stack->active = false;
 	current_ucontext->notification->done = true;
 	int ret = destroy_ucontext(current_context, current_ucontext);
