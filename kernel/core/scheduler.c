@@ -97,6 +97,27 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext)
 	if (context == NULL || ucontext == NULL)
 		RETURN_ERROR;
 
+	struct notification *notification = ucontext->notification;
+	if (notification) {
+		struct context *current_context = CORE_LOCAL->current_context;
+		if (current_context == NULL)
+			RETURN_ERROR;
+
+		struct ucontext *current_ucontext = current_context->ucontext_active;
+		if (current_ucontext == NULL)
+			RETURN_ERROR;
+
+		for (int i = 0; i < notification->etrigger.length; i++) {
+			struct etrigger *etrigger = notification->etrigger.data[i];
+			if (etrigger == NULL)
+				continue;
+
+			int ret = equeue_wake(etrigger, current_ucontext);
+			if (ret == -1)
+				RETURN_ERROR;
+		}
+	}
+
 	if (context->ucontext_top == ucontext)
 		context->ucontext_top = ucontext->last;
 	if (context->ucontext_queue == ucontext)
@@ -118,27 +139,6 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext)
 	}
 
 	ucontext->stack->active = false;
-
-	struct notification *notification = ucontext->notification;
-	if (notification) {
-		struct context *current_context = CORE_LOCAL->current_context;
-		if (current_context == NULL)
-			RETURN_ERROR;
-
-		struct ucontext *current_ucontext = current_context->ucontext_active;
-		if (current_ucontext == NULL)
-			RETURN_ERROR;
-
-		for (int i = 0; i < notification->etrigger.length; i++) {
-			struct etrigger *etrigger = notification->etrigger.data[i];
-			if (etrigger == NULL)
-				continue;
-
-			int ret = equeue_wake(etrigger, current_ucontext);
-			if (ret == -1)
-				RETURN_ERROR;
-		}
-	}
 
 	return 0;
 }
@@ -349,8 +349,8 @@ void reschedule(struct registers *regs, void *)
 
 	//print("rescheduling to: rip=%x on cid=%x [%s] with [%x]\n", r->rip, next_context->comms.proc_id.cid, next_context->comms.server ? next_context->comms.server : "NULL", r->rflags);
 
-	if (next_ucontext->notification)
-		next_ucontext->delivered = 1;
+	//if (next_ucontext->notification)
+	//	next_ucontext->delivered = 1;
 
 	xapic_write(XAPIC_EOI_OFF, 0);
 
@@ -560,14 +560,13 @@ int sched_delivery_queue_push(struct delivery_queue *queue,
 	if (unlikely(queue == NULL || context == NULL))
 		RETURN_ERROR;
 
-	context->last = queue->top;
-	context->next = NULL;
+	if(queue->list) context->next = queue->list->next;
+	context->last = NULL;
 
-	if (queue->list == NULL)
-		queue->list = context;
-	else if (queue->top)
-		queue->top->next = context;
-	queue->top = context;
+	if(queue->top) queue->top->next = queue->list;
+
+	queue->top = queue->list;
+	queue->list = context;
 
 	return 0;
 }

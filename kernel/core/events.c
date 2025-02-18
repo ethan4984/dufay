@@ -45,6 +45,8 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 		spinrelease_irqsave(&equeue->lock);
 	}
 
+	spinrelease_irqsave(&etrigger->lock);
+
 	struct sched_queue_config_set *queue_set =
 		alloc(sizeof(struct sched_queue_config_set) +
 			  context_unblocked.length * sizeof(struct sched_queue_config));
@@ -54,6 +56,8 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 		struct context *context = context_unblocked.data[i];
 		if (context == NULL)
 			continue;
+
+		//print("event_wake: requeuing %s\n", context->comms.server);
 
 		queue_set->config[i] =
 			(struct sched_queue_config){ .proc_id = context->comms.proc_id };
@@ -70,8 +74,6 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 									NOTIFY_WEIGHT_INSTANTANEOUS);
 	if (ret == -1)
 		RETURN_ERROR;
-
-	spinrelease_irqsave(&etrigger->lock);
 
 	return 0;
 }
@@ -109,8 +111,9 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 		RETURN_ERROR;
 
 	ucontext->blocking = true;
-	for (; ucontext->blocking;)
+	for (; ucontext->blocking;) {
 		yield();
+	}
 
 	if (waking_object)
 		*waking_object = ucontext->last_etrigger;

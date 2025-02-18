@@ -521,19 +521,14 @@ SYSCALL_DEFINE0(notification_return, {
 
 	spinlock_irqsave(&CORE_LOCAL->sched_lock);
 
-	struct context *rcontext = (current_ucontext->notification->weight ==
-								NOTIFY_WEIGHT_INSTANTANEOUS) ?
+	struct context *rcontext = current_ucontext->notification->source ?
 								   current_ucontext->notification->source :
-								   current_context;
+								   CORE_LOCAL->scheduling_server->context;
 	struct ucontext *rucontext = ({
 		__label__ finish;
 		struct ucontext *rucontext = rcontext->ucontext_top;
 
 		for (; rucontext;) {
-			if (rucontext == current_ucontext) {
-				rucontext = rucontext->last;
-				continue;
-			}
 			if (rucontext->notification && !rucontext->delivered) {
 				if (rucontext->notification->weight ==
 					NOTIFY_WEIGHT_INSTANTANEOUS)
@@ -541,7 +536,8 @@ SYSCALL_DEFINE0(notification_return, {
 				rucontext = rucontext->last;
 				continue;
 			}
-			goto finish;
+			if(rucontext->last) rucontext = rucontext->last;
+			else goto finish;
 		}
 		rucontext = NULL;
 finish:
@@ -550,16 +546,27 @@ finish:
 	if (rcontext == NULL || rucontext == NULL)
 		RETURN_ERROR;
 
-	int ret = sched_delivery_queue_remove(&CORE_LOCAL->delivery_queue,
-										  current_context);
-	if (ret == -1)
-		RETURN_ERROR;
+	if(rucontext->notification) rucontext->delivered = true;
+
+	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
+
+	//print(
+	//	"notification_return: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
+	//	current_context->comms.server, rcontext->comms.server,
+	//	rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
+	//	current_ucontext->notification ? 'T' : 'F');
 
 	current_ucontext->stack->active = false;
 	current_ucontext->notification->done = true;
-	ret = destroy_ucontext(current_context, current_ucontext);
+	int ret = destroy_ucontext(current_context, current_ucontext);
 	if (ret == -1)
 		RETURN_ERROR;
+
+	//print(
+	//	"notification_return: ESCAPED DESTROY: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
+	//	current_context->comms.server, rcontext->comms.server,
+	//	rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
+	//	current_ucontext->notification ? 'T' : 'F');
 
 	if (rucontext->notification) {
 		struct notification_action *action =
@@ -569,9 +576,12 @@ finish:
 			rcontext, rucontext, rucontext->notification, action);
 		if (ret == -1)
 			RETURN_ERROR;
-
-		rucontext->delivered = 1; // streamline
 	}
+
+	ret = sched_delivery_queue_remove(&CORE_LOCAL->delivery_queue,
+									  current_context);
+	if (ret == -1)
+		RETURN_ERROR;
 
 	rcontext->ucontext_active = rucontext;
 
@@ -591,13 +601,6 @@ finish:
 	CORE_LOCAL->error = rucontext->sysctx.user_stack;
 
 	rucontext->blocking = false;
-
-	/*print("notification_return: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
-		current_context->comms.server, rcontext->comms.server, rucontext->regs.rip,
-		rucontext->notification ? 'T' : 'F',
-		current_ucontext->notification ? 'T' : 'F');*/
-
-	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
 
 	SWAP_TLS(&rucontext->regs);
 
