@@ -30,6 +30,12 @@ struct ustack {
 	struct ustack *last;
 };
 
+struct context;
+struct delivery_queue {
+	struct context *list;
+	struct context *top;
+};
+
 #define USTACK_CLAIM(CONTEXT, USTACK)      \
 	({                                     \
 		__label__ finish;                  \
@@ -117,6 +123,8 @@ struct context {
 	uintptr_t user_gs_base;
 	uintptr_t user_fs_base;
 
+	struct page_table *page_table;
+
 	struct ustack *stack_tree;
 	struct ucontext *ucontext_queue;
 
@@ -139,9 +147,10 @@ struct context {
 		struct sched_proc_id proc_id;
 	} comms;
 
-	struct page_table *page_table;
-
 	struct handle_table *handles;
+
+	struct context *next;
+	struct context *last;
 };
 
 #define yield() __asm__("int $32");
@@ -158,6 +167,9 @@ int sched_dequeue_context(struct server *, struct context *,
 int sched_enqueue_context(struct server *, struct context *,
 						  struct sched_queue_config_set *, int);
 int archctl(int, int *);
+int sched_delivery_queue_peek(struct delivery_queue *, struct context **);
+int sched_delivery_queue_remove(struct delivery_queue *, struct context *);
+int sched_delivery_queue_push(struct delivery_queue *, struct context *);
 
 int cgroup_search(int, struct sched_cgroup **);
 int cgroup_insert(struct sched_cgroup *);

@@ -225,7 +225,10 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		}
 
 		target->ucontext_top = ucontext;
-		VECTOR_PUSH(CORE_LOCAL->delivery_stack, target);
+
+		ret = sched_delivery_queue_push(&CORE_LOCAL->delivery_queue, target);
+		if (ret == -1)
+			RETURN_ERROR;
 	}
 	if (weight & NOTIFY_WEIGHT_INSTANTANEOUS)
 		yield();
@@ -297,7 +300,10 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge *, bridge, {
 
 	if (bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS ||
 		bridge->weight & NOTIFY_WEIGHT_TICK) {
-		VECTOR_PUSH(CORE_LOCAL->delivery_stack, destination);
+		int ret =
+			sched_delivery_queue_push(&CORE_LOCAL->delivery_queue, destination);
+		if (ret == -1)
+			RETURN_ERROR;
 	}
 	if (bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) {
 		struct equeue equeue = { 0 };
@@ -544,11 +550,14 @@ finish:
 	if (rcontext == NULL || rucontext == NULL)
 		RETURN_ERROR;
 
-	VECTOR_REMOVE_BY_VALUE(CORE_LOCAL->delivery_stack, current_context);
+	int ret = sched_delivery_queue_remove(&CORE_LOCAL->delivery_queue,
+										  current_context);
+	if (ret == -1)
+		RETURN_ERROR;
 
 	current_ucontext->stack->active = false;
 	current_ucontext->notification->done = true;
-	int ret = destroy_ucontext(current_context, current_ucontext);
+	ret = destroy_ucontext(current_context, current_ucontext);
 	if (ret == -1)
 		RETURN_ERROR;
 

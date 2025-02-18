@@ -17,7 +17,7 @@ struct cpu_local {
 	struct server *scheduling_server;
 	struct portal_link *thread_enqueue_link;
 	struct portal_link *thread_baqueue_link;
-	VECTOR(struct context *) delivery_stack;
+	struct delivery_queue delivery_queue;
 	struct spinlock sched_lock;
 
 	struct context *current_context;

@@ -220,8 +220,10 @@ static int fetch_context(struct context **context, struct ucontext **ucontext)
 	struct sched_queue_entry queue_entry;
 
 	bool found = false;
-	int ret = VECTOR_PEEK_BEGINNING(CORE_LOCAL->delivery_stack, next_context);
-	if (ret == 0) {
+
+	int ret =
+		sched_delivery_queue_peek(&CORE_LOCAL->delivery_queue, &next_context);
+	if (next_context) {
 		goto find_ucontext;
 	}
 find_context:
@@ -502,3 +504,70 @@ int archctl(int request, int *data)
 
 SYSCALL_DEFINE2(archctl, int, request, int *, data,
 				{ return archctl(request, data); });
+
+int sched_delivery_queue_peek(struct delivery_queue *queue,
+							  struct context **context)
+{
+	if (unlikely(queue == NULL || context == NULL))
+		RETURN_ERROR;
+
+	(*context) = queue->list;
+	if (queue->list == NULL || queue->list == queue->top) {
+		return 0;
+	}
+
+	if (queue->list->next)
+		queue->list->next->last = NULL;
+	queue->list = queue->list->next;
+	sched_delivery_queue_push(queue, (*context));
+
+	return 0;
+}
+
+int sched_delivery_queue_remove(struct delivery_queue *queue,
+								struct context *context)
+{
+	if (unlikely(queue == NULL || context == NULL))
+		RETURN_ERROR;
+	if (queue->list == NULL)
+		return 0;
+
+	if (queue->list == context) {
+		queue->list = context->next;
+		if (queue->list)
+			queue->list->last = NULL;
+		if (queue->top)
+			queue->top = NULL;
+	}
+
+	if (queue->top == context) {
+		queue->top = context->last;
+		if (queue->top)
+			queue->top->next = NULL;
+	}
+
+	if (context->last)
+		context->last->next = context->next;
+	if (context->next)
+		context->next->last = context->last;
+
+	return 0;
+}
+
+int sched_delivery_queue_push(struct delivery_queue *queue,
+							  struct context *context)
+{
+	if (unlikely(queue == NULL || context == NULL))
+		RETURN_ERROR;
+
+	context->last = queue->top;
+	context->next = NULL;
+
+	if (queue->list == NULL)
+		queue->list = context;
+	else if (queue->top)
+		queue->top->next = context;
+	queue->top = context;
+
+	return 0;
+}
