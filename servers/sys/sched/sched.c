@@ -340,7 +340,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 
 	struct portal_resp portal_resp;
 	struct portal_req portal_req = {
-		.type = PORTAL_REQ_SHARE | PORTAL_REQ_ANON,
+		.type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT,
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
 		.share = { .identifier = "SCHEDULER META",

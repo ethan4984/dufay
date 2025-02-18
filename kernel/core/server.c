@@ -412,36 +412,28 @@ static int launch_schedulers(struct limine_file *file)
 	}
 
 	struct sched_descriptor *descriptors = ({
-		size_t page_cnt = DIV_ROUNDUP(bootable_processor_cnt *
-										  sizeof(struct sched_descriptor),
-									  PAGE_SIZE);
+		size_t page_cnt = DIV_ROUNDUP(0x10000, PAGE_SIZE);
 		uint64_t physical_base = pmm_alloc(page_cnt, 1);
 		uint64_t virtual_base = physical_base + HIGH_VMA;
 
 		struct portal_resp resp;
-		struct portal_req *req =
-			alloc(sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt);
+		struct portal_req req = { .type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT,
+								  .prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
+								  .length = sizeof(struct portal_req),
+								  .share = { .identifier = "SCHEDULER META",
+											 .type = LINK_RAW,
+											 .create = 1 },
+								  .morphology = { .addr = virtual_base,
+												  .length =
+													  page_cnt * PAGE_SIZE,
+												  .pcnt = page_cnt,
+												  .paddr = physical_base } };
 
-		*req =
-			(struct portal_req){ .type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT,
-								 .prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-								 .length = sizeof(struct portal_req) +
-										   sizeof(uint64_t) * page_cnt,
-								 .share = { .identifier = "SCHEDULER META",
-											.type = LINK_RAW,
-											.create = 1 } };
-
-		req->morphology.addr = virtual_base;
-		req->morphology.length = page_cnt * PAGE_SIZE;
-		req->morphology.pcnt = page_cnt;
-		req->morphology.paddr = physical_base;
-
-		ret = portal(req, &resp);
+		ret = portal(&req, &resp);
 		if (ret == -1)
 			RETURN_ERROR;
-		free(req);
 
-		(struct sched_descriptor *)virtual_base;
+		(struct sched_descriptor *)(virtual_base + sizeof(struct portal_link));
 	});
 
 	for (int i = 0; i < bootable_processor_cnt; i++) {

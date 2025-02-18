@@ -139,7 +139,7 @@ static int notification_ucontext_instantiate(struct context *context,
 
 	ucontext->regs.ss = 0x3b;
 	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
-	ucontext->regs.rflags = 0x202;
+	ucontext->regs.rflags = 0x202 & ~(1 << 9);
 	ucontext->regs.cs = 0x43;
 	ucontext->regs.rip = (uintptr_t)action->handler;
 
@@ -536,8 +536,10 @@ SYSCALL_DEFINE0(notification_return, {
 				rucontext = rucontext->last;
 				continue;
 			}
-			if(rucontext->last) rucontext = rucontext->last;
-			else goto finish;
+			if (rucontext->last)
+				rucontext = rucontext->last;
+			else
+				goto finish;
 		}
 		rucontext = NULL;
 finish:
@@ -546,7 +548,8 @@ finish:
 	if (rcontext == NULL || rucontext == NULL)
 		RETURN_ERROR;
 
-	if(rucontext->notification) rucontext->delivered = true;
+	if (rucontext->notification)
+		rucontext->delivered = true;
 
 	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
 

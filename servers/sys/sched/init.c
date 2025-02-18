@@ -5,6 +5,7 @@
 #include <fayt/stream.h>
 #include <fayt/slab.h>
 #include <fayt/rb_tree.h>
+#include <fayt/string.h>
 
 #include <sched.h>
 
@@ -66,12 +67,15 @@ int main(struct sched_descriptor *sched_desc)
 		goto failure;
 	}
 
+	char identifier[256];
+	sprint(identifier, "ENQUEUE SCHEDULER CORE%d", sched_desc->processor_id);
+
 	struct portal_resp portal_resp;
 	struct portal_req portal_req = {
 		.type = PORTAL_REQ_SHARE,
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
-		.share = { .identifier = "ENQUEUE SCHEDULER CORE0",
+		.share = { .identifier = identifier,
 				   .length = sizeof(struct sched_queue_entry),
 				   .create = 0,
 				   .type = LINK_CIRCULAR },
@@ -86,7 +90,8 @@ int main(struct sched_descriptor *sched_desc)
 	}
 
 	struct portal_link *enqueue_link = (void *)portal_resp.base;
-	print("Enqueue link with kernel has been stablished [%x]\n", enqueue_link);
+	print("Enqueue link with kernel has been stablished [%s] [%x]\n",
+		  identifier, enqueue_link);
 
 	ret = as_allocate(&address_space, &addr, 0x10000);
 	if (ret == -1) {
@@ -94,11 +99,13 @@ int main(struct sched_descriptor *sched_desc)
 		goto failure;
 	}
 
+	sprint(identifier, "BACKQUEUE SCHEDULER CORE%d", sched_desc->processor_id);
+
 	portal_req = (struct portal_req){
 		.type = PORTAL_REQ_SHARE,
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
-		.share = { .identifier = "BACKQUEUE SCHEDULER CORE0",
+		.share = { .identifier = identifier,
 				   .length = sizeof(struct sched_queue_entry),
 				   .create = 0,
 				   .type = LINK_CIRCULAR },
@@ -112,7 +119,8 @@ int main(struct sched_descriptor *sched_desc)
 	}
 
 	struct portal_link *baqueue_link = (void *)portal_resp.base;
-	print("Baqueue link with kernel has been stablished [%x]\n", baqueue_link);
+	print("Baqueue link with kernel has been stablished [%s] [%x]\n",
+		  identifier, baqueue_link);
 
 	ret = sched(enqueue_link, baqueue_link, sched_desc);
 	if (ret == -1) {

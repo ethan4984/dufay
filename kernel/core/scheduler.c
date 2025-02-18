@@ -160,7 +160,7 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	struct portal_req req = {
 		.type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT, 
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
+		.length = sizeof(struct portal_req),
 		.share = {
 			.identifier = enqueue_identifier, .length = sizeof(struct sched_queue_entry),
 			.create = 1, .type = LINK_CIRCULAR, 
@@ -187,7 +187,7 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	req = (struct portal_req) {
 		.type = PORTAL_REQ_SHARE | PORTAL_REQ_DIRECT, 
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
-		.length = sizeof(struct portal_req) + sizeof(uint64_t) * page_cnt,
+		.length = sizeof(struct portal_req),
 		.share = {
 			.identifier = backqueue_identifier, .length = sizeof(struct sched_queue_entry),
 			.create = 1, .type = LINK_CIRCULAR, 
@@ -560,10 +560,12 @@ int sched_delivery_queue_push(struct delivery_queue *queue,
 	if (unlikely(queue == NULL || context == NULL))
 		RETURN_ERROR;
 
-	if(queue->list) context->next = queue->list->next;
+	if (queue->list)
+		context->next = queue->list->next;
 	context->last = NULL;
 
-	if(queue->top) queue->top->next = queue->list;
+	if (queue->top)
+		queue->top->next = queue->list;
 
 	queue->top = queue->list;
 	queue->list = context;
