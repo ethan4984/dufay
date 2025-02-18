@@ -9,7 +9,7 @@ syscall_main:
 	mov qword [gs:8], rsp ; save user stack
 	mov rsp, qword [gs:0] ; restore kernel stack
 
-	cli
+	sti
 
 	push rcx ; rip
 	push r11 ; rflags

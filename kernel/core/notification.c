@@ -139,7 +139,7 @@ static int notification_ucontext_instantiate(struct context *context,
 
 	ucontext->regs.ss = 0x3b;
 	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
-	ucontext->regs.rflags = 0x202 & ~(1 << 9);
+	ucontext->regs.rflags = 0x202;
 	ucontext->regs.cs = 0x43;
 	ucontext->regs.rip = (uintptr_t)action->handler;
 
