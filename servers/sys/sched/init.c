@@ -124,6 +124,7 @@ int main(struct sched_descriptor *sched_desc)
 
 	ret = sched(enqueue_link, baqueue_link, sched_desc);
 	if (ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: critical failure\n");
 		goto failure;
 	}

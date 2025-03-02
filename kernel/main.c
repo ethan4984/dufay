@@ -3,9 +3,9 @@
 #include <core/aslr.h>
 #include <core/debug.h>
 #include <core/message.h>
+#include <core/init.h>
 #include <core/physical.h>
 #include <core/scheduler.h>
-#include <core/server.h>
 #include <core/virtual.h>
 
 #include <acpi/madt.h>
@@ -82,7 +82,7 @@ void dufay_entry(void)
 	x86_system_tables();
 
 	message_init();
-	launch_servers();
+	launch_init();
 
 	__asm__("sti");
 

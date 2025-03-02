@@ -3,7 +3,6 @@
 
 #include <core/virtual.h>
 #include <core/physical.h>
-#include <core/server.h>
 #include <core/elf.h>
 #include <core/debug.h>
 
@@ -388,8 +387,9 @@ static int elf64_apply_relocation(struct elf64_file *file, uintptr_t vaddr,
 	}
 
 	// blob stolen from limine who stole it from https://maskray.me/blog/2021-10-31-relative-relocations-and-relr
-	if (file->dynamic.rel_ent == 0)
+	if (file->dynamic.rel_ent == 0) {
 		return 0;
+	}
 	for (int i = 0; i < file->dynamic.rel_size / file->dynamic.rel_ent; i++) {
 		struct elf64_rela relocation = {
 			.r_offset = ({

@@ -8,7 +8,6 @@
 #include <core/scheduler.h>
 #include <core/virtual.h>
 #include <core/physical.h>
-#include <core/server.h>
 #include <core/syscall.h>
 #include <core/notification.h>
 #include <core/debug.h>
@@ -237,16 +236,20 @@ find_context:
 	if (found)
 		goto find_ucontext;
 
-	struct server *scheduling_server = CORE_LOCAL->scheduling_server;
-	if (scheduling_server == NULL)
+	struct context *scheduling_context = CORE_LOCAL->scheduling_context;
+	if (scheduling_context == NULL) {
+		REPORT_ERROR;
 		panic("DUFAY: SCHEDULING SERVER DOWN");
+	}
 
-	next_context = scheduling_server->context;
-	if (next_context == NULL)
+	next_context = scheduling_context;
+	if (next_context == NULL) {
+		REPORT_ERROR;
 		panic("DUFAY: SCHEDULING SERVER DOWN");
+	}
 find_ucontext:
 	if (next_context == NULL) {
-		if (queue_entry.proc_id.cid == -1) {
+		if (queue_entry.birth.active) {
 			struct context *current_context = CORE_LOCAL->current_context;
 			if (unlikely(current_context == NULL))
 				panic("DUFAY: core local corrupt");
@@ -258,8 +261,10 @@ find_ucontext:
 			panic("DUFAY: this is a reminder to implement this");
 		} else {
 			ret = search_context(queue_entry.proc_id, &next_context);
-			if (ret == -1 || next_context == NULL)
+			if (ret == -1 || next_context == NULL) {
+				REPORT_ERROR;
 				panic("DUFAY: context table corrupt (or invalid paramater)");
+			}
 		}
 	}
 
@@ -378,11 +383,11 @@ void reschedule(struct registers *regs, void *)
 					 "iretq\n\t" ::"r"(r));
 }
 
-int sched_dequeue_context(struct server *scheduling_server,
+int sched_dequeue_context(struct context *scheduling_context,
 						  struct context *context,
 						  struct sched_queue_config_set *config_set, int weight)
 {
-	if (scheduling_server == NULL || context == NULL || config_set == NULL)
+	if (scheduling_context == NULL || context == NULL || config_set == NULL)
 		RETURN_ERROR;
 
 	//if(CORE_LOCAL->current_context) print("denqueueing context [%s] from [%s]\n", CORE_LOCAL->current_context->comms.server ? CORE_LOCAL->current_context->comms.server : "NULL", context->comms.server ? context->comms.server : "NULL");
@@ -394,8 +399,8 @@ int sched_dequeue_context(struct server *scheduling_server,
 			   config_set->cnt * sizeof(struct sched_queue_config));
 
 	int ret = notification_queue(CORE_LOCAL->current_context,
-								 scheduling_server->context, NOT_SCHED_DEQUEUE,
-								 weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+								 scheduling_context, NOT_SCHED_DEQUEUE, weight,
+								 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -404,11 +409,11 @@ int sched_dequeue_context(struct server *scheduling_server,
 	return 0;
 }
 
-int sched_enqueue_context(struct server *scheduling_server,
+int sched_enqueue_context(struct context *scheduling_context,
 						  struct context *context,
 						  struct sched_queue_config_set *config_set, int weight)
 {
-	if (scheduling_server == NULL || context == NULL || config_set == NULL)
+	if (scheduling_context == NULL || context == NULL || config_set == NULL)
 		RETURN_ERROR;
 
 	//if(CORE_LOCAL->current_context) print("enqueueing context [%s] from [%s]\n", CORE_LOCAL->current_context->comms.server ? CORE_LOCAL->current_context->comms.server : "NULL", context->comms.server ? context->comms.server : "NULL");
@@ -420,8 +425,8 @@ int sched_enqueue_context(struct server *scheduling_server,
 			   config_set->cnt * sizeof(struct sched_queue_config));
 
 	int ret = notification_queue(CORE_LOCAL->current_context,
-								 scheduling_server->context, NOT_SCHED_ENQUEUE,
-								 weight, 1, 0, (uint64_t)config - HIGH_VMA, 1);
+								 scheduling_context, NOT_SCHED_ENQUEUE, weight,
+								 1, 0, (uint64_t)config - HIGH_VMA, 1);
 	if (ret == -1)
 		RETURN_ERROR;
 

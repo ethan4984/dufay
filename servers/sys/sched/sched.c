@@ -106,7 +106,7 @@ static void notify_clone(struct notification_info *, void *data, int)
 		goto finish;
 	}
 
-	thread->proc_id = (struct sched_proc_id){ .cgid = 0, .cid = cid };
+	thread->proc_id = (struct sched_proc_id){ .cgid = 1, .cid = cid };
 	thread->weight = weight_set_nice(SCHED_DEFAULT_NICE);
 	thread->active = false;
 
@@ -122,6 +122,7 @@ static void notify_clone(struct notification_info *, void *data, int)
 		print("unable to push thread onto thread_table\n");
 		goto finish;
 	}
+
 	sched_desc->load++;
 finish:
 	SYSCALL2(SYSCALL_ARCHCTL, ARCHCTL_SCHED_RELEASE, NULL);
@@ -132,6 +133,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 {
 	struct sched_queue_config_set *config_set = data;
 	if (config_set == NULL) {
+		REPORT_ERROR;
 		print("ERROR: config set is null\n");
 		goto finish;
 	}
@@ -162,6 +164,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 				}));
 
 			if (ret == -1) {
+				REPORT_ERROR;
 				print("ERROR: Critical failure to enqueue thread\n");
 				goto finish;
 			}
@@ -172,8 +175,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 			struct comm_bridge bridge = { .proc_id = optimal_sched->proc_id,
 										  .not= NOT_SCHED_ENQUEUE,
 										  .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-										  .namespace = NULL,
-										  .destination = NULL };
+										  .destination = 0 };
 
 			bridge.data.limit = sizeof(struct sched_queue_config);
 			uintptr_t vaddr;
@@ -181,6 +183,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 							  DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
 			bridge.data.base = (void *)vaddr;
 			if (ret == -1) {
+				REPORT_ERROR;
 				print(
 					"ERROR: failed address allocation unable to offload thread to other core\n");
 				continue;
@@ -189,6 +192,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 			struct syscall_response response =
 				SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
 			if (response.ret == -1) {
+				REPORT_ERROR;
 				print("ERROR: Unable to offload thread to other core\n");
 				continue;
 			}
@@ -198,6 +202,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 
 			response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
 			if (response.ret == -1) {
+				REPORT_ERROR;
 				print("ERROR: unable to offload thread to other core\n");
 				goto finish;
 			} else
@@ -209,8 +214,10 @@ exit:
 									sizeof(config->proc_id), (void **)&thread);
 		if (ret == -1 || thread == NULL) {
 			thread = alloc(sizeof(struct thread));
-			if (thread == NULL)
+			if (thread == NULL) {
+				REPORT_ERROR;
 				panic("heap depleted");
+			}
 
 			thread->proc_id = config->proc_id;
 			thread->weight = weight_set_nice(config->nice);
@@ -223,12 +230,14 @@ exit:
 		ret = hash_table_push(&thread_table, &thread->proc_id, thread,
 							  sizeof(thread->proc_id));
 		if (ret == -1) {
+			REPORT_ERROR;
 			print("ERROR: unable to push thread onto thread_table\n");
 			continue;
 		}
 
 		ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 		if (ret == -1) {
+			REPORT_ERROR;
 			print("ERROR: unable to insert on thread tree\n");
 			continue;
 		}
@@ -236,6 +245,7 @@ exit:
 
 	int ret = sched_flush_enqueue();
 	if (ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failed to flush queue\n");
 		goto finish;
 	}
@@ -283,7 +293,7 @@ finish:
 static int traverse_and_queue(struct thread **thread)
 {
 	if (thread == NULL)
-		return -1;
+		RETURN_ERROR;
 
 	struct thread *enqueue = thread_tree;
 	while (enqueue && enqueue->left)
@@ -297,7 +307,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 		  struct sched_descriptor *desc)
 {
 	if (enqueue_link == NULL || baqueue_link == NULL || desc == NULL)
-		return -1;
+		RETURN_ERROR;
 
 	sched_desc = desc;
 	sched_enqueue_link = enqueue_link;
@@ -312,6 +322,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 	struct syscall_response response = SYSCALL3(
 		SYSCALL_NOTIFICATION_ACTION, NOT_SCHED_ENQUEUE, &enqueue_action, NULL);
 	if (response.ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failure to set notification\n");
 		return -1;
 	}
@@ -319,6 +330,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, NOT_SCHED_DEQUEUE,
 						&dequeue_action, NULL);
 	if (response.ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failure to set notification\n");
 		return -1;
 	}
@@ -326,6 +338,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 	response = SYSCALL3(SYSCALL_NOTIFICATION_ACTION, NOT_SCHED_CLONE,
 						&clone_action, NULL);
 	if (response.ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failure to set notification\n");
 		return -1;
 	}
@@ -335,7 +348,9 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 	uintptr_t addr;
 	int ret = as_allocate(&address_space, &addr, 0x10000);
 	if (ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failed to allocate address\n");
+		return -1;
 	}
 
 	struct portal_resp portal_resp;
@@ -351,13 +366,16 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 
 	response = SYSCALL2(SYSCALL_PORTAL, &portal_req, &portal_resp);
 	if (response.ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failed to establish link\n");
+		return -1;
 	}
 
 	sched_meta_link = (void *)portal_resp.base;
 
 	response = SYSCALL0(SYSCALL_NOTIFICATION_UNMUTE);
 	if (response.ret == -1) {
+		REPORT_ERROR;
 		print("ERROR: failed to activate notification queue\n");
 		return -1;
 	}
@@ -369,12 +387,14 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 
 		int ret = sched_flush_enqueue();
 		if (ret == -1) {
+			REPORT_ERROR;
 			print("ERROR: critical failure to refill queue\n");
 			return -1;
 		}
 
 		ret = sched_flush_baqueue();
 		if (ret == -1) {
+			REPORT_ERROR;
 			print("ERROR: critical failure to flush baqueue\n");
 			return -1;
 		}

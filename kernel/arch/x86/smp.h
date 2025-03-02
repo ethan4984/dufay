@@ -14,7 +14,7 @@ struct cpu_local {
 	uint64_t error;
 	// EVERYTHING ABOVE MUST REMAIN IN ORDER
 
-	struct server *scheduling_server;
+	struct context *scheduling_context;
 	struct portal_link *thread_enqueue_link;
 	struct portal_link *thread_baqueue_link;
 	struct delivery_queue delivery_queue;

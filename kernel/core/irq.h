@@ -2,7 +2,6 @@
 #define IRQ_H_
 
 #include <core/virtual.h>
-#include <core/server.h>
 #include <core/lock.h>
 #include <core/aslr.h>
 

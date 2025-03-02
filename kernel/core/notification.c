@@ -7,7 +7,7 @@
 #include <core/physical.h>
 #include <core/lock.h>
 #include <core/debug.h>
-#include <core/server.h>
+#include <core/handle.h>
 
 #include <fayt/lock.h>
 #include <fayt/string.h>
@@ -76,22 +76,19 @@ static int bridge_to_destination(struct comm_bridge *bridge,
 		RETURN_ERROR;
 	struct context *context = CORE_LOCAL->current_context;
 
-	if (bridge->destination) {
-		const char *namespace = context->comms.namespace;
-		if (bridge->namespace)
-		namespace = bridge->namespace;
+	struct handle_binding *binding =
+		handle_lookup(context->handles, bridge->destination);
+	if (binding == NULL)
+		RETURN_ERROR;
 
-		struct server *server = find_server(namespace, bridge->destination);
-		if (server == NULL || server->context == NULL)
-			RETURN_ERROR;
+	struct notif_channel_hdl *channel_handle = binding->obj;
+	if (unlikely(channel_handle == NULL))
+		RETURN_ERROR;
 
-		*dest = server->context;
-	} else {
-		*dest = NULL;
-		int ret = search_context(bridge->proc_id, dest);
-		if (ret == -1 || *dest == NULL)
-			RETURN_ERROR;
-	}
+	*dest = NULL;
+	int ret = search_context(channel_handle->proc_id, dest);
+	if (ret == -1 || *dest == NULL)
+		RETURN_ERROR;
 
 	return 0;
 }
@@ -523,7 +520,7 @@ SYSCALL_DEFINE0(notification_return, {
 
 	struct context *rcontext = current_ucontext->notification->source ?
 								   current_ucontext->notification->source :
-								   CORE_LOCAL->scheduling_server->context;
+								   CORE_LOCAL->scheduling_context;
 	struct ucontext *rucontext = ({
 		__label__ finish;
 		struct ucontext *rucontext = rcontext->ucontext_top;

@@ -292,15 +292,15 @@ static int pci_device_spawn(struct pci_device *pci_device)
 			break;
 		}
 		case 8: { // NVME
-			struct pci_info pci_info = { .descriptor = pci_device->descriptor,
-										 .msi_capable = pci_device->msi_capable,
-										 .msix_capable =
-											 pci_device->msix_capable };
-			struct syscall_response syscall_response =
-				SYSCALL4(SYSCALL_SERVER_ACTIVATE, "IO", "nvme", &pci_info,
-						 sizeof(struct pci_info));
-			if (syscall_response.ret == -1)
-				RETURN_ERROR;
+			//struct pci_info pci_info = { .descriptor = pci_device->descriptor,
+			//							 .msi_capable = pci_device->msi_capable,
+			//							 .msix_capable =
+			//								 pci_device->msix_capable };
+			//			struct syscall_response syscall_response =
+			//				SYSCALL4(SYSCALL_SERVER_ACTIVATE, "IO", "nvme", &pci_info,
+			//						 sizeof(struct pci_info));
+			//			if (syscall_response.ret == -1)
+			//				RETURN_ERROR;
 			break;
 		}
 		}

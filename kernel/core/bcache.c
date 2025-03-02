@@ -40,8 +40,8 @@ static int bcache_lookup_blk(struct bcache *bcache, size_t lba_start,
 	if (bcache == NULL || blk == NULL)
 		RETURN_ERROR;
 
-	struct handle_blk *handle_blk = bcache->handle_binding->obj;
-	if (handle_blk == NULL)
+	struct blk_hdl *blk_hdl = bcache->handle_binding->obj;
+	if (blk_hdl == NULL)
 		RETURN_ERROR;
 
 	for (size_t lba = lba_start, i = 0; lba < lba_cnt; lba++, i++) {
@@ -81,12 +81,12 @@ static int bcache_consult_read(handle_t handle, size_t offset, int count,
 	if ((bcache->handle_binding->access & HANDLE_ACCESS_READ) == 0)
 		RETURN_ERROR;
 
-	struct handle_blk *handle_blk = bcache->handle_binding->obj;
-	if (handle_blk == NULL)
+	struct blk_hdl *blk_hdl = bcache->handle_binding->obj;
+	if (blk_hdl == NULL)
 		RETURN_ERROR;
 
-	size_t lba_start = offset / handle_blk->lba_size;
-	size_t lba_end = DIV_ROUNDUP(offset + count, handle_blk->lba_size);
+	size_t lba_start = offset / blk_hdl->lba_size;
+	size_t lba_end = DIV_ROUNDUP(offset + count, blk_hdl->lba_size);
 	size_t lba_cnt = lba_end - lba_start;
 
 	if (!lba_cnt)
@@ -104,8 +104,8 @@ static int bcache_consult_read(handle_t handle, size_t offset, int count,
 		 lba < lba_cnt; lba++, i++) {
 		struct blk *blk = blks[i];
 
-		size_t index_into_blk = location % handle_blk->lba_size;
-		size_t byte_cnt = handle_blk->lba_size - index_into_blk;
+		size_t index_into_blk = location % blk_hdl->lba_size;
+		size_t byte_cnt = blk_hdl->lba_size - index_into_blk;
 
 		bytes_read += byte_cnt;
 		if (unlikely(bytes_read > count)) {
@@ -118,7 +118,7 @@ static int bcache_consult_read(handle_t handle, size_t offset, int count,
 		} else {
 		}
 
-		bytes_read += handle_blk->lba_size;
+		bytes_read += blk_hdl->lba_size;
 		location += byte_cnt;
 	}
 
@@ -141,12 +141,12 @@ static int bcache_consult_write(handle_t handle, size_t offset, int count,
 	if ((bcache->handle_binding->access & HANDLE_ACCESS_WRITE) == 0)
 		RETURN_ERROR;
 
-	struct handle_blk *handle_blk = bcache->handle_binding->obj;
-	if (handle_blk == NULL)
+	struct blk_hdl *blk_hdl = bcache->handle_binding->obj;
+	if (blk_hdl == NULL)
 		RETURN_ERROR;
 
-	size_t lba_start = offset / handle_blk->lba_size;
-	size_t lba_end = DIV_ROUNDUP(offset + count, handle_blk->lba_size);
+	size_t lba_start = offset / blk_hdl->lba_size;
+	size_t lba_end = DIV_ROUNDUP(offset + count, blk_hdl->lba_size);
 	size_t lba_cnt = lba_end - lba_start;
 
 	struct blk **blks = alloc(sizeof(struct blk *) * lba_cnt);
@@ -161,8 +161,8 @@ static int bcache_consult_write(handle_t handle, size_t offset, int count,
 		 lba < lba_cnt; lba++, i++) {
 		struct blk *blk = blks[i];
 
-		size_t index_into_blk = location % handle_blk->lba_size;
-		size_t byte_cnt = handle_blk->lba_size - index_into_blk;
+		size_t index_into_blk = location % blk_hdl->lba_size;
+		size_t byte_cnt = blk_hdl->lba_size - index_into_blk;
 
 		bytes_read += byte_cnt;
 		if (unlikely(bytes_read > count)) {
@@ -174,7 +174,7 @@ static int bcache_consult_write(handle_t handle, size_t offset, int count,
 		} else {
 		}
 
-		bytes_read += handle_blk->lba_size;
+		bytes_read += blk_hdl->lba_size;
 		location += byte_cnt;
 	}
 

@@ -6,7 +6,6 @@
 #include <core/notification.h>
 #include <core/lock.h>
 #include <core/physical.h>
-#include <core/server.h>
 
 #include <fayt/debug.h>
 #include <fayt/sched.h>
@@ -69,7 +68,7 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 	if (queue_set->cnt == 0)
 		return 0;
 
-	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_server,
+	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_context,
 									CORE_LOCAL->current_context, queue_set,
 									NOTIFY_WEIGHT_INSTANTANEOUS);
 	if (ret == -1)
@@ -105,7 +104,7 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 
 	spinrelease_irqsave(&equeue->lock);
 
-	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_server, context,
+	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_context, context,
 									queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
 	if (ret == -1)
 		RETURN_ERROR;

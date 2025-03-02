@@ -5,8 +5,8 @@
 #include <core/irq.h>
 #include <core/debug.h>
 #include <core/syscall.h>
-#include <core/server.h>
 #include <core/elf.h>
+#include <core/init.h>
 
 #include <fayt/debug.h>
 #include <fayt/compiler.h>
