@@ -92,9 +92,18 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (cortex->elf == NULL)
 		RETURN_ERROR;
 
-	cortex->elf->data.buffer = module->address;
-	cortex->elf->data.length = module->size;
-	cortex->elf->page_table = &kernel_mappings;
+	struct elf64_file_buffer *file_buffer =
+		alloc(sizeof(struct elf64_file_buffer));
+
+	file_buffer->data = module->address;
+	file_buffer->length = module->size;
+	file_buffer->page_table = &kernel_mappings;
+
+	cortex->elf->elf64_read = elf64_read;
+	cortex->elf->elf64_write = elf64_write;
+	cortex->elf->elf64_map = elf64_map;
+	cortex->elf->private = file_buffer;
+
 	cortex->elf->aslr = &aslr_irq;
 	cortex->identifier = alloc(strlen(identifier) + 1);
 	strcpy((void *)cortex->identifier, identifier);

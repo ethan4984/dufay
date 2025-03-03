@@ -12,7 +12,7 @@ static void spfree(void *, uint64_t, uint64_t);
 
 int main()
 {
-	print("Hello from INIT!!\n");
+	print("Bootstrapping\n");
 
 	struct slab_pool pool = { .page_size = PAGE_SIZE,
 							  .page_alloc = spalloc,
@@ -28,7 +28,6 @@ int main()
 	slab_cache_create(&pool, "CACHE4096", 4096);
 
 	print("Slab cache directory initialised\n");
-
 failure:
 	for (;;)
 		;

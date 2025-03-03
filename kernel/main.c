@@ -1,6 +1,5 @@
 #include <arch/x86/cpu.h>
 
-#include <core/aslr.h>
 #include <core/debug.h>
 #include <core/message.h>
 #include <core/init.h>

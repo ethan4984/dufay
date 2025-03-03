@@ -88,10 +88,26 @@ finish:
 		RETURN_ERROR;
 
 	struct elf64_file *elf = alloc(sizeof(struct elf64_file));
-	elf->data.buffer = file->address;
-	elf->data.length = file->size;
+	if (unlikely(elf == NULL))
+		RETURN_ERROR;
+
+	struct elf64_file_buffer *file_buffer =
+		alloc(sizeof(struct elf64_file_buffer));
+	if (unlikely(file_buffer == NULL))
+		RETURN_ERROR;
+
+	file_buffer->data = file->address;
+	file_buffer->length = file->size;
+	file_buffer->page_table = context->page_table;
+
+	elf->elf64_read = elf64_read;
+	elf->elf64_write = elf64_write;
+	elf->elf64_map = elf64_map;
+	elf->private = file_buffer;
 
 	struct aslr *aslr = alloc(sizeof(struct aslr));
+	if (unlikely(aslr == NULL))
+		RETURN_ERROR;
 
 	*aslr = (struct aslr){ .layout = NULL,
 						   .minimum_vaddr = 0x100000000000,
@@ -142,8 +158,6 @@ finish:
 	}
 
 	context->ucontext_top = ucontext;
-
-	elf->page_table = context->page_table;
 
 	ret = elf64_file_load(elf);
 	if (ret == -1)

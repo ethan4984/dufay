@@ -3,10 +3,10 @@
 
 #include <core/virtual.h>
 #include <core/lock.h>
-#include <core/aslr.h>
 
 #include <fayt/pci.h>
 #include <fayt/irq.h>
+#include <fayt/aslr.h>
 
 struct irq_family {};
 
