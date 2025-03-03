@@ -251,8 +251,8 @@ static int pci_device_spawn(struct pci_device *pci_device)
 				}
 
 				ret = as_vmem_allocate(HANDLE_AS,
-								 (uintptr_t *)&pci_device->msix_space,
-								 pci_device->msix_bar.limit);
+									   (uintptr_t *)&pci_device->msix_space,
+									   pci_device->msix_bar.limit);
 				if (ret == -1)
 					RETURN_ERROR;
 

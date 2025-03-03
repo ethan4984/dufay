@@ -113,7 +113,7 @@ static void *spalloc(void *, uint64_t s)
 {
 	uintptr_t addr;
 
-	int ret = as_vmem_allocate(HANDLE_AS, &addr, s * PAGE_SIZE);
+	int ret = as_mem_allocate(HANDLE_AS, &addr, s * PAGE_SIZE);
 	if (ret == -1)
 		return NULL;
 

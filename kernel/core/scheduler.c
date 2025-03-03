@@ -40,6 +40,27 @@ int create_context(int cgid, struct context **context)
 	if (ret == -1)
 		RETURN_ERROR;
 
+	struct address_space_handle *as_handle =
+		alloc(sizeof(struct address_space_handle));
+	if (as_handle == NULL)
+		RETURN_ERROR;
+
+	as_handle->asid = asid;
+
+	(*context)->handles = alloc(sizeof(struct handle_table));
+	handle_table_init((*context)->handles);
+
+	handle_t as_handle_out;
+	ret = handle_create((*context)->handles, as_handle,
+						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE,
+						&as_handle_out);
+	if (ret == -1)
+		RETURN_ERROR;
+	if (as_handle_out != HANDLE_AS) {
+		REPORT_ERROR;
+		panic("");
+	}
+
 	(*context)->notification.actions =
 		alloc(sizeof(struct notification_action) * NOTIFICATION_MAX);
 	if (unlikely((*context)->notification.actions == NULL))
@@ -65,10 +86,6 @@ int create_context(int cgid, struct context **context)
 						  (*context), sizeof((*context)->comms.proc_id.cid));
 	if (ret == -1)
 		RETURN_ERROR;
-
-	(*context)->handles = alloc(sizeof(struct handle_table));
-
-	handle_table_init((*context)->handles);
 
 	return 0;
 }
