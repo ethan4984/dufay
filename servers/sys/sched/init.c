@@ -1,4 +1,4 @@
-#include <fayt/address_space.h>
+#include <fayt/address.h>
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
 #include <fayt/portal.h>
@@ -44,7 +44,7 @@ int main(struct sched_descriptor *sched_desc)
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for (int i = 0; i < 16; i++) {
 		uintptr_t addr;
-		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
+		int ret = as_vmem_allocate(HANDLE_AS, &addr, NOTIFICATION_STACK_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to allocate address for stack\n");
 			goto failure;
@@ -61,7 +61,7 @@ int main(struct sched_descriptor *sched_desc)
 	}
 
 	uintptr_t addr;
-	int ret = as_allocate(&address_space, &addr, 0x10000);
+	int ret = as_vmem_allocate(HANDLE_AS, &addr, 0x10000);
 	if (ret == -1) {
 		print("ERROR: failed to allocate address\n");
 		goto failure;
@@ -93,7 +93,7 @@ int main(struct sched_descriptor *sched_desc)
 	print("Enqueue link with kernel has been stablished [%s] [%x]\n",
 		  identifier, enqueue_link);
 
-	ret = as_allocate(&address_space, &addr, 0x10000);
+	ret = as_vmem_allocate(HANDLE_AS, &addr, 0x10000);
 	if (ret == -1) {
 		print("ERROR: failed to allocate address\n");
 		goto failure;
@@ -174,19 +174,15 @@ void panic(const char *str, ...)
 		;
 }
 
-struct address_space address_space = { .current = 0xa0000000,
-									   .base = 0xa0000000,
-									   .limit = 0x0000fffffffff0ff };
-
 static void *spalloc(void *, uint64_t s)
 {
-	uintptr_t addr;
+	uintptr_t address;
 
-	int ret = as_allocate(&address_space, &addr, s * PAGE_SIZE);
+	int ret = as_mem_allocate(HANDLE_AS, &address, s * PAGE_SIZE);
 	if (ret == -1)
 		return NULL;
 
-	return (void *)addr;
+	return (void *)address;
 }
 
 static void spfree(void *, uint64_t, uint64_t)

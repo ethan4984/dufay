@@ -1,4 +1,4 @@
-#include <fayt/address_space.h>
+#include <fayt/address.h>
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
 #include <fayt/portal.h>
@@ -39,7 +39,7 @@ int main(struct pci_info *pci_info)
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for (int i = 0; i < 16; i++) {
 		uintptr_t addr;
-		int ret = as_allocate(&address_space, &addr, NOTIFICATION_STACK_SIZE);
+		int ret = as_vmem_allocate(HANDLE_AS, &addr, NOTIFICATION_STACK_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to allocate address for stack\n");
 			goto failure;
@@ -105,15 +105,11 @@ void panic(const char *str, ...)
 		;
 }
 
-struct address_space address_space = { .current = 0xa0000000,
-									   .base = 0xa0000000,
-									   .limit = 0x0000fffffffff0ff };
-
 static void *spalloc(void *, uint64_t s)
 {
 	uintptr_t addr;
 
-	int ret = as_allocate(&address_space, &addr, s * PAGE_SIZE);
+	int ret = as_vmem_allocate(HANDLE_AS, &addr, s * PAGE_SIZE);
 	if (ret == -1)
 		return NULL;
 

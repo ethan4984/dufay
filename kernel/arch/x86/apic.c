@@ -3,7 +3,8 @@
 #include <arch/x86/apic.h>
 #include <arch/x86/cpu.h>
 
-#include <core/virtual.h>
+#include <core/mm/virtual.h>
+#include <core/mm/address.h>
 
 #include <core/debug.h>
 #include <fayt/string.h>
@@ -163,8 +164,8 @@ void apic_init()
 			.madt1 = madt1
 		};
 
-		kernel_mappings.map_page(
-			&kernel_mappings, (uintptr_t)ioapic.ioapic_base,
+		kernel_mappings.page_table->map_page(
+			kernel_mappings.page_table, (uintptr_t)ioapic.ioapic_base,
 			((uintptr_t)ioapic.ioapic_base - HIGH_VMA),
 			X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
 
@@ -206,8 +207,9 @@ void apic_init()
 		}
 	}
 
-	kernel_mappings.map_page(
-		&kernel_mappings, (rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + HIGH_VMA,
+	kernel_mappings.page_table->map_page(
+		kernel_mappings.page_table,
+		(rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + HIGH_VMA,
 		(rdmsr(MSR_LAPIC_BASE) & 0xfffff000),
 		X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
 

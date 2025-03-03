@@ -3,9 +3,9 @@
 #include <core/debug.h>
 #include <core/message.h>
 #include <core/init.h>
-#include <core/physical.h>
+#include <core/mm/physical.h>
 #include <core/scheduler.h>
-#include <core/virtual.h>
+#include <core/mm/virtual.h>
 
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>

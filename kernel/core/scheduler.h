@@ -2,9 +2,10 @@
 #define SCHEDULE_H_
 
 #include <arch/x86/cpu.h>
-#include <core/handle.h>
 
+#include <core/handle.h>
 #include <core/events.h>
+#include <core/mm/address.h>
 
 #include <fayt/lock.h>
 #include <fayt/sched.h>
@@ -122,7 +123,7 @@ struct context {
 	uintptr_t user_gs_base;
 	uintptr_t user_fs_base;
 
-	struct page_table *page_table;
+	struct address_space *address_space;
 
 	struct ustack *stack_tree;
 	struct ucontext *ucontext_queue;

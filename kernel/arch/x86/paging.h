@@ -1,7 +1,7 @@
 #ifndef X86_PAGING_H_
 #define X86_PAGING_H_
 
-#include <core/virtual.h>
+#include <core/mm/virtual.h>
 
 #include <stdint.h>
 

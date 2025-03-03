@@ -1,7 +1,7 @@
 #ifndef IRQ_H_
 #define IRQ_H_
 
-#include <core/virtual.h>
+#include <core/mm/virtual.h>
 #include <core/lock.h>
 
 #include <fayt/pci.h>

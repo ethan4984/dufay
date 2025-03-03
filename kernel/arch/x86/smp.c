@@ -5,8 +5,8 @@
 #include <arch/x86/idt.h>
 #include <arch/x86/gdt.h>
 
-#include <core/physical.h>
-#include <core/virtual.h>
+#include <core/mm/physical.h>
+#include <core/mm/virtual.h>
 
 #include <fayt/string.h>
 #include <core/debug.h>
@@ -67,7 +67,7 @@ static void chain_aps()
 	__asm__("sidtq %0" ::"m"(idtr));
 
 	if ((logical_processor_cnt) >= bootable_processor_cnt) {
-		kernel_mappings.unmap_page(&kernel_mappings, 0);
+		kernel_mappings.page_table->unmap_page(kernel_mappings.page_table, 0);
 		return;
 	}
 
@@ -90,7 +90,7 @@ static void chain_aps()
 	uint64_t *parameters = (uint64_t *)0x81000;
 
 	*(parameters + 0) = cpu_local->kernel_stack;
-	*(parameters + 1) = (uint64_t)kernel_mappings.pmlt - HIGH_VMA;
+	*(parameters + 1) = (uint64_t)kernel_mappings.page_table->pmlt - HIGH_VMA;
 	*(parameters + 2) = (uint64_t)core_bootstrap;
 	*(parameters + 3) = (uint64_t)cpu_local;
 	*(parameters + 4) = (uint64_t)&idtr;
@@ -115,8 +115,9 @@ static void chain_aps()
 
 void boot_aps(void)
 {
-	kernel_mappings.map_page(&kernel_mappings, 0, 0,
-							 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_PS);
+	kernel_mappings.page_table->map_page(kernel_mappings.page_table, 0, 0,
+										 X86_FLAGS_P | X86_FLAGS_RW |
+											 X86_FLAGS_PS);
 	memcpy8((void *)0x80000, (void *)(uintptr_t)smp_init_begin,
 			(uintptr_t)smp_init_end - (uintptr_t)smp_init_begin);
 

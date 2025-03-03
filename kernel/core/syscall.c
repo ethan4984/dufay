@@ -38,6 +38,7 @@ extern int syscall_msg_send(struct registers *);
 extern int syscall_create_obj(struct registers *);
 extern int syscall_duplicate_obj(struct registers *);
 extern int syscall_destroy_obj(struct registers *);
+extern int syscall_as_action(struct registers *);
 
 static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_log }, // 0
@@ -59,7 +60,8 @@ static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_msg_send }, // 16
 	{ .handler = syscall_create_obj }, // 17
 	{ .handler = syscall_duplicate_obj }, // 18
-	{ .handler = syscall_destroy_obj } // 19
+	{ .handler = syscall_destroy_obj }, // 19
+	{ .handler = syscall_as_action } // 20
 };
 
 void syscall_handler(struct registers *regs, void *)

@@ -2,7 +2,7 @@
 #include <fayt/slab.h>
 #include <fayt/string.h>
 #include <fayt/portal.h>
-#include <fayt/address_space.h>
+#include <fayt/address.h>
 #include <fayt/syscall.h>
 #include <fayt/notification.h>
 #include <fayt/pci.h>
@@ -265,8 +265,8 @@ int nvme_lba_rw(struct nvme_namespace *namespace, int base, int cnt, int rw,
 
 	struct nvme_command command = {};
 
-	if (cnt * namespace->lba_size > PAGE_SIZE) {
-		if (cnt * namespace->lba_size > PAGE_SIZE * 2) {
+	if ((unsigned)cnt * namespace->lba_size > PAGE_SIZE) {
+		if ((unsigned)cnt * namespace->lba_size > PAGE_SIZE * 2) {
 			int prp_cnt = (cnt - 1) * namespace->lba_size / PAGE_SIZE;
 			if (prp_cnt > namespace->max_prp)
 				RETURN_ERROR;
@@ -495,7 +495,7 @@ int nvme(struct pci_info *pci_info)
 
 	volatile struct nvme_regs *regs = ({
 		uintptr_t addr;
-		int ret = as_address(&address_space, &addr, nbar->bar.limit);
+		int ret = as_vmem_allocate(HANDLE_AS, &addr, nbar->bar.limit);
 		if (ret == -1)
 			RETURN_ERROR;
 

@@ -31,7 +31,7 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	if (unlikely(context == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = context->page_table;
+	struct page_table *page_table = context->address_space->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
@@ -47,8 +47,8 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	RETURN_ERROR;
 found:
 	uint64_t faulting_page = faulting_address & ~(0xfff);
-	uint64_t *pml_entry =
-		kernel_mappings.page_entry(&kernel_mappings, faulting_page);
+	uint64_t *pml_entry = kernel_mappings.page_table->page_entry(
+		kernel_mappings.page_table, faulting_page);
 	if (pml_entry == NULL)
 		RETURN_ERROR;
 
@@ -97,7 +97,7 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 
 	file_buffer->data = module->address;
 	file_buffer->length = module->size;
-	file_buffer->page_table = &kernel_mappings;
+	file_buffer->address_space = &kernel_mappings;
 
 	cortex->elf->elf64_read = elf64_read;
 	cortex->elf->elf64_write = elf64_write;

@@ -4,7 +4,7 @@
 #include <core/notification.h>
 #include <core/syscall.h>
 #include <core/scheduler.h>
-#include <core/physical.h>
+#include <core/mm/physical.h>
 #include <core/lock.h>
 #include <core/debug.h>
 #include <core/handle.h>
@@ -147,7 +147,8 @@ static int notification_ucontext_instantiate(struct context *context,
 	int parameter_length = notification->parameter.page_cnt * PAGE_SIZE;
 	if (parameter_length) {
 		uintptr_t vaddr = ucontext->regs.rsp -= parameter_length;
-		x86_map_page(context->page_table, vaddr, notification->parameter.paddr,
+		x86_map_page(context->address_space->page_table, vaddr,
+					 notification->parameter.paddr,
 					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
 		ucontext->regs.rsi = ucontext->regs.rsp;
 	}
@@ -198,7 +199,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		notification->parameter.page_cnt = page_cnt;
 
 		if (vaddr)
-			x86_map_page(sender->page_table, vaddr, paddr,
+			x86_map_page(sender->address_space->page_table, vaddr, paddr,
 						 X86_FLAGS_PS | X86_FLAGS_US | X86_FLAGS_NX);
 	}
 
@@ -253,7 +254,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 	uint64_t paddr = 0;
 	if (vaddr && page_cnt) {
 		paddr = pmm_alloc(page_cnt, 1);
-		x86_map_page(context->page_table, vaddr, paddr,
+		x86_map_page(context->address_space->page_table, vaddr, paddr,
 					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
 		notification->parameter.paddr = paddr;
 		notification->parameter.page_cnt = page_cnt;
@@ -586,7 +587,7 @@ finish:
 	rcontext->ucontext_active = rucontext;
 
 	if (rcontext != current_context) {
-		x86_swap_tables(rcontext->page_table);
+		x86_swap_tables(rcontext->address_space->page_table);
 
 		set_user_fs(rcontext->user_fs_base);
 		set_user_gs(rcontext->user_gs_base);

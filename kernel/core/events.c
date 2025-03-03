@@ -5,7 +5,7 @@
 #include <core/scheduler.h>
 #include <core/notification.h>
 #include <core/lock.h>
-#include <core/physical.h>
+#include <core/mm/physical.h>
 
 #include <fayt/debug.h>
 #include <fayt/sched.h>

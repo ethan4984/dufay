@@ -1,12 +1,14 @@
 #ifndef ELF_H_
 #define ELF_H_
 
+#include <core/mm/address.h>
+
 #include <fayt/elf.h>
 
 struct elf64_file_buffer {
 	void *data;
 	size_t length;
-	struct page_table *page_table;
+	struct address_space *address_space;
 };
 
 int elf64_read(struct elf64_file *file, void *buffer, int offset, size_t cnt);

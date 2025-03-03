@@ -1,6 +1,6 @@
 #include <arch/x86/cpu.h>
 
-#include <core/physical.h>
+#include <core/mm/physical.h>
 #include <fayt/slab.h>
 
 struct segment_descriptor {

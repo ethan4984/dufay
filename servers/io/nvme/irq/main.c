@@ -1,7 +1,7 @@
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
 #include <fayt/irq.h>
-#include <fayt/address_space.h>
+#include <fayt/address.h>
 #include <fayt/sched.h>
 #include <fayt/syscall.h>
 

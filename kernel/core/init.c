@@ -4,7 +4,7 @@
 #include <core/init.h>
 #include <core/debug.h>
 #include <core/elf.h>
-#include <core/physical.h>
+#include <core/mm/physical.h>
 
 #include <fayt/debug.h>
 #include <fayt/notification.h>
@@ -98,7 +98,7 @@ finish:
 
 	file_buffer->data = file->address;
 	file_buffer->length = file->size;
-	file_buffer->page_table = context->page_table;
+	file_buffer->address_space = context->address_space;
 
 	elf->elf64_read = elf64_read;
 	elf->elf64_write = elf64_write;
@@ -174,8 +174,8 @@ finish:
 	uintptr_t stack_virtual = ucontext->stack->user_stack.sp;
 
 	for (size_t i = 0; i < SERVER_DEFAULT_STACK_SIZE / PAGE_SIZE; i++) {
-		context->page_table->map_page(
-			context->page_table, stack_virtual - PAGE_SIZE * i,
+		context->address_space->page_table->map_page(
+			context->address_space->page_table, stack_virtual - PAGE_SIZE * i,
 			stack_physical - PAGE_SIZE * i,
 			X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US);
 	}

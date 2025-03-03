@@ -6,8 +6,8 @@
 #include <arch/x86/idt.h>
 
 #include <core/scheduler.h>
-#include <core/virtual.h>
-#include <core/physical.h>
+#include <core/mm/virtual.h>
+#include <core/mm/physical.h>
 #include <core/syscall.h>
 #include <core/notification.h>
 #include <core/debug.h>
@@ -31,13 +31,13 @@ int create_context(int cgid, struct context **context)
 	if (unlikely(*context == NULL))
 		RETURN_ERROR;
 
-	(*context)->page_table = alloc(sizeof(struct page_table));
-	int ret = vmm_default_table((*context)->page_table);
-	if (unlikely(ret == -1))
+	int asid = -1;
+	int ret = address_space_construct(&asid);
+	if (ret == -1 || asid == -1)
 		RETURN_ERROR;
 
-	ret = vmm_as_push((*context)->page_table);
-	if (unlikely(ret == -1))
+	ret = address_find_as(asid, &(*context)->address_space);
+	if (ret == -1)
 		RETURN_ERROR;
 
 	(*context)->notification.actions =
@@ -255,7 +255,7 @@ find_ucontext:
 				panic("DUFAY: core local corrupt");
 
 			int asid = (queue_entry.asid == -1) ?
-						   current_context->page_table->asid :
+						   current_context->address_space->asid :
 						   queue_entry.asid;
 
 			panic("DUFAY: this is a reminder to implement this");
@@ -340,7 +340,7 @@ void reschedule(struct registers *regs, void *)
 	fpu_context = &next_ucontext->fpu_context;
 	r = &next_ucontext->regs;
 
-	x86_swap_tables(next_context->page_table);
+	x86_swap_tables(next_context->address_space->page_table);
 
 	CORE_LOCAL->fpu_rstor(*fpu_context);
 

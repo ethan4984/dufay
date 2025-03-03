@@ -1,11 +1,12 @@
 #include <arch/x86/smp.h>
 #include <arch/x86/paging.h>
 
-#include <core/physical.h>
+#include <core/mm/physical.h>
 #include <core/syscall.h>
-#include <core/portal.h>
+#include <core/mm/portal.h>
 #include <core/debug.h>
-#include <core/virtual.h>
+#include <core/mm/virtual.h>
+#include <core/mm/address.h>
 
 #include <fayt/compiler.h>
 #include <fayt/circular_queue.h>
@@ -64,7 +65,7 @@ int portal_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	if (unlikely(context == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = context->page_table;
+	struct page_table *page_table = context->address_space->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
@@ -470,19 +471,21 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 	if (unlikely(current_context == NULL))
 		panic("DUFAY: core local corrupt");
 
-	struct page_table *source_table;
-	struct page_table *destination_table;
-	if (req->cow.source.asid == -1)
-		source_table = current_context->page_table;
-	else {
-		int ret = vmm_as_find(req->cow.source.asid, &source_table);
-		if (ret == -1 || source_table == NULL)
-			return -1;
-	}
+	struct address_space *source_address_space = ({
+		struct handle_binding *handle_binding =
+			handle_lookup(current_context->handles, req->cow.source.handle);
+		handle_binding->obj;
+	});
 
-	int ret = vmm_as_find(req->cow.destination.asid, &destination_table);
-	if (ret == -1 || source_table == NULL)
-		return -1;
+	struct address_space *destination_address_space = ({
+		struct handle_binding *handle_binding =
+			handle_lookup(current_context->handles, req->cow.source.handle);
+		handle_binding->obj;
+	});
+
+	struct page_table *source_table = source_address_space->page_table;
+	struct page_table *destination_table =
+		destination_address_space->page_table;
 
 	if ((req->cow.source.base == -1 && req->cow.destination.base != -1) ||
 		(req->cow.source.base != -1 && req->cow.destination.base == -1))
@@ -514,8 +517,9 @@ skip:
 				destination_table, dest_page->vaddr, dest_page->frame->paddr,
 				dest_page->flags);
 
-			ret = hash_table_push(destination_table->pages, &dest_page->vaddr,
-								  dest_page, sizeof(dest_page->vaddr));
+			int ret = hash_table_push(destination_table->pages,
+									  &dest_page->vaddr, dest_page,
+									  sizeof(dest_page->vaddr));
 			if (ret == -1)
 				RETURN_ERROR;
 		}
@@ -531,8 +535,8 @@ skip:
 		for (int i = 0; i < DIV_ROUNDUP(req->cow.limit, PAGE_SIZE); i++) {
 			__label__ skip;
 			struct page *src_page;
-			ret = hash_table_search(source_table->pages, &src_vaddr,
-									sizeof(src_vaddr), (void **)&src_page);
+			int ret = hash_table_search(source_table->pages, &src_vaddr,
+										sizeof(src_vaddr), (void **)&src_page);
 			if (src_page == NULL)
 				continue;
 			if (src_page->frame == NULL)
@@ -598,9 +602,9 @@ int portal(struct portal_req *req, struct portal_resp *resp)
 	struct page_table *page_table = NULL;
 
 	if (likely(context))
-		page_table = context->page_table;
+		page_table = context->address_space->page_table;
 	if (unlikely(context == NULL))
-		page_table = &kernel_mappings;
+		page_table = kernel_mappings.page_table;
 	if (unlikely(page_table == NULL))
 		goto failure;
 

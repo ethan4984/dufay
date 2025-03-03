@@ -1,8 +1,8 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 
-#include <core/virtual.h>
-#include <core/physical.h>
+#include <core/mm/virtual.h>
+#include <core/mm/physical.h>
 #include <core/elf.h>
 #include <core/debug.h>
 
@@ -86,8 +86,9 @@ int elf64_map(struct elf64_file *file, struct elf64_phdr *phdr,
 		if ((flags & ELF_PF_X) == ELF_PF_X)
 			page_flags &= ~X86_FLAGS_NX;
 
-		file_buffer->page_table->map_page(file_buffer->page_table, virtual,
-										  physical[j], page_flags);
+		file_buffer->address_space->page_table->map_page(
+			file_buffer->address_space->page_table, virtual, physical[j],
+			page_flags);
 	}
 
 	if (place) {

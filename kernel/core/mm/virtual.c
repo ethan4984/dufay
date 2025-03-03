@@ -1,8 +1,9 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 
-#include <core/virtual.h>
-#include <core/physical.h>
+#include <core/mm/virtual.h>
+#include <core/mm/physical.h>
+#include <core/mm/address.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>
@@ -11,41 +12,9 @@
 
 #include <limine.h>
 
-static struct hash_table as_table;
 static volatile struct limine_kernel_address_request
 	limine_kernel_address_request = { .id = LIMINE_KERNEL_ADDRESS_REQUEST,
 									  .revision = 0 };
-static int asid_bump;
-
-struct page_table kernel_mappings;
-
-int vmm_as_find(int asid, struct page_table **page_table)
-{
-	if (page_table == NULL)
-		RETURN_ERROR;
-
-	int ret =
-		hash_table_search(&as_table, &asid, sizeof(asid), (void **)page_table);
-	if (ret == -1)
-		RETURN_ERROR;
-
-	return 0;
-}
-
-int vmm_as_push(struct page_table *page_table)
-{
-	if (page_table == NULL)
-		RETURN_ERROR;
-
-	page_table->asid = asid_bump++;
-
-	int ret = hash_table_push(&as_table, &page_table->asid, page_table,
-							  sizeof(page_table->asid));
-	if (ret == -1)
-		RETURN_ERROR;
-
-	return 0;
-}
 
 int vmm_default_table(struct page_table *page_table)
 {
@@ -137,11 +106,15 @@ int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt)
 
 int vmm_init(void)
 {
-	int ret = vmm_default_table(&kernel_mappings);
+	kernel_mappings.page_table = alloc(sizeof(struct page_table));
+	if (kernel_mappings.page_table == NULL)
+		RETURN_ERROR;
+
+	int ret = vmm_default_table(kernel_mappings.page_table);
 	if (ret == -1)
 		RETURN_ERROR;
 
-	x86_swap_tables(&kernel_mappings);
+	x86_swap_tables(kernel_mappings.page_table);
 
 	return 0;
 }

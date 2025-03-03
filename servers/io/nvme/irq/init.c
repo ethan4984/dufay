@@ -1,6 +1,6 @@
 #include <fayt/syscall.h>
 #include <fayt/debug.h>
-#include <fayt/address_space.h>
+#include <fayt/address.h>
 #include <fayt/stream.h>
 #include <fayt/string.h>
 
@@ -44,7 +44,3 @@ void panic(const char *str, ...)
 	for (;;)
 		;
 }
-
-struct address_space address_space = { .current = 0xa0000000,
-									   .base = 0xf0000000,
-									   .limit = 0x0000fffffffff0ff };

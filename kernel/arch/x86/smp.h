@@ -2,7 +2,7 @@
 #define X86_SMP_H_
 
 #include <core/scheduler.h>
-#include <core/portal.h>
+#include <core/mm/portal.h>
 #include <fayt/circular_queue.h>
 
 #include <stddef.h>

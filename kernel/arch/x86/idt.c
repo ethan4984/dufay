@@ -3,7 +3,7 @@
 #include <arch/x86/apic.h>
 
 #include <core/scheduler.h>
-#include <core/portal.h>
+#include <core/mm/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
 #include <core/syscall.h>
