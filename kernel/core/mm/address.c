@@ -91,14 +91,14 @@ SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
 
 					struct address_space_handle *as_handle = NULL;
 					if (ops != AS_ACTION_CONSTRUCT) {
-						struct address_space_handle *address_space_handle = ({
+						as_handle = ({
 							struct handle_binding *binding =
 								handle_lookup(current_context->handles, handle);
 							if (binding == NULL)
 								RETURN_ERROR;
 							binding->obj;
 						});
-						if (address_space_handle == NULL)
+						if (as_handle == NULL)
 							RETURN_ERROR;
 					}
 
@@ -126,8 +126,8 @@ SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
 					}
 					case AS_ACTION_ALLOCATE: {
 						struct address_space *as = NULL;
-
-						int ret = address_find_as(as->asid, &as);
+						int ret = address_find_as(as_handle->asid,
+												  (struct address_space **)&as);
 						if (ret == -1 || as == NULL)
 							RETURN_ERROR;
 
@@ -135,7 +135,6 @@ SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
 					}
 					case AS_ACTION_FREE: {
 						struct address_space *as = NULL;
-
 						int ret = address_find_as(as_handle->asid, &as);
 						if (ret == -1 || as == NULL)
 							RETURN_ERROR;
