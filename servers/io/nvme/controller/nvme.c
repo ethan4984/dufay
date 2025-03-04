@@ -495,7 +495,7 @@ int nvme(struct pci_info *pci_info)
 
 	volatile struct nvme_regs *regs = ({
 		uintptr_t addr;
-		int ret = as_vmem_allocate(HANDLE_AS, &addr, nbar->bar.limit);
+		int ret = as_vmem_allocate(CAPABILITY_SELF_AS, &addr, nbar->bar.limit);
 		if (ret == -1)
 			RETURN_ERROR;
 

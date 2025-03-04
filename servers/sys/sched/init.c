@@ -44,7 +44,7 @@ int main(struct sched_descriptor *sched_desc)
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for (int i = 0; i < 16; i++) {
 		uintptr_t addr;
-		int ret = as_mem_allocate(HANDLE_AS, &addr, NOTIFICATION_STACK_SIZE);
+		int ret = as_mem_allocate(CAPABILITY_SELF_AS, &addr, NOTIFICATION_STACK_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to allocate address for stack\n");
 			goto failure;
@@ -61,7 +61,7 @@ int main(struct sched_descriptor *sched_desc)
 	}
 
 	uintptr_t addr;
-	int ret = as_mem_allocate(HANDLE_AS, &addr, 0x10000);
+	int ret = as_mem_allocate(CAPABILITY_SELF_AS, &addr, 0x10000);
 	if (ret == -1) {
 		print("ERROR: failed to allocate address\n");
 		goto failure;
@@ -93,7 +93,7 @@ int main(struct sched_descriptor *sched_desc)
 	print("Enqueue link with kernel has been stablished [%s] [%x]\n",
 		  identifier, enqueue_link);
 
-	ret = as_mem_allocate(HANDLE_AS, &addr, 0x10000);
+	ret = as_mem_allocate(CAPABILITY_SELF_AS, &addr, 0x10000);
 	if (ret == -1) {
 		print("ERROR: failed to allocate address\n");
 		goto failure;
@@ -178,7 +178,7 @@ static void *spalloc(void *, uint64_t s)
 {
 	uintptr_t address;
 
-	int ret = as_mem_allocate(HANDLE_AS, &address, s * PAGE_SIZE);
+	int ret = as_mem_allocate(CAPABILITY_SELF_AS, &address, s * PAGE_SIZE);
 	if (ret == -1)
 		return NULL;
 

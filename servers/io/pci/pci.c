@@ -250,7 +250,7 @@ static int pci_device_spawn(struct pci_device *pci_device)
 					continue;
 				}
 
-				ret = as_vmem_allocate(HANDLE_AS,
+				ret = as_vmem_allocate(CAPABILITY_SELF_AS,
 									   (uintptr_t *)&pci_device->msix_space,
 									   pci_device->msix_bar.limit);
 				if (ret == -1)
@@ -372,7 +372,7 @@ int pci(struct pci_server_meta *server_meta)
 			PAGE_SIZE);
 
 		uintptr_t addr;
-		int ret = as_vmem_allocate(HANDLE_AS, &addr, page_cnt * PAGE_SIZE);
+		int ret = as_vmem_allocate(CAPABILITY_SELF_AS, &addr, page_cnt * PAGE_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to map configuration space for segment=%d\n",
 				  mcfg_entry->segment);
