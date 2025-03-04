@@ -50,13 +50,26 @@ int create_context(int cgid, struct context **context)
 	(*context)->handles = alloc(sizeof(struct handle_table));
 	handle_table_init((*context)->handles);
 
-	handle_t as_handle_out;
+	handle_t handle_out;
 	ret = handle_create((*context)->handles, as_handle,
-						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE,
-						&as_handle_out);
+						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle_out);
 	if (ret == -1)
 		RETURN_ERROR;
-	if (as_handle_out != HANDLE_AS) {
+	if (handle_out != CAPABILITY_SELF_AS) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	struct notification_channel_handle *notification_channel_handle =
+		alloc(sizeof(struct notification_channel_handle));
+	if (notification_channel_handle == NULL)
+		RETURN_ERROR;
+
+	ret = handle_create((*context)->handles, notification_channel_handle,
+						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle_out);
+	if (ret == -1)
+		RETURN_ERROR;
+	if (handle_out != CAPABILITY_SELF_SCHED) {
 		REPORT_ERROR;
 		panic("");
 	}

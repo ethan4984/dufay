@@ -58,11 +58,9 @@ int address_space_construct(int *asid)
 	as->current = 0xa0000000;
 	as->base = 0xa0000000;
 	as->limit = 0x0000fffffffff0ff;
-	as->aslr = (struct aslr) {
-		.layout = NULL,
-		.minimum_vaddr = 0x100000000000,
-		.maximum_vaddr = 0x7fffffffffff
-	};
+	as->aslr = (struct aslr){ .layout = NULL,
+							  .minimum_vaddr = 0x100000000000,
+							  .maximum_vaddr = 0x7fffffffffff };
 
 	*asid = as->asid;
 

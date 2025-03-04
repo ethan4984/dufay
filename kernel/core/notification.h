@@ -49,6 +49,10 @@ struct notification_queue {
 	struct spinlock lock;
 };
 
+struct notification_channel_handle {
+	struct sched_proc_id proc_id;
+};
+
 int notification_queue(struct context *, struct context *, int, int, int,
 					   uintptr_t, uint64_t, int);
 int notification_dispatch(struct context *);

@@ -81,7 +81,7 @@ static int bridge_to_destination(struct comm_bridge *bridge,
 	if (binding == NULL)
 		RETURN_ERROR;
 
-	struct notif_channel_hdl *channel_handle = binding->obj;
+	struct notification_channel_handle *channel_handle = binding->obj;
 	if (unlikely(channel_handle == NULL))
 		RETURN_ERROR;
 

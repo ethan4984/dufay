@@ -180,7 +180,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 			bridge.data.limit = sizeof(struct sched_queue_config);
 			uintptr_t vaddr;
 			ret = as_mem_allocate(HANDLE_AS, &vaddr,
-								   DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
+								  DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
 			bridge.data.base = (void *)vaddr;
 			if (ret == -1) {
 				REPORT_ERROR;

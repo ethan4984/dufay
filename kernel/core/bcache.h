@@ -17,4 +17,11 @@ struct blk {
 	RB_META(struct blk);
 };
 
+struct blk_handle {
+	size_t lba_start;
+	size_t lba_cnt;
+	size_t lba_size;
+	void *private;
+};
+
 #endif
