@@ -179,7 +179,7 @@ static void notify_enqueue_thread(struct notification_info *, void *data, int)
 
 			bridge.data.limit = sizeof(struct sched_queue_config);
 			uintptr_t vaddr;
-			ret = as_vmem_allocate(HANDLE_AS, &vaddr,
+			ret = as_mem_allocate(HANDLE_AS, &vaddr,
 								   DIV_ROUNDUP(bridge.data.limit, PAGE_SIZE));
 			bridge.data.base = (void *)vaddr;
 			if (ret == -1) {
@@ -346,7 +346,7 @@ int sched(struct portal_link *enqueue_link, struct portal_link *baqueue_link,
 	print("Initialised enqueue and dequeue notifications\n");
 
 	uintptr_t addr;
-	int ret = as_vmem_allocate(HANDLE_AS, &addr, 0x10000);
+	int ret = as_mem_allocate(HANDLE_AS, &addr, 0x10000);
 	if (ret == -1) {
 		REPORT_ERROR;
 		print("ERROR: failed to allocate address\n");

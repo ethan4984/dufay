@@ -55,7 +55,57 @@ int address_space_construct(int *asid)
 	if (ret == -1)
 		RETURN_ERROR;
 
+	as->current = 0xa0000000;
+	as->base = 0xa0000000;
+	as->limit = 0x0000fffffffff0ff;
+	as->aslr = (struct aslr) {
+		.layout = NULL,
+		.minimum_vaddr = 0x100000000000,
+		.maximum_vaddr = 0x7fffffffffff
+	};
+
 	*asid = as->asid;
+
+	return 0;
+}
+
+int as_address(struct address_space *as, uintptr_t *ret, size_t size)
+{
+	if (as == NULL || ret == NULL || size == 0 ||
+		(as->current + size) > (as->base + as->limit))
+		RETURN_ERROR;
+
+	uintptr_t address = as->current;
+
+	for (struct address_hole *hole = as->hole_root; hole; hole = hole->next) {
+		if ((address < hole->base + hole->limit) &&
+			(hole->base < address + size))
+			address += hole->limit;
+		hole = hole->next;
+	}
+
+	as->current = address + size;
+	*ret = address;
+
+	return 0;
+}
+
+int as_insert_hole(struct address_space *as, struct address_hole *hole)
+{
+	if (as == NULL || hole == NULL)
+		RETURN_ERROR;
+
+	if (as->hole_root == NULL) {
+		as->hole_root = hole;
+		as->hole_tail = as->hole_root;
+		return 0;
+	}
+
+	hole->next = NULL;
+	hole->last = as->hole_tail;
+
+	as->hole_tail->next = hole;
+	as->hole_tail = hole;
 
 	return 0;
 }
@@ -67,6 +117,10 @@ int address_space_allocate(struct address_space *as, uintptr_t *address,
 		RETURN_ERROR;
 	if (!length)
 		return -1;
+
+	int ret = as_address(as, address, length);
+	if (ret == -1)
+		RETURN_ERROR;
 
 	return 0;
 }

@@ -105,15 +105,7 @@ finish:
 	elf->elf64_map = elf64_map;
 	elf->private = file_buffer;
 
-	struct aslr *aslr = alloc(sizeof(struct aslr));
-	if (unlikely(aslr == NULL))
-		RETURN_ERROR;
-
-	*aslr = (struct aslr){ .layout = NULL,
-						   .minimum_vaddr = 0x100000000000,
-						   .maximum_vaddr = 0x7fffffffffff };
-
-	elf->aslr = aslr;
+	elf->aslr = &context->address_space->aslr;
 
 	int ret = elf64_file_init(elf);
 	if (ret == -1)

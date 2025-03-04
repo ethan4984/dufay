@@ -3,13 +3,32 @@
 
 #include <core/mm/virtual.h>
 
+#include <fayt/aslr.h>
+
 struct address_space_handle {
 	int asid;
 };
 
+struct address_hole {
+	uintptr_t base;
+	size_t limit;
+
+	struct address_hole *next;
+	struct address_hole *last;
+};
+
 struct address_space {
+	struct address_hole *hole_root;
+	struct address_hole *hole_tail;
+
+	uintptr_t current;
+	uintptr_t base;
+	size_t limit;
+
 	struct page_table *page_table;
+
 	int asid;
+	struct aslr aslr;
 	struct spinlock lock;
 };
 
