@@ -27,8 +27,12 @@ int vmm_default_table(struct page_table *page_table)
 	page_table->unmap_page = x86_unmap_page;
 	page_table->page_entry = x86_page_entry;
 	page_table->pages = alloc(sizeof(struct hash_table));
+	if (page_table->pages == NULL)
+		RETURN_ERROR;
 
 	page_table->pmlt = (uint64_t *)(pmm_alloc(1, 1) + HIGH_VMA);
+	if (page_table->pmlt == (void *)HIGH_VMA)
+		RETURN_ERROR;
 
 	uintptr_t kernel_vaddr =
 		limine_kernel_address_request.response->virtual_base;
@@ -107,6 +111,8 @@ int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt)
 int vmm_init(void)
 {
 	kernel_mappings.page_table = alloc(sizeof(struct page_table));
+	if (kernel_mappings.page_table == NULL)
+		RETURN_ERROR;
 	if (kernel_mappings.page_table == NULL)
 		RETURN_ERROR;
 

@@ -49,6 +49,8 @@ int launch_init(void)
 	struct sched_queue_config_set *queue_set =
 		alloc(sizeof(struct sched_queue_config_set) +
 			  sizeof(struct sched_queue_config));
+	if (queue_set == NULL)
+		RETURN_ERROR;
 
 	queue_set->cnt = 1;
 	queue_set->config->proc_id = context_init->comms.proc_id;
@@ -119,10 +121,14 @@ finish:
 		RETURN_ERROR;
 
 	struct ustack *ustack = alloc(sizeof(struct ustack));
+	if (ustack == NULL)
+		RETURN_ERROR;
 
 	ustack->kernel_stack.sp =
 		pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE), 1) +
 		CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
+	if (!ustack->kernel_stack.sp)
+		RETURN_ERROR;
 	ustack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
 	ustack->user_stack.sp =
 		SERVER_DEFAULT_STACK_LOCATION + SERVER_DEFAULT_STACK_SIZE;
@@ -136,11 +142,17 @@ finish:
 	}
 
 	struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+	if (ucontext == NULL)
+		RETURN_ERROR;
 
 	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
+	if (ucontext->fpu_context == NULL)
+		RETURN_ERROR;
 	ucontext->stack = ustack;
 	ucontext->context = context;
 	ucontext->etrigger = alloc(sizeof(struct etrigger));
+	if (ucontext->etrigger == NULL)
+		RETURN_ERROR;
 	ucontext->etrigger->ucontext = ucontext;
 
 	ret = UCONTEXT_PUSH(context, ucontext);
@@ -163,6 +175,8 @@ finish:
 	uintptr_t stack_physical =
 		pmm_alloc(ucontext->stack->user_stack.sp / PAGE_SIZE, 1) +
 		SERVER_DEFAULT_STACK_SIZE;
+	if (!stack_physical)
+		RETURN_ERROR;
 	uintptr_t stack_virtual = ucontext->stack->user_stack.sp;
 
 	for (size_t i = 0; i < SERVER_DEFAULT_STACK_SIZE / PAGE_SIZE; i++) {
@@ -210,6 +224,8 @@ static int launch_schedulers(void)
 	struct sched_descriptor *descriptors = ({
 		size_t page_cnt = DIV_ROUNDUP(0x10000, PAGE_SIZE);
 		uint64_t physical_base = pmm_alloc(page_cnt, 1);
+		if (!physical_base)
+			RETURN_ERROR;
 		uint64_t virtual_base = physical_base + HIGH_VMA;
 
 		struct portal_resp resp;
@@ -246,6 +262,8 @@ static int launch_schedulers(void)
 			(struct time){ .sec = 0, .nsec = MS_TO_NS(SCHED_TICK_RATE_MS) };
 
 		scheduler_context[i] = alloc(sizeof(struct context));
+		if (scheduler_context[i] == NULL)
+			RETURN_ERROR;
 
 		int ret = create_context(CGID_SYSTEM, &scheduler_context[i]);
 		if (unlikely(ret == -1 || scheduler_context[i] == NULL))

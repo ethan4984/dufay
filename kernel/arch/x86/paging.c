@@ -5,6 +5,7 @@
 #include <core/mm/virtual.h>
 
 #include <fayt/lock.h>
+#include <fayt/debug.h>
 
 #define PML5_FLAGS_MASK ~(X86_FLAGS_PS | X86_FLAGS_G | X86_FLAGS_NX)
 #define PML4_FLAGS_MASK ~(X86_FLAGS_PS | X86_FLAGS_G | X86_FLAGS_NX)
@@ -47,6 +48,10 @@ static uint64_t *pml4_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((page_table->pmlt[pml_indices.pml4_index] & X86_FLAGS_P) == 0) {
 		page_table->pmlt[pml_indices.pml4_index] =
 			pmm_alloc(1, 1) | (flags & PML4_FLAGS_MASK) | X86_FLAGS_RW;
+		if (!page_table->pmlt[pml_indices.pml4_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml3 =
@@ -56,6 +61,10 @@ static uint64_t *pml4_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((pml3[pml_indices.pml3_index] & X86_FLAGS_P) == 0) {
 		pml3[pml_indices.pml3_index] = pmm_alloc(1, 1) |
 									   (flags & PML3_FLAGS_MASK) | X86_FLAGS_RW;
+		if (!pml3[pml_indices.pml3_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml2 =
@@ -70,6 +79,10 @@ static uint64_t *pml4_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((pml2[pml_indices.pml2_index] & X86_FLAGS_P) == 0) {
 		pml2[pml_indices.pml2_index] = pmm_alloc(1, 1) |
 									   (flags & PML2_FLAGS_MASK) | X86_FLAGS_RW;
+		if (!pml2[pml_indices.pml2_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml1 =
@@ -228,6 +241,10 @@ static uint64_t *pml5_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((page_table->pmlt[pml_indices.pml5_index] & X86_FLAGS_P) == 0) {
 		page_table->pmlt[pml_indices.pml5_index] = pmm_alloc(1, 1) |
 												   (flags & PML5_FLAGS_MASK);
+		if (!page_table->pmlt[pml_indices.pml5_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml4 =
@@ -237,6 +254,10 @@ static uint64_t *pml5_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((pml4[pml_indices.pml4_index] & X86_FLAGS_P) == 0) {
 		pml4[pml_indices.pml4_index] = pmm_alloc(1, 1) |
 									   (flags & PML4_FLAGS_MASK);
+		if (!pml4[pml_indices.pml4_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml3 =
@@ -245,6 +266,10 @@ static uint64_t *pml5_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((pml3[pml_indices.pml3_index] & X86_FLAGS_P) == 0) {
 		pml3[pml_indices.pml3_index] = pmm_alloc(1, 1) |
 									   (flags & PML3_FLAGS_MASK);
+		if (!pml3[pml_indices.pml3_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml2 =
@@ -259,6 +284,10 @@ static uint64_t *pml5_map_page(struct page_table *page_table, uint64_t vaddr,
 	if ((pml2[pml_indices.pml2_index] & X86_FLAGS_P) == 0) {
 		pml2[pml_indices.pml2_index] = pmm_alloc(1, 1) |
 									   (flags & PML2_FLAGS_MASK);
+		if (!pml2[pml_indices.pml2_index]) {
+			REPORT_ERROR;
+			panic("");
+		}
 	}
 
 	uint64_t *pml1 =

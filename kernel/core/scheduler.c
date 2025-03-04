@@ -48,6 +48,8 @@ int create_context(int cgid, struct context **context)
 	as_handle->asid = asid;
 
 	(*context)->handles = alloc(sizeof(struct handle_table));
+	if ((*context)->handles == NULL)
+		RETURN_ERROR;
 	handle_table_init((*context)->handles);
 
 	handle_t handle_out;
@@ -179,10 +181,14 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	size_t page_cnt = DIV_ROUNDUP(SCHEDULER_DEFAULT_QUEUE_SIZE, PAGE_SIZE);
 
 	uint64_t physical_base = pmm_alloc(page_cnt, 1);
+	if (!physical_base)
+		RETURN_ERROR;
 	uint64_t virtual_base = physical_base + HIGH_VMA;
 
 	char *enqueue_identifier =
 		alloc(strlen(identifier) + strlen("ENQUEUE ") + 1);
+	if (enqueue_identifier == NULL)
+		RETURN_ERROR;
 	sprint(enqueue_identifier, "ENQUEUE %s", identifier);
 
 	struct portal_resp resp;
@@ -207,10 +213,14 @@ int sched_establish_shared_link(struct context *scheduler_context,
 	cpu_local->thread_enqueue_link = (void *)(physical_base + HIGH_VMA);
 
 	physical_base = pmm_alloc(page_cnt, 1);
+	if (!physical_base)
+		RETURN_ERROR;
 	virtual_base = physical_base + HIGH_VMA;
 
 	char *backqueue_identifier =
 		alloc(strlen(identifier) + strlen("BACKQUEUE ") + 1);
+	if (backqueue_identifier == NULL)
+		RETURN_ERROR;
 	sprint(backqueue_identifier, "BACKQUEUE %s", identifier);
 
 	req = (struct portal_req) {
@@ -424,6 +434,8 @@ int sched_dequeue_context(struct context *scheduling_context,
 
 	struct sched_queue_config_set *config =
 		(void *)(pmm_alloc(1, 1) + HIGH_VMA);
+	if (config == (void *)HIGH_VMA)
+		RETURN_ERROR;
 	memcpy(config, config_set,
 		   sizeof(struct sched_queue_config_set) +
 			   config_set->cnt * sizeof(struct sched_queue_config));
@@ -450,6 +462,8 @@ int sched_enqueue_context(struct context *scheduling_context,
 
 	struct sched_queue_config_set *config =
 		(void *)(pmm_alloc(1, 1) + HIGH_VMA);
+	if (config == (void *)HIGH_VMA)
+		RETURN_ERROR;
 	memcpy(config, config_set,
 		   sizeof(struct sched_queue_config_set) +
 			   config_set->cnt * sizeof(struct sched_queue_config));

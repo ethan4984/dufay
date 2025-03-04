@@ -131,16 +131,27 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 
 				if (page->frame == NULL) {
 					page->frame = alloc(sizeof(struct frame));
+					if (page->frame == NULL)
+						RETURN_ERROR;
+
 					page->frame->paddr = pmm_alloc(1, 1);
+					if (!page->frame->paddr)
+						RETURN_ERROR;
 					page->frame->refcnt = 1;
 					page->vaddr = vaddr;
 				} else
 					page->frame->refcnt++;
 			} else {
 				page = alloc(sizeof(struct page));
+				if (page == NULL)
+					RETURN_ERROR;
 
 				page->frame = alloc(sizeof(struct frame));
+				if (page->frame == NULL)
+					RETURN_ERROR;
 				page->frame->paddr = pmm_alloc(1, 1);
+				if (!page->frame->paddr)
+					RETURN_ERROR;
 				page->frame->refcnt = 1;
 				page->vaddr = vaddr;
 			}
@@ -202,7 +213,11 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 			frame = original_frame;
 		else {
 			page->frame = alloc(sizeof(struct frame));
+			if (page->frame == NULL)
+				RETURN_ERROR;
 			new_frame = pmm_alloc(1, 1);
+			if (!new_frame)
+				RETURN_ERROR;
 			memcpy((void *)new_frame + HIGH_VMA,
 				   (void *)original_frame + HIGH_VMA, PAGE_SIZE);
 		}
@@ -216,6 +231,8 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 
 	page->frame->paddr = new_frame;
 	page->refcnt = alloc(sizeof(page->refcnt));
+	if (page->refcnt == NULL)
+		RETURN_ERROR;
 	*page->refcnt = 1;
 
 	return 0;
@@ -235,6 +252,8 @@ static int portal_handle_direct(struct portal *portal, struct portal_req *req,
 		uint64_t permissions = portal_translate_protections(req->prot);
 
 		struct page *page = alloc(sizeof(struct page));
+		if (page == NULL)
+			RETURN_ERROR;
 
 		portal->page_table->map_page(portal->page_table, vaddr, paddr,
 									 permissions);
@@ -280,6 +299,8 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 
 	for (size_t i = 0; i < req->morphology.pcnt; i++) {
 		struct page *page = alloc(sizeof(struct page));
+		if (page == NULL)
+			RETURN_ERROR;
 
 		page->vaddr = vaddr;
 		if (paddr)
@@ -289,6 +310,8 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 		page->pmle = portal->page_table->page_entry(portal->page_table,
 													vaddr + i * PAGE_SIZE);
 		page->refcnt = alloc(sizeof(page->refcnt));
+		if (page->refcnt == NULL)
+			RETURN_ERROR;
 
 		int ret = hash_table_push(portal->page_table->pages, &page->vaddr, page,
 								  sizeof(page->vaddr));
@@ -316,10 +339,16 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 		RETURN_ERROR;
 	if (orb == NULL && req->share.create) {
 		orb = alloc(sizeof(struct gateway_orb));
+		if (orb == NULL)
+			RETURN_ERROR;
 
 		orb->identifier = alloc(strlen(req->share.identifier) + 1);
+		if (orb->identifier == NULL)
+			RETURN_ERROR;
 		orb->page_cnt = DIV_ROUNDUP(req->morphology.length, PAGE_SIZE);
 		orb->pages = alloc(sizeof(struct page) * orb->page_cnt);
+		if (orb->pages == NULL)
+			RETURN_ERROR;
 
 		strcpy((void *)orb->identifier, req->share.identifier);
 
@@ -594,6 +623,8 @@ int portal(struct portal_req *req, struct portal_resp *resp)
 		RETURN_ERROR;
 
 	struct portal *portal = alloc(sizeof(struct portal));
+	if (portal == NULL)
+		RETURN_ERROR;
 
 	portal->base = req->morphology.addr;
 	portal->limit = req->morphology.length;

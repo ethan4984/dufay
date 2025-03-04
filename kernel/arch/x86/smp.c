@@ -7,10 +7,11 @@
 
 #include <core/mm/physical.h>
 #include <core/mm/virtual.h>
+#include <core/debug.h>
 
 #include <fayt/string.h>
-#include <core/debug.h>
 #include <fayt/lock.h>
+#include <fayt/debug.h>
 
 #include <acpi/madt.h>
 
@@ -76,6 +77,10 @@ static void chain_aps()
 		&logical_processor_locales[logical_processor_cnt];
 
 	cpu_local->kernel_stack = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	if (!cpu_local->kernel_stack) {
+		REPORT_ERROR;
+		panic("");
+	}
 	cpu_local->apic_id = madt0->apic_id;
 
 	if (cpu_local->apic_id == (xapic_read(XAPIC_ID_REG_OFF) >> 24)) {
@@ -124,6 +129,10 @@ void boot_aps(void)
 	bootable_processor_cnt = madt_ent0_list.length;
 	logical_processor_locales =
 		alloc(sizeof(struct cpu_local) * (bootable_processor_cnt + 1));
+	if (logical_processor_locales == NULL) {
+		REPORT_ERROR;
+		panic("");
+	}
 
 	chain_aps();
 }

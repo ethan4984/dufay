@@ -1,7 +1,9 @@
 #include <arch/x86/cpu.h>
 
 #include <core/mm/physical.h>
+
 #include <fayt/slab.h>
+#include <fayt/debug.h>
 
 struct segment_descriptor {
 	uint16_t limit;
@@ -62,6 +64,10 @@ struct gdt {
 void gdt_init(void)
 {
 	struct gdt *gdt = alloc(sizeof(struct gdt));
+	if (gdt == NULL) {
+		REPORT_ERROR;
+		panic("");
+	}
 
 	gdt->code16.limit = 0xffff;
 	gdt->code16.access = 0b10011010;
@@ -92,10 +98,26 @@ void gdt_init(void)
 	gdt->user_code64.granularity = 0b00100000;
 
 	struct tss *tss = alloc(sizeof(struct tss));
+	if (tss == NULL) {
+		REPORT_ERROR;
+		panic("");
+	}
 
 	tss->rsp0 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	if (!tss->rsp0) {
+		REPORT_ERROR;
+		panic("");
+	}
 	tss->rsp1 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	if (!tss->rsp1) {
+		REPORT_ERROR;
+		panic("");
+	}
 	tss->rsp2 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	if (!tss->rsp2) {
+		REPORT_ERROR;
+		panic("");
+	}
 
 	gdt->tss_descriptor.length = 104;
 	gdt->tss_descriptor.base_low = (uintptr_t)tss & 0xffff;

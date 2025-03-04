@@ -372,7 +372,8 @@ int pci(struct pci_server_meta *server_meta)
 			PAGE_SIZE);
 
 		uintptr_t addr;
-		int ret = as_vmem_allocate(CAPABILITY_SELF_AS, &addr, page_cnt * PAGE_SIZE);
+		int ret =
+			as_vmem_allocate(CAPABILITY_SELF_AS, &addr, page_cnt * PAGE_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to map configuration space for segment=%d\n",
 				  mcfg_entry->segment);

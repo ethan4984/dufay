@@ -57,6 +57,8 @@ int message_init()
 int message_send(struct message_header *message, struct context *context)
 {
 	struct kernel_message *msg = alloc(sizeof(struct kernel_message));
+	if (msg == NULL)
+		RETURN_ERROR;
 	uint8_t dest_rights = 0, reply_rights = 0;
 
 	struct port *destination =
@@ -73,6 +75,8 @@ int message_send(struct message_header *message, struct context *context)
 		RETURN_ERROR;
 
 	msg->header = alloc(message->size);
+	if (msg->header == NULL)
+		RETURN_ERROR;
 
 	memcpy(msg->header, message, message->size);
 

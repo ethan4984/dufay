@@ -27,6 +27,8 @@ int object_new(void **out, uint8_t class)
 
 	struct object_header *newobj =
 		alloc(sizeof(struct object_header) + obj_class.size);
+	if (newobj == NULL)
+		RETURN_ERROR;
 
 	*out = ((char *)newobj) + sizeof(struct object_header);
 

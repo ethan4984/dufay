@@ -133,6 +133,8 @@ static int notification_ucontext_instantiate(struct context *context,
 
 	ucontext->stack = ustack;
 	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
+	if (ucontext->fpu_context == NULL)
+		RETURN_ERROR;
 
 	ucontext->regs.ss = 0x3b;
 	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
@@ -184,11 +186,15 @@ int notification_queue(struct context *sender, struct context *target, int not,
 
 	struct notification_queue *queue = target->notification.queue;
 	struct notification *notification = alloc(sizeof(struct notification));
+	if (notification == NULL)
+		RETURN_ERROR;
 
 	notification->refcnt = 1;
 	notification->notnum = not;
 	notification->weight = weight;
 	notification->info = alloc(sizeof(struct notification_info));
+	if (notification->info == NULL)
+		RETURN_ERROR;
 	notification->queue = queue;
 	notification->source = sender;
 
@@ -209,8 +215,12 @@ int notification_queue(struct context *sender, struct context *target, int not,
 
 	if (weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+		if (ucontext == NULL)
+			RETURN_ERROR;
 
 		ucontext->etrigger = alloc(sizeof(struct etrigger));
+		if (ucontext->etrigger == NULL)
+			RETURN_ERROR;
 		ucontext->etrigger->ucontext = ucontext;
 		ucontext->context = target;
 		ucontext->notification = notification;
@@ -250,10 +260,14 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 		RETURN_ERROR;
 
 	struct notification *notification = alloc(sizeof(struct notification));
+	if (notification == NULL)
+		RETURN_ERROR;
 
 	uint64_t paddr = 0;
 	if (vaddr && page_cnt) {
 		paddr = pmm_alloc(page_cnt, 1);
+		if (!paddr)
+			RETURN_ERROR;
 		x86_map_page(context->address_space->page_table, vaddr, paddr,
 					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
 		notification->parameter.paddr = paddr;
@@ -264,6 +278,8 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 	notification->notnum = bridge->not;
 	notification->weight = bridge->weight;
 	notification->info = alloc(sizeof(struct notification_info));
+	if (notification->info == NULL)
+		RETURN_ERROR;
 	notification->queue = queue;
 	notification->active = false;
 	notification->source = context;
@@ -394,8 +410,12 @@ int notification_dispatch(struct context *context)
 		}
 
 		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
+		if (ucontext == NULL)
+			RETURN_ERROR;
 
 		ucontext->etrigger = alloc(sizeof(struct etrigger));
+		if (ucontext->etrigger == NULL)
+			RETURN_ERROR;
 		ucontext->etrigger->ucontext = ucontext;
 		ucontext->notification = notification;
 		ucontext->ready = true;
@@ -464,6 +484,8 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 		RETURN_ERROR;
 
 	struct ustack *new_stack = alloc(sizeof(struct ustack));
+	if (new_stack == NULL)
+		RETURN_ERROR;
 
 	new_stack->user_stack.sp = (uintptr_t)sp;
 	new_stack->user_stack.size = sp_size;
@@ -471,6 +493,8 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 		(uintptr_t)pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE),
 							 1) +
 		CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
+	if (!new_stack->kernel_stack.sp)
+		RETURN_ERROR;
 	new_stack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
 	new_stack->active = 0;
 

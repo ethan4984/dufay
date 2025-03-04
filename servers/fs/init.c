@@ -39,7 +39,8 @@ int main(struct pci_info *pci_info)
 	constexpr int NOTIFICATION_STACK_SIZE = 0x10000;
 	for (int i = 0; i < 16; i++) {
 		uintptr_t addr;
-		int ret = as_vmem_allocate(CAPABILITY_SELF_AS, &addr, NOTIFICATION_STACK_SIZE);
+		int ret = as_vmem_allocate(CAPABILITY_SELF_AS, &addr,
+								   NOTIFICATION_STACK_SIZE);
 		if (ret == -1) {
 			print("ERROR: failed to allocate address for stack\n");
 			goto failure;

@@ -49,6 +49,8 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 	struct sched_queue_config_set *queue_set =
 		alloc(sizeof(struct sched_queue_config_set) +
 			  context_unblocked.length * sizeof(struct sched_queue_config));
+	if (queue_set == NULL)
+		RETURN_ERROR;
 
 	queue_set->cnt = 0;
 	for (int i = 0; i < context_unblocked.length; i++) {
@@ -97,6 +99,8 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 	struct sched_queue_config_set *queue_set =
 		alloc(sizeof(struct sched_queue_config_set) +
 			  sizeof(struct sched_queue_config));
+	if (queue_set == NULL)
+		RETURN_ERROR;
 
 	queue_set->cnt = 1;
 	*queue_set->config =
