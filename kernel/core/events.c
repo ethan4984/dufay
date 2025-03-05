@@ -58,7 +58,7 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 		if (context == NULL)
 			continue;
 
-		//print("event_wake: requeuing %s\n", context->comms.server);
+		//print("event_wake: requeuing cid=%x\n", context->comms.proc_id.cid);
 
 		queue_set->config[i] =
 			(struct sched_queue_config){ .proc_id = context->comms.proc_id };

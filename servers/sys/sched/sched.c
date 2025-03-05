@@ -235,6 +235,8 @@ exit:
 			continue;
 		}
 
+		//print("requeueing thread cid=%x\n", thread->proc_id.cid);
+
 		ret = RB_GENERIC_INSERT(thread_tree, vruntime, thread);
 		if (ret == -1) {
 			REPORT_ERROR;
@@ -270,6 +272,8 @@ static void notify_dequeue_thread(struct notification_info *, void *data, int)
 									sizeof(config->proc_id), (void **)&thread);
 		if (ret == -1 || thread == NULL)
 			continue;
+
+		//print("dequeueing thread cid=%x\n", thread->proc_id.cid);
 
 		ret = RB_GENERIC_DELETE(thread_tree, vruntime, thread);
 		if (ret == -1)

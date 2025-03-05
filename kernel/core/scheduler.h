@@ -91,8 +91,6 @@ struct ucontext {
 	} sysctx;
 
 	struct notification *notification;
-	int ready;
-	int delivered;
 
 	struct context *context;
 

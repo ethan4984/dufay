@@ -51,7 +51,7 @@ static int notification_pop(struct notification_queue *queue,
 	int i = 0;
 	for (; i < NOTIFICATION_PENDING_CAPACITY; i++) {
 		if (queue->queue[NOTIFICATION_INDEX(not)][i] &&
-			queue->queue[NOTIFICATION_INDEX(not)][i]->active)
+			queue->queue[NOTIFICATION_INDEX(not)][i]->serviceable)
 			goto finish;
 	}
 	*notification = NULL;
@@ -176,8 +176,8 @@ static int notification_ucontext_instantiate(struct context *context,
 }
 
 int notification_queue(struct context *sender, struct context *target, int not,
-					   int weight, int ready, uintptr_t vaddr, uint64_t paddr,
-					   int page_cnt)
+					   int weight, int serviceable, uintptr_t vaddr,
+					   uint64_t paddr, int page_cnt)
 {
 	if (target == NULL || notification_is_valid(not) == -1)
 		RETURN_ERROR;
@@ -224,7 +224,7 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		ucontext->etrigger->ucontext = ucontext;
 		ucontext->context = target;
 		ucontext->notification = notification;
-		ucontext->ready = ready;
+		ucontext->notification->serviceable = serviceable;
 
 		int ret = UCONTEXT_PUSH(target, ucontext);
 		if (ret == -1) {
@@ -281,7 +281,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 	if (notification->info == NULL)
 		RETURN_ERROR;
 	notification->queue = queue;
-	notification->active = false;
+	notification->serviceable = false;
 	notification->source = context;
 
 	ret = notification_push(queue, notification);
@@ -310,7 +310,7 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge *, bridge, {
 	if (notification == NULL)
 		return -1;
 
-	notification->active = true;
+	notification->serviceable = true;
 
 	if (bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS ||
 		bridge->weight & NOTIFY_WEIGHT_TICK) {
@@ -333,11 +333,11 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge *, bridge, {
 			RETURN_ERROR;
 
 		for (;;) {
-			//print("broadcast: blocking on %s\n", context->comms.server);
+			//print("broadcast: blocking on cid=%x\n", context->comms.proc_id.cid);
 			int ret = equeue_block(&equeue, NULL);
 			if (ret == -1)
 				RETURN_ERROR;
-			//print("broadcast: unblocking on %s\n", context->comms.server);
+			//print("broadcast: unblocking on cid=%x\n", context->comms.proc_id.cid);
 			if (!ucontext->blocking && notification->done)
 				break; // think of a better way to solve this
 		}
@@ -365,7 +365,8 @@ int notification_dispatch(struct context *context)
 
 	struct ucontext *top = context->ucontext_top;
 
-	if (top->notification && top->ready && !top->delivered) {
+	if (top->notification && top->notification->serviceable &&
+		!top->notification->serviced) {
 		struct notification_action *action =
 			&context->notification
 				 .actions[context->ucontext_top->notification->notnum - 1];
@@ -378,6 +379,9 @@ int notification_dispatch(struct context *context)
 			RETURN_ERROR;
 		}
 
+		top->notification->serviceable = false;
+		top->notification->serviced = true;
+
 		for (int i = 0; i < NOTIFICATION_PENDING_CAPACITY; i++) {
 			if (queue->queue[NOTIFICATION_INDEX(top->notification->notnum)][i] ==
 				top->notification) {
@@ -387,6 +391,7 @@ int notification_dispatch(struct context *context)
 		}
 
 		spinrelease(&queue->lock);
+
 		return 0;
 	}
 
@@ -418,8 +423,10 @@ int notification_dispatch(struct context *context)
 			RETURN_ERROR;
 		ucontext->etrigger->ucontext = ucontext;
 		ucontext->notification = notification;
-		ucontext->ready = true;
 		ucontext->context = context;
+
+		ucontext->notification->serviceable = false;
+		ucontext->notification->serviced = true;
 
 		ret = notification_ucontext_instantiate(context, ucontext, notification,
 												action);
@@ -437,10 +444,12 @@ int notification_dispatch(struct context *context)
 		context->ucontext_top = ucontext;
 
 		spinrelease(&queue->lock);
+
 		return 0;
 	}
 
 	spinrelease(&queue->lock);
+
 	return 0;
 }
 
@@ -543,6 +552,8 @@ SYSCALL_DEFINE0(notification_return, {
 
 	spinlock_irqsave(&CORE_LOCAL->sched_lock);
 
+	// REFINE AND STREAMLINE HOW WE INDICIATE WHETHER OR NOT A NOTIFICATION HAS BEEN SERVICED/FINISHED
+
 	struct context *rcontext = current_ucontext->notification->source ?
 								   current_ucontext->notification->source :
 								   CORE_LOCAL->scheduling_context;
@@ -551,7 +562,9 @@ SYSCALL_DEFINE0(notification_return, {
 		struct ucontext *rucontext = rcontext->ucontext_top;
 
 		for (; rucontext;) {
-			if (rucontext->notification && !rucontext->delivered) {
+			if (rucontext->notification &&
+				rucontext->notification->serviceable &&
+				!rucontext->notification->serviced) {
 				if (rucontext->notification->weight ==
 					NOTIFY_WEIGHT_INSTANTANEOUS)
 					goto finish;
@@ -571,15 +584,15 @@ finish:
 		RETURN_ERROR;
 
 	if (rucontext->notification)
-		rucontext->delivered = true;
+		rucontext->notification->serviced = true;
 
 	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
 
-	//print(
-	//	"notification_return: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
-	//	current_context->comms.server, rcontext->comms.server,
-	//	rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
-	//	current_ucontext->notification ? 'T' : 'F');
+	//	print(
+	//		"notification_return: current ctx [cid=%x] going to [cid=%x] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
+	//		current_context->comms.proc_id.cid, rcontext->comms.proc_id.cid,
+	//		rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
+	//		current_ucontext->notification ? 'T' : 'F');
 
 	current_ucontext->stack->active = false;
 	current_ucontext->notification->done = true;
@@ -588,8 +601,8 @@ finish:
 		RETURN_ERROR;
 
 	//print(
-	//	"notification_return: ESCAPED DESTROY: current ctx [%s] going to [%s] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
-	//	current_context->comms.server, rcontext->comms.server,
+	//	"notification_return: ESCAPED DESTROY: current ctx [%x] going to [%x] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
+	//	current_context->comms.proc_id.cid, rcontext->comms.proc_id.cid,
 	//	rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
 	//	current_ucontext->notification ? 'T' : 'F');
 

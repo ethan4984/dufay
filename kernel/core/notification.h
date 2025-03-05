@@ -20,12 +20,18 @@ struct notification_parameter {
 	int share;
 };
 
+//	WE NEED SOME FLAGS TO INDICATE WHETHER OR NOT A NOTIFICATION HAS BEEN
+//	SERVICED, WHETHER OR NOT IT HAS BEEN FINISHED, WHETHER OR NOT IT IS READY
+//	TO BE SERVICED.
+
 struct ucontext;
 struct notification_queue;
 struct notification {
 	int refcnt;
 	int notnum;
 	int weight;
+	int serviced;
+	int serviceable;
 	int done;
 
 	struct notification_parameter parameter;
@@ -35,8 +41,6 @@ struct notification {
 
 	VECTOR(struct etrigger *) etrigger;
 	struct context *source;
-
-	bool active;
 };
 
 struct notification_queue {

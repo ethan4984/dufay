@@ -128,27 +128,6 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext)
 	if (context == NULL || ucontext == NULL)
 		RETURN_ERROR;
 
-	struct notification *notification = ucontext->notification;
-	if (notification) {
-		struct context *current_context = CORE_LOCAL->current_context;
-		if (current_context == NULL)
-			RETURN_ERROR;
-
-		struct ucontext *current_ucontext = current_context->ucontext_active;
-		if (current_ucontext == NULL)
-			RETURN_ERROR;
-
-		for (int i = 0; i < notification->etrigger.length; i++) {
-			struct etrigger *etrigger = notification->etrigger.data[i];
-			if (etrigger == NULL)
-				continue;
-
-			int ret = equeue_wake(etrigger, current_ucontext);
-			if (ret == -1)
-				RETURN_ERROR;
-		}
-	}
-
 	if (context->ucontext_top == ucontext)
 		context->ucontext_top = ucontext->last;
 	if (context->ucontext_queue == ucontext)
@@ -170,6 +149,27 @@ int destroy_ucontext(struct context *context, struct ucontext *ucontext)
 	}
 
 	ucontext->stack->active = false;
+
+	struct notification *notification = ucontext->notification;
+	if (notification) {
+		struct context *current_context = CORE_LOCAL->current_context;
+		if (current_context == NULL)
+			RETURN_ERROR;
+
+		struct ucontext *current_ucontext = current_context->ucontext_active;
+		if (current_ucontext == NULL)
+			RETURN_ERROR;
+
+		for (int i = 0; i < notification->etrigger.length; i++) {
+			struct etrigger *etrigger = notification->etrigger.data[i];
+			if (etrigger == NULL)
+				continue;
+
+			int ret = equeue_wake(etrigger, current_ucontext);
+			if (ret == -1)
+				RETURN_ERROR;
+		}
+	}
 
 	return 0;
 }
@@ -353,7 +353,26 @@ void reschedule(struct registers *regs, void *)
 	struct context *next_context = NULL;
 	struct ucontext *next_ucontext = NULL;
 
-	fetch_context(&next_context, &next_ucontext);
+	int ret = fetch_context(&next_context, &next_ucontext);
+	if (unlikely(ret == -1)) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	struct handle_binding *handle_binding =
+		handle_lookup(next_context->handles, CAPABILITY_SELF_SCHED);
+	if (unlikely(handle_binding == NULL)) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	struct notification_channel_handle *channel_handle = handle_binding->obj;
+	if (channel_handle == NULL) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	channel_handle->proc_id = CORE_LOCAL->scheduling_context->comms.proc_id;
 
 	void **fpu_context;
 	struct registers *r;
