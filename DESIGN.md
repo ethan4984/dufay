@@ -3,6 +3,7 @@
 2. [Notifications](#notifications)
 3. [Memory Portals](#memory-portals)
 4. [Events](#events)
+5. [Capabilities](#capabilities)
 
 # Scheduling
 
@@ -12,9 +13,11 @@ We utilise a per-processor scheduling server that interacts with the kernel over
 
 To allow for efficent load-balancing and communication between schedulers, information and metadata are exchanged between servers via a protal link. Where the servers `processor_id` acts as an index into shared memory which points to its respective metadata structure. 
 
-The notifications `NOT_SCHED_ENQUEUE` and `NOT_SCHED_DEQUEUE` allow for the enqueuing and dequeuing of threads owned by a scheduler server. When a `NOT_SCHED_ENQUEUE` notification is invoked, it can trigger an additional notification to off-load the thread to another server to ensure balanced load between processors.
+The notifications `NOT_SCHED_ENQUEUE` and `NOT_SCHED_DEQUEUE` allow for the enqueuing and dequeuing of threads owned by a scheduling server. When `NOT_SCHED_ENQUEUE` is invoked, it can trigger an additional notification to off-load the thread to another server to ensure balanced load between processors.
 
 A thread is represented by a `context`, and a `context` is in essence just a set of states all unified around a single address space. These states are referred to as `ucontexts`. These `ucontexts` are maintained in the form a priority queue, that we pop from when possible to get the next schedulable ucontext. This allows for a dynamic morphology of threading. When you are blocking a thread, you are really just blocking on the active `ucontext` of that thread.
+
+A context is exposed to userspace in the form of a [capability](#capabilities).
 
 # Notifications
 
@@ -119,4 +122,10 @@ for(a; b; c) {
 }
 ```
 
-You add trigger sources to the queue. Then you block on the queue and the active ucontext is dequeued. If unblocked by a trigger, it will confirm that the condition of interest has been satisfied, if not it will block again. Depending on your morphology of queues and triggers, near any configuration of blocking is possible.
+You add trigger sources to the queue. Then you block on the queue and the active ucontext is dequeued. If unblocked by a trigger, it will confirm that the condition of interest has been satisfied, if not it will block again. Depending on your morphology of queues and triggers, near any configuration of blocking is possible. This interface is exposed to userspace in the form of futexes
+
+# Capabilities
+
+A capability represents the ability to perform an action on a resource with some privilege. They are analogous to file descriptors, capabilities are exposed to userspace in the form of discrete integers, with each context having its own table of capabilities. 
+
+
