@@ -3,7 +3,7 @@
 
 #include <arch/x86/cpu.h>
 
-#include <core/handle.h>
+#include <core/capability.h>
 #include <core/events.h>
 #include <core/mm/address.h>
 
@@ -145,7 +145,7 @@ struct context {
 		struct sched_proc_id proc_id;
 	} comms;
 
-	struct handle_table *handles;
+	struct capability_table *handles;
 
 	struct context *next;
 	struct context *last;

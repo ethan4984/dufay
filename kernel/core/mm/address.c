@@ -2,7 +2,7 @@
 
 #include <core/mm/address.h>
 #include <core/syscall.h>
-#include <core/handle.h>
+#include <core/capability.h>
 
 #include <fayt/compiler.h>
 #include <fayt/debug.h>
@@ -134,7 +134,7 @@ int address_space_free(struct address_space *as, uintptr_t address,
 	return 0;
 }
 
-SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
+SYSCALL_DEFINE4(as_action, capability_t, handle, int, ops, uintptr_t *, address,
 				size_t, length, ({
 					struct context *current_context =
 						CORE_LOCAL->current_context;
@@ -144,8 +144,8 @@ SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
 					struct address_space_handle *as_handle = NULL;
 					if (ops != AS_ACTION_CONSTRUCT) {
 						as_handle = ({
-							struct handle_binding *binding =
-								handle_lookup(current_context->handles, handle);
+							struct capability_binding *binding =
+								capability_lookup(current_context->handles, handle);
 							if (binding == NULL)
 								RETURN_ERROR;
 							binding->obj;
@@ -167,8 +167,8 @@ SYSCALL_DEFINE4(as_action, handle_t, handle, int, ops, uintptr_t *, address,
 
 						as_handle->asid = asid;
 
-						handle_t handle;
-						ret = handle_create(
+						capability_t handle;
+						ret = capability_create(
 							current_context->handles, as_handle,
 							HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle);
 						if (ret == -1)

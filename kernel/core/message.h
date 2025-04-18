@@ -1,6 +1,6 @@
 #ifndef MESSAGE_H_
 #define MESSAGE_H_
-#include <core/handle.h>
+#include <core/capability.h>
 #include <core/scheduler.h>
 #include <stddef.h>
 #include <sys/queue.h>
@@ -15,8 +15,8 @@
 // They are a more lightweight alternatives to notifications intended for
 // simpler message-passing
 struct message_header {
-	handle_t destination; // Whom to send the message to
-	handle_t reply; // A SEND or SEND-ONCE right that is sent along with the
+	capability_t destination; // Whom to send the message to
+	capability_t reply; // A SEND or SEND-ONCE right that is sent along with the
 		// message, to allow for reply
 
 	size_t size;
@@ -42,7 +42,7 @@ struct port {
 int message_init();
 
 int message_send(struct message_header *message, struct context *context);
-int message_receive(handle_t port, struct message_header *out,
+int message_receive(capability_t port, struct message_header *out,
 					struct context *context);
 
 #endif

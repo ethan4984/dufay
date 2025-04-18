@@ -3,7 +3,7 @@
 #include <core/syscall.h>
 #include <core/debug.h>
 #include <core/events.h>
-#include <core/handle.h>
+#include <core/capability.h>
 #include <core/message.h>
 #include <core/object.h>
 
@@ -13,10 +13,10 @@
 
 #include <sys/queue.h>
 
-static struct port *lookup_port(handle_t port, struct context *ctx,
+static struct port *lookup_port(capability_t port, struct context *ctx,
 								uint8_t *rights)
 {
-	struct handle_binding *binding = handle_lookup(ctx->handles, port);
+	struct capability_binding *binding = capability_lookup(ctx->handles, port);
 
 	if (!binding)
 		return NULL;
@@ -93,7 +93,7 @@ int message_send(struct message_header *message, struct context *context)
 	return 0;
 }
 
-int message_receive(handle_t port, struct message_header *out,
+int message_receive(capability_t port, struct message_header *out,
 					struct context *context)
 {
 	uint8_t rights;
@@ -127,7 +127,7 @@ int message_receive(handle_t port, struct message_header *out,
 	return 0;
 }
 
-SYSCALL_DEFINE2(msg_recv, handle_t, port, struct message_header *, out, {
+SYSCALL_DEFINE2(msg_recv, capability_t, port, struct message_header *, out, {
 	return message_receive(port, out, CORE_LOCAL->current_context);
 });
 

@@ -1,14 +1,14 @@
 #ifndef BCACHE_H_
 #define BCACHE_H_
 
-#include <core/handle.h>
+#include <core/capability.h>
 
 #include <fayt/rb_tree.h>
 
 struct blk;
 struct bcache {
 	struct blk *blk_tree;
-	struct handle_binding *handle_binding;
+	struct capability_binding *capability_binding;
 };
 
 struct blk {

@@ -501,15 +501,15 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 		panic("DUFAY: core local corrupt");
 
 	struct address_space *source_address_space = ({
-		struct handle_binding *handle_binding =
-			handle_lookup(current_context->handles, req->cow.source.handle);
-		handle_binding->obj;
+		struct capability_binding *capability_binding =
+			capability_lookup(current_context->handles, req->cow.source.capability);
+		capability_binding->obj;
 	});
 
 	struct address_space *destination_address_space = ({
-		struct handle_binding *handle_binding =
-			handle_lookup(current_context->handles, req->cow.source.handle);
-		handle_binding->obj;
+		struct capability_binding *capability_binding =
+			capability_lookup(current_context->handles, req->cow.source.capability);
+		capability_binding->obj;
 	});
 
 	struct page_table *source_table = source_address_space->page_table;

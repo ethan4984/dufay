@@ -1,4 +1,4 @@
-#include "core/handle.h"
+#include "core/capability.h"
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 #include <arch/x86/apic.h>
@@ -47,17 +47,17 @@ int create_context(int cgid, struct context **context)
 
 	as_handle->asid = asid;
 
-	(*context)->handles = alloc(sizeof(struct handle_table));
+	(*context)->handles = alloc(sizeof(struct capability_table));
 	if ((*context)->handles == NULL)
 		RETURN_ERROR;
-	handle_table_init((*context)->handles);
+	capability_table_init((*context)->handles);
 
-	handle_t handle_out;
-	ret = handle_create((*context)->handles, as_handle,
-						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle_out);
+	capability_t capability_out;
+	ret = capability_create((*context)->handles, as_handle,
+						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &capability_out);
 	if (ret == -1)
 		RETURN_ERROR;
-	if (handle_out != CAPABILITY_SELF_AS) {
+	if (capability_out != CAPABILITY_SELF_AS) {
 		REPORT_ERROR;
 		panic("");
 	}
@@ -67,11 +67,11 @@ int create_context(int cgid, struct context **context)
 	if (notification_channel_handle == NULL)
 		RETURN_ERROR;
 
-	ret = handle_create((*context)->handles, notification_channel_handle,
-						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle_out);
+	ret = capability_create((*context)->handles, notification_channel_handle,
+						HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &capability_out);
 	if (ret == -1)
 		RETURN_ERROR;
-	if (handle_out != CAPABILITY_SELF_SCHED) {
+	if (capability_out != CAPABILITY_SELF_SCHED) {
 		REPORT_ERROR;
 		panic("");
 	}
@@ -359,14 +359,14 @@ void reschedule(struct registers *regs, void *)
 		panic("");
 	}
 
-	struct handle_binding *handle_binding =
-		handle_lookup(next_context->handles, CAPABILITY_SELF_SCHED);
-	if (unlikely(handle_binding == NULL)) {
+	struct capability_binding *capability_binding =
+		capability_lookup(next_context->handles, CAPABILITY_SELF_SCHED);
+	if (unlikely(capability_binding == NULL)) {
 		REPORT_ERROR;
 		panic("");
 	}
 
-	struct notification_channel_handle *channel_handle = handle_binding->obj;
+	struct notification_channel_handle *channel_handle = capability_binding->obj;
 	if (channel_handle == NULL) {
 		REPORT_ERROR;
 		panic("");

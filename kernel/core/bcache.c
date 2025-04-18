@@ -1,7 +1,7 @@
 #include <arch/x86/smp.h>
 
 #include <core/bcache.h>
-#include <core/handle.h>
+#include <core/capability.h>
 #include <core/syscall.h>
 
 #include <fayt/debug.h>
@@ -11,23 +11,23 @@
 
 static struct hash_table bcache_table;
 
-static int bcache_register(handle_t handle)
+static int bcache_register(capability_t handle)
 {
 	return 0;
 }
 
-static int bcache_lookup(handle_t handle, struct bcache **bcache)
+static int bcache_lookup(capability_t handle, struct bcache **bcache)
 {
 	if (bcache == NULL)
 		RETURN_ERROR;
 
-	struct handle_binding *handle_binding =
-		handle_lookup(CORE_LOCAL->current_context->handles, handle);
-	if (handle_binding == NULL)
+	struct capability_binding *capability_binding =
+		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+	if (capability_binding == NULL)
 		RETURN_ERROR;
 
-	int ret = hash_table_search(&bcache_table, handle_binding,
-								sizeof(struct handle_binding), (void **)bcache);
+	int ret = hash_table_search(&bcache_table, capability_binding,
+								sizeof(struct capability_binding), (void **)bcache);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -40,7 +40,7 @@ static int bcache_lookup_blk(struct bcache *bcache, size_t lba_start,
 	if (bcache == NULL || blk == NULL)
 		RETURN_ERROR;
 
-	struct blk_handle *blk_handle = bcache->handle_binding->obj;
+	struct blk_handle *blk_handle = bcache->capability_binding->obj;
 	if (blk_handle == NULL)
 		RETURN_ERROR;
 
@@ -67,7 +67,7 @@ found:
 	return 0;
 }
 
-static int bcache_consult_read(handle_t handle, size_t offset, int count,
+static int bcache_consult_read(capability_t handle, size_t offset, int count,
 							   void *buffer)
 {
 	if (buffer == NULL)
@@ -78,10 +78,10 @@ static int bcache_consult_read(handle_t handle, size_t offset, int count,
 	if (ret == -1 || bcache == NULL)
 		RETURN_ERROR;
 
-	if ((bcache->handle_binding->access & HANDLE_ACCESS_READ) == 0)
+	if ((bcache->capability_binding->access & HANDLE_ACCESS_READ) == 0)
 		RETURN_ERROR;
 
-	struct blk_handle *blk_handle = bcache->handle_binding->obj;
+	struct blk_handle *blk_handle = bcache->capability_binding->obj;
 	if (blk_handle == NULL)
 		RETURN_ERROR;
 
@@ -127,7 +127,7 @@ static int bcache_consult_read(handle_t handle, size_t offset, int count,
 	return count;
 }
 
-static int bcache_consult_write(handle_t handle, size_t offset, int count,
+static int bcache_consult_write(capability_t handle, size_t offset, int count,
 								const void *buffer)
 {
 	if (buffer == NULL)
@@ -138,10 +138,10 @@ static int bcache_consult_write(handle_t handle, size_t offset, int count,
 	if (ret == -1 || bcache == NULL)
 		RETURN_ERROR;
 
-	if ((bcache->handle_binding->access & HANDLE_ACCESS_WRITE) == 0)
+	if ((bcache->capability_binding->access & HANDLE_ACCESS_WRITE) == 0)
 		RETURN_ERROR;
 
-	struct blk_handle *blk_handle = bcache->handle_binding->obj;
+	struct blk_handle *blk_handle = bcache->capability_binding->obj;
 	if (blk_handle == NULL)
 		RETURN_ERROR;
 
@@ -183,10 +183,10 @@ static int bcache_consult_write(handle_t handle, size_t offset, int count,
 	return count;
 }
 
-SYSCALL_DEFINE4(bcache_consult_read, handle_t, handle, size_t, offset, int,
+SYSCALL_DEFINE4(bcache_consult_read, capability_t, handle, size_t, offset, int,
 				count, void *, buffer,
 				{ bcache_consult_read(handle, offset, count, buffer); })
 
-SYSCALL_DEFINE4(bcache_consult_write, handle_t, handle, size_t, offset, int,
+SYSCALL_DEFINE4(bcache_consult_write, capability_t, handle, size_t, offset, int,
 				count, const void *, buffer,
 				{ bcache_consult_write(handle, offset, count, buffer); })

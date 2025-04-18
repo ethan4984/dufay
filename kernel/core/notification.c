@@ -7,7 +7,7 @@
 #include <core/mm/physical.h>
 #include <core/lock.h>
 #include <core/debug.h>
-#include <core/handle.h>
+#include <core/capability.h>
 
 #include <fayt/lock.h>
 #include <fayt/string.h>
@@ -76,8 +76,8 @@ static int bridge_to_destination(struct comm_bridge *bridge,
 		RETURN_ERROR;
 	struct context *context = CORE_LOCAL->current_context;
 
-	struct handle_binding *binding =
-		handle_lookup(context->handles, bridge->destination);
+	struct capability_binding *binding =
+		capability_lookup(context->handles, bridge->destination);
 	if (binding == NULL)
 		RETURN_ERROR;
 

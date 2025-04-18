@@ -4,21 +4,21 @@
 #include <core/object.h>
 #include <core/scheduler.h>
 #include <core/syscall.h>
-#include <core/handle.h>
+#include <core/capability.h>
 
 #include <fayt/debug.h>
 #include <fayt/string.h>
 #include <fayt/vector.h>
 
-void handle_table_init(struct handle_table *table)
+void capability_table_init(struct capability_table *table)
 {
 	VECTOR_INIT(table->values, 1);
 	table->bitmap.resizable = true;
 	table->bitmap.size = 64;
 }
 
-struct handle_binding *handle_lookup(struct handle_table *table,
-									 handle_t handle)
+struct capability_binding *capability_lookup(struct capability_table *table,
+									 capability_t handle)
 {
 	if (table->bitmap.size < handle || !table->bitmap.data) {
 		return NULL;
@@ -32,8 +32,8 @@ struct handle_binding *handle_lookup(struct handle_table *table,
 	return NULL;
 }
 
-int handle_create(struct handle_table *table, void *obj, uint8_t access,
-				  handle_t *out_handle)
+int capability_create(struct capability_table *table, void *obj, uint8_t access,
+				  capability_t *out_handle)
 {
 	size_t i;
 	int free_bit = -1;
@@ -44,7 +44,7 @@ int handle_create(struct handle_table *table, void *obj, uint8_t access,
 
 	*out_handle = free_bit;
 
-	VECTOR_INDEX(table->values, (struct handle_binding){}, *out_handle);
+	VECTOR_INDEX(table->values, (struct capability_binding){}, *out_handle);
 
 	table->values.data[free_bit].access = access;
 	table->values.data[free_bit].obj = obj;
@@ -54,12 +54,12 @@ int handle_create(struct handle_table *table, void *obj, uint8_t access,
 	return 0;
 }
 
-int handle_destroy(struct handle_table *table, handle_t handle)
+int capability_destroy(struct capability_table *table, capability_t handle)
 {
-	struct handle_binding *binding;
+	struct capability_binding *binding;
 
 	// This handle doesn't exist
-	if ((binding = handle_lookup(table, handle)) == NULL)
+	if ((binding = capability_lookup(table, handle)) == NULL)
 		return -1;
 
 	bitmap_free(&table->bitmap, handle);
@@ -72,12 +72,12 @@ int handle_destroy(struct handle_table *table, handle_t handle)
 // Creates an object and returns an handle to it
 SYSCALL_DEFINE2(create_obj, uint8_t, class, uint8_t, access, {
 	void *obj;
-	handle_t out_handle;
+	capability_t out_handle;
 
 	if (object_new(&obj, class) == -1)
 		RETURN_ERROR;
 
-	if (handle_create(CORE_LOCAL->current_context->handles, obj, access,
+	if (capability_create(CORE_LOCAL->current_context->handles, obj, access,
 					  &out_handle) == -1)
 		RETURN_ERROR;
 
@@ -85,10 +85,10 @@ SYSCALL_DEFINE2(create_obj, uint8_t, class, uint8_t, access, {
 });
 
 // Duplicates an handle with new permissions
-SYSCALL_DEFINE2(duplicate_obj, handle_t, handle, uint8_t, access, {
-	struct handle_binding *binding =
-		handle_lookup(CORE_LOCAL->current_context->handles, handle);
-	handle_t out_handle;
+SYSCALL_DEFINE2(duplicate_obj, capability_t, handle, uint8_t, access, {
+	struct capability_binding *binding =
+		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+	capability_t out_handle;
 
 	if (!binding)
 		RETURN_ERROR;
@@ -100,7 +100,7 @@ SYSCALL_DEFINE2(duplicate_obj, handle_t, handle, uint8_t, access, {
 
 	object_retain(binding->obj);
 
-	if (handle_create(CORE_LOCAL->current_context->handles, binding->obj,
+	if (capability_create(CORE_LOCAL->current_context->handles, binding->obj,
 					  access, &out_handle) == -1)
 		RETURN_ERROR;
 
@@ -108,15 +108,15 @@ SYSCALL_DEFINE2(duplicate_obj, handle_t, handle, uint8_t, access, {
 });
 
 // Destroys an handle
-SYSCALL_DEFINE1(destroy_obj, handle_t, handle, {
-	struct handle_binding *binding =
-		handle_lookup(CORE_LOCAL->current_context->handles, handle);
-	handle_t out_handle;
+SYSCALL_DEFINE1(destroy_obj, capability_t, handle, {
+	struct capability_binding *binding =
+		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+	capability_t out_handle;
 
 	if (!binding)
 		RETURN_ERROR;
 
-	if (handle_destroy(CORE_LOCAL->current_context->handles, handle) == -1)
+	if (capability_destroy(CORE_LOCAL->current_context->handles, handle) == -1)
 		RETURN_ERROR;
 
 	return 0;
