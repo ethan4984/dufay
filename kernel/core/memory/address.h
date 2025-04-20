@@ -1,11 +1,11 @@
-#ifndef CORE_MM_ADDRESS_H_
-#define CORE_MM_ADDRESS_H_
+#ifndef CORE_MEMORY_ADDRESS_H_
+#define CORE_MEMORY_ADDRESS_H_
 
-#include <core/mm/virtual.h>
+#include <core/memory/virtual.h>
 
 #include <fayt/aslr.h>
 
-struct address_space_handle {
+struct address_space_capability {
 	int asid;
 };
 

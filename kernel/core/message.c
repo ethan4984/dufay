@@ -13,10 +13,11 @@
 
 #include <sys/queue.h>
 
-static struct port *lookup_port(capability_t port, struct context *ctx,
+static struct port *lookup_port(capability_t port, struct thread *ctx,
 								uint8_t *rights)
 {
-	struct capability_binding *binding = capability_lookup(ctx->handles, port);
+	struct capability_binding *binding =
+		capability_lookup(ctx->capability_table, port);
 
 	if (!binding)
 		return NULL;
@@ -54,7 +55,7 @@ int message_init()
 	return object_register_class(OBJ_CLASS_PORT, class);
 }
 
-int message_send(struct message_header *message, struct context *context)
+int message_send(struct message_header *message, struct thread *thread)
 {
 	struct kernel_message *msg = alloc(sizeof(struct kernel_message));
 	if (msg == NULL)
@@ -62,9 +63,9 @@ int message_send(struct message_header *message, struct context *context)
 	uint8_t dest_rights = 0, reply_rights = 0;
 
 	struct port *destination =
-		lookup_port(message->destination, context, &dest_rights);
+		lookup_port(message->destination, thread, &dest_rights);
 
-	struct port *reply = lookup_port(message->reply, context, &reply_rights);
+	struct port *reply = lookup_port(message->reply, thread, &reply_rights);
 
 	if (!destination || !reply)
 		RETURN_ERROR;
@@ -88,16 +89,16 @@ int message_send(struct message_header *message, struct context *context)
 	VECTOR_PUSH(destination->trigger.equeue, &destination->equeue);
 
 	equeue_wake(&destination->trigger,
-				CORE_LOCAL->current_context->ucontext_active);
+				CORE_LOCAL->current_thread->context_active);
 
 	return 0;
 }
 
 int message_receive(capability_t port, struct message_header *out,
-					struct context *context)
+					struct thread *thread)
 {
 	uint8_t rights;
-	struct port *actual_port = lookup_port(port, context, &rights);
+	struct port *actual_port = lookup_port(port, thread, &rights);
 
 	// Can't receive if we don't have the right to do so
 	if (!(rights & PORT_RIGHT_RECV)) {
@@ -128,8 +129,8 @@ int message_receive(capability_t port, struct message_header *out,
 }
 
 SYSCALL_DEFINE2(msg_recv, capability_t, port, struct message_header *, out, {
-	return message_receive(port, out, CORE_LOCAL->current_context);
+	return message_receive(port, out, CORE_LOCAL->current_thread);
 });
 
 SYSCALL_DEFINE1(msg_send, struct message_header *, msg,
-				{ return message_send(msg, CORE_LOCAL->current_context); });
+				{ return message_send(msg, CORE_LOCAL->current_thread); });

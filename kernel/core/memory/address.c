@@ -1,6 +1,6 @@
 #include <arch/x86/smp.h>
 
-#include <core/mm/address.h>
+#include <core/memory/address.h>
 #include <core/syscall.h>
 #include <core/capability.h>
 
@@ -134,68 +134,68 @@ int address_space_free(struct address_space *as, uintptr_t address,
 	return 0;
 }
 
-SYSCALL_DEFINE4(as_action, capability_t, handle, int, ops, uintptr_t *, address,
-				size_t, length, ({
-					struct context *current_context =
-						CORE_LOCAL->current_context;
-					if (unlikely(current_context == NULL))
-						RETURN_ERROR;
+SYSCALL_DEFINE4(
+	as_action, capability_t, capability, int, ops, uintptr_t *, address, size_t,
+	length, ({
+		struct thread *current_thread = CORE_LOCAL->current_thread;
+		if (unlikely(current_thread == NULL))
+			RETURN_ERROR;
 
-					struct address_space_handle *as_handle = NULL;
-					if (ops != AS_ACTION_CONSTRUCT) {
-						as_handle = ({
-							struct capability_binding *binding =
-								capability_lookup(current_context->handles, handle);
-							if (binding == NULL)
-								RETURN_ERROR;
-							binding->obj;
-						});
-						if (as_handle == NULL)
-							RETURN_ERROR;
-					}
+		struct address_space_capability *as_capability = NULL;
+		if (ops != AS_ACTION_CONSTRUCT) {
+			as_capability = ({
+				struct capability_binding *binding = capability_lookup(
+					current_thread->capability_table, capability);
+				if (binding == NULL)
+					RETURN_ERROR;
+				binding->obj;
+			});
+			if (as_capability == NULL)
+				RETURN_ERROR;
+		}
 
-					switch (ops) {
-					case AS_ACTION_CONSTRUCT: {
-						int asid;
-						int ret = address_space_construct(&asid);
-						if (ret == -1)
-							RETURN_ERROR;
+		switch (ops) {
+		case AS_ACTION_CONSTRUCT: {
+			int asid;
+			int ret = address_space_construct(&asid);
+			if (ret == -1)
+				RETURN_ERROR;
 
-						as_handle = alloc(sizeof(struct address_space_handle));
-						if (unlikely(as_handle == NULL))
-							RETURN_ERROR;
+			as_capability = alloc(sizeof(struct address_space_capability));
+			if (unlikely(as_capability == NULL))
+				RETURN_ERROR;
 
-						as_handle->asid = asid;
+			as_capability->asid = asid;
 
-						capability_t handle;
-						ret = capability_create(
-							current_context->handles, as_handle,
-							HANDLE_ACCESS_READ | HANDLE_ACCESS_WRITE, &handle);
-						if (ret == -1)
-							RETURN_ERROR;
+			capability_t capability;
+			ret = capability_create(
+				current_thread->capability_table, as_capability,
+				CAPABILITY_ACCESS_READ | CAPABILITY_ACCESS_WRITE, &capability);
+			if (ret == -1)
+				RETURN_ERROR;
 
-						return handle;
-					}
-					case AS_ACTION_ALLOCATE: {
-						struct address_space *as = NULL;
-						int ret = address_find_as(as_handle->asid,
-												  (struct address_space **)&as);
-						if (ret == -1 || as == NULL)
-							RETURN_ERROR;
+			return capability;
+		}
+		case AS_ACTION_ALLOCATE: {
+			struct address_space *as = NULL;
+			int ret = address_find_as(as_capability->asid,
+									  (struct address_space **)&as);
+			if (ret == -1 || as == NULL)
+				RETURN_ERROR;
 
-						return address_space_allocate(as, address, length);
-					}
-					case AS_ACTION_FREE: {
-						struct address_space *as = NULL;
-						int ret = address_find_as(as_handle->asid, &as);
-						if (ret == -1 || as == NULL)
-							RETURN_ERROR;
+			return address_space_allocate(as, address, length);
+		}
+		case AS_ACTION_FREE: {
+			struct address_space *as = NULL;
+			int ret = address_find_as(as_capability->asid, &as);
+			if (ret == -1 || as == NULL)
+				RETURN_ERROR;
 
-						return address_space_free(as, *address, length);
-					}
-					default:
-						RETURN_ERROR;
-					}
-				}));
+			return address_space_free(as, *address, length);
+		}
+		default:
+			RETURN_ERROR;
+		}
+	}));
 
 struct address_space kernel_mappings;

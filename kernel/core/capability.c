@@ -2,7 +2,7 @@
 #include <arch/x86/smp.h>
 
 #include <core/object.h>
-#include <core/scheduler.h>
+#include <core/scheduler/thread.h>
 #include <core/syscall.h>
 #include <core/capability.h>
 
@@ -18,7 +18,7 @@ void capability_table_init(struct capability_table *table)
 }
 
 struct capability_binding *capability_lookup(struct capability_table *table,
-									 capability_t handle)
+											 capability_t handle)
 {
 	if (table->bitmap.size < handle || !table->bitmap.data) {
 		return NULL;
@@ -33,7 +33,7 @@ struct capability_binding *capability_lookup(struct capability_table *table,
 }
 
 int capability_create(struct capability_table *table, void *obj, uint8_t access,
-				  capability_t *out_handle)
+					  capability_t *out_handle)
 {
 	size_t i;
 	int free_bit = -1;
@@ -77,8 +77,8 @@ SYSCALL_DEFINE2(create_obj, uint8_t, class, uint8_t, access, {
 	if (object_new(&obj, class) == -1)
 		RETURN_ERROR;
 
-	if (capability_create(CORE_LOCAL->current_context->handles, obj, access,
-					  &out_handle) == -1)
+	if (capability_create(CORE_LOCAL->current_thread->capability_table, obj,
+						  access, &out_handle) == -1)
 		RETURN_ERROR;
 
 	return out_handle;
@@ -87,7 +87,7 @@ SYSCALL_DEFINE2(create_obj, uint8_t, class, uint8_t, access, {
 // Duplicates an handle with new permissions
 SYSCALL_DEFINE2(duplicate_obj, capability_t, handle, uint8_t, access, {
 	struct capability_binding *binding =
-		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
 	capability_t out_handle;
 
 	if (!binding)
@@ -100,8 +100,8 @@ SYSCALL_DEFINE2(duplicate_obj, capability_t, handle, uint8_t, access, {
 
 	object_retain(binding->obj);
 
-	if (capability_create(CORE_LOCAL->current_context->handles, binding->obj,
-					  access, &out_handle) == -1)
+	if (capability_create(CORE_LOCAL->current_thread->capability_table,
+						  binding->obj, access, &out_handle) == -1)
 		RETURN_ERROR;
 
 	return out_handle;
@@ -110,13 +110,14 @@ SYSCALL_DEFINE2(duplicate_obj, capability_t, handle, uint8_t, access, {
 // Destroys an handle
 SYSCALL_DEFINE1(destroy_obj, capability_t, handle, {
 	struct capability_binding *binding =
-		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
 	capability_t out_handle;
 
 	if (!binding)
 		RETURN_ERROR;
 
-	if (capability_destroy(CORE_LOCAL->current_context->handles, handle) == -1)
+	if (capability_destroy(CORE_LOCAL->current_thread->capability_table,
+						   handle) == -1)
 		RETURN_ERROR;
 
 	return 0;

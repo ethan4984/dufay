@@ -29,19 +29,6 @@ int main()
 	slab_cache_create(&pool, "CACHE4096", 4096);
 
 	print("Slab cache directory initialised\n");
-
-	struct comm_bridge bridge = { .not= NOT_SCHED_CLONE,
-								  .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
-								  .destination = CAPABILITY_SELF_SCHED };
-
-	struct syscall_response response =
-		SYSCALL1(SYSCALL_NOTIFICATION_BUILD, &bridge);
-	if (response.ret == -1)
-		goto failure;
-
-	response = SYSCALL1(SYSCALL_NOTIFICATION_BROADCAST, &bridge);
-	if (response.ret == -1)
-		goto failure;
 failure:
 	for (;;)
 		;

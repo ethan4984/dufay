@@ -1,6 +1,7 @@
-#pragma once
+#ifndef CORE_MEMORY_VIRTUAL_H_
+#define CORE_MEMORY_VIRTUAL_H_
 
-#include <core/mm/portal.h>
+#include <core/memory/portal.h>
 
 #include <fayt/vector.h>
 #include <fayt/lock.h>
@@ -46,3 +47,5 @@ int vmm_map_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt,
 int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr,
 					uint64_t cnt);
 int vmm_default_table(struct page_table *page_table);
+
+#endif

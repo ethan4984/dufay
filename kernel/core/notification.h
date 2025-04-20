@@ -1,7 +1,7 @@
 #ifndef NOTIFICATION_H_
 #define NOTIFICATION_H_
 
-#include <core/scheduler.h>
+#include <core/scheduler/thread.h>
 #include <core/events.h>
 
 #include <fayt/lock.h>
@@ -24,7 +24,7 @@ struct notification_parameter {
 //	SERVICED, WHETHER OR NOT IT HAS BEEN FINISHED, WHETHER OR NOT IT IS READY
 //	TO BE SERVICED.
 
-struct ucontext;
+struct context;
 struct notification_queue;
 struct notification {
 	int refcnt;
@@ -40,7 +40,7 @@ struct notification {
 	struct notification_queue *queue;
 
 	VECTOR(struct etrigger *) etrigger;
-	struct context *source;
+	struct thread *source;
 };
 
 struct notification_queue {
@@ -53,12 +53,8 @@ struct notification_queue {
 	struct spinlock lock;
 };
 
-struct notification_channel_handle {
-	struct sched_proc_id proc_id;
-};
-
-int notification_queue(struct context *, struct context *, int, int, int,
+int notification_queue(struct thread *, struct thread *, int, int, int,
 					   uintptr_t, uint64_t, int);
-int notification_dispatch(struct context *);
+int notification_dispatch(struct thread *);
 
 #endif

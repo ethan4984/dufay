@@ -1,9 +1,9 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 
-#include <core/mm/virtual.h>
-#include <core/mm/physical.h>
-#include <core/mm/address.h>
+#include <core/memory/virtual.h>
+#include <core/memory/physical.h>
+#include <core/memory/address.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>

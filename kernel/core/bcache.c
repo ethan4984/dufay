@@ -22,12 +22,13 @@ static int bcache_lookup(capability_t handle, struct bcache **bcache)
 		RETURN_ERROR;
 
 	struct capability_binding *capability_binding =
-		capability_lookup(CORE_LOCAL->current_context->handles, handle);
+		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
 	if (capability_binding == NULL)
 		RETURN_ERROR;
 
 	int ret = hash_table_search(&bcache_table, capability_binding,
-								sizeof(struct capability_binding), (void **)bcache);
+								sizeof(struct capability_binding),
+								(void **)bcache);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -78,7 +79,7 @@ static int bcache_consult_read(capability_t handle, size_t offset, int count,
 	if (ret == -1 || bcache == NULL)
 		RETURN_ERROR;
 
-	if ((bcache->capability_binding->access & HANDLE_ACCESS_READ) == 0)
+	if ((bcache->capability_binding->access & CAPABILITY_ACCESS_READ) == 0)
 		RETURN_ERROR;
 
 	struct blk_handle *blk_handle = bcache->capability_binding->obj;
@@ -138,7 +139,7 @@ static int bcache_consult_write(capability_t handle, size_t offset, int count,
 	if (ret == -1 || bcache == NULL)
 		RETURN_ERROR;
 
-	if ((bcache->capability_binding->access & HANDLE_ACCESS_WRITE) == 0)
+	if ((bcache->capability_binding->access & CAPABILITY_ACCESS_WRITE) == 0)
 		RETURN_ERROR;
 
 	struct blk_handle *blk_handle = bcache->capability_binding->obj;

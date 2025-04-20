@@ -2,24 +2,27 @@
 #include <arch/x86/smp.h>
 
 #include <core/events.h>
-#include <core/scheduler.h>
+#include <core/scheduler/thread.h>
 #include <core/notification.h>
 #include <core/lock.h>
-#include <core/mm/physical.h>
+#include <core/memory/physical.h>
 
 #include <fayt/debug.h>
 #include <fayt/sched.h>
+#include <fayt/compiler.h>
 
-int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
+int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 {
-	if (etrigger == NULL || waking_ucontext == NULL)
+	if (etrigger == NULL || waking_context == NULL)
 		RETURN_ERROR;
 
-	etrigger->ucontext = waking_ucontext;
+	etrigger->context = waking_context;
 
 	spinlock_irqsave(&etrigger->lock);
 
-	VECTOR(struct context *) context_unblocked = { 0 };
+	struct scheduler *scheduler = CORE_LOCAL->scheduler;
+	if (unlikely(scheduler == NULL || scheduler->enqueue == NULL))
+		RETURN_ERROR;
 
 	for (int i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
@@ -28,53 +31,29 @@ int equeue_wake(struct etrigger *etrigger, struct ucontext *waking_ucontext)
 
 		spinlock_irqsave(&equeue->lock);
 
-		for (int j = 0; j < equeue->ucontext.length; j++) {
-			struct ucontext *ucontext = equeue->ucontext.data[j];
-			if (ucontext == NULL)
+		for (int j = 0; j < equeue->context.length; j++) {
+			struct context *context = equeue->context.data[j];
+			if (context == NULL)
 				continue;
 
-			ucontext->last_etrigger = etrigger;
-			ucontext->blocking = false;
+			context->last_etrigger = etrigger;
+			context->blocking = false;
 
-			VECTOR_PUSH(context_unblocked, ucontext->context);
+			struct thread *thread = context->thread;
+			if (thread == NULL)
+				RETURN_ERROR;
+
+			int ret = scheduler->enqueue(scheduler, thread);
+			if (ret == -1)
+				RETURN_ERROR;
 		}
 
-		VECTOR_CLEAR(equeue->ucontext);
+		VECTOR_CLEAR(equeue->context);
 
 		spinrelease_irqsave(&equeue->lock);
 	}
 
 	spinrelease_irqsave(&etrigger->lock);
-
-	struct sched_queue_config_set *queue_set =
-		alloc(sizeof(struct sched_queue_config_set) +
-			  context_unblocked.length * sizeof(struct sched_queue_config));
-	if (queue_set == NULL)
-		RETURN_ERROR;
-
-	queue_set->cnt = 0;
-	for (int i = 0; i < context_unblocked.length; i++) {
-		struct context *context = context_unblocked.data[i];
-		if (context == NULL)
-			continue;
-
-		//print("event_wake: requeuing cid=%x\n", context->comms.proc_id.cid);
-
-		queue_set->config[i] =
-			(struct sched_queue_config){ .proc_id = context->comms.proc_id };
-
-		queue_set->cnt++;
-	}
-
-	VECTOR_CLEAR(context_unblocked);
-	if (queue_set->cnt == 0)
-		return 0;
-
-	int ret = sched_enqueue_context(CORE_LOCAL->scheduling_context,
-									CORE_LOCAL->current_context, queue_set,
-									NOTIFY_WEIGHT_INSTANTANEOUS);
-	if (ret == -1)
-		RETURN_ERROR;
 
 	return 0;
 }
@@ -84,42 +63,40 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 	if (equeue == NULL)
 		RETURN_ERROR;
 
-	struct context *context = CORE_LOCAL->current_context;
-	if (context == NULL)
+	struct thread *thread = CORE_LOCAL->current_thread;
+	if (thread == NULL)
 		RETURN_ERROR;
 
-	struct ucontext *ucontext = context->ucontext_active;
-	if (ucontext == NULL)
+	struct context *context = thread->context_active;
+	if (context == NULL)
 		RETURN_ERROR;
 
 	spinlock_irqsave(&equeue->lock);
 
-	VECTOR_PUSH(equeue->ucontext, ucontext);
-
-	struct sched_queue_config_set *queue_set =
-		alloc(sizeof(struct sched_queue_config_set) +
-			  sizeof(struct sched_queue_config));
-	if (queue_set == NULL)
-		RETURN_ERROR;
-
-	queue_set->cnt = 1;
-	*queue_set->config =
-		(struct sched_queue_config){ .proc_id = context->comms.proc_id };
+	VECTOR_PUSH(equeue->context, context);
 
 	spinrelease_irqsave(&equeue->lock);
 
-	int ret = sched_dequeue_context(CORE_LOCAL->scheduling_context, context,
-									queue_set, NOTIFY_WEIGHT_INSTANTANEOUS);
+	struct scheduler *scheduler = CORE_LOCAL->scheduler;
+	if (unlikely(scheduler == NULL || scheduler->dequeue == NULL))
+		RETURN_ERROR;
+
+	struct spinlock blksync;
+	spinlock_irqsave(&blksync);
+
+	int ret = scheduler->dequeue(scheduler, thread);
 	if (ret == -1)
 		RETURN_ERROR;
 
-	ucontext->blocking = true;
-	for (; ucontext->blocking;) {
+	context->blocking = true;
+	spinrelease_irqsave(&blksync);
+
+	for (; context->blocking;) {
 		yield();
 	}
 
 	if (waking_object)
-		*waking_object = ucontext->last_etrigger;
+		*waking_object = context->last_etrigger;
 
 	return 0;
 }

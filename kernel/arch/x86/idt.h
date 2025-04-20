@@ -13,6 +13,7 @@ struct idtr {
 int idt_instantiate_vector(uint8_t, void (*handler)(struct registers *, void *),
 						   void *ptr, struct irq_cortex *irq_cortex);
 int idt_reserve_vector(void);
+void idt_release_vector(uint8_t);
 void idt_init(void);
 
 #endif

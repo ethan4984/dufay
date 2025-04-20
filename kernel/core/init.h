@@ -1,8 +1,6 @@
 #ifndef INIT_H_
 #define INIT_H_
 
-#include <core/scheduler.h>
-
 #include <limine.h>
 
 #define SERVER_DEFAULT_STACK_LOCATION 0x20000

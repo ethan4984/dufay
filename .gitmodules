@@ -1,6 +1,3 @@
-[submodule "servers/sys/sched/fayt"]
-	path = servers/sys/sched/fayt
-	url = https://github.com/ethan4984/fayt
 [submodule "servers/io/nvme/fayt"]
 	path = servers/io/nvme/fayt
 	url = https://github.com/ethan4984/fayt

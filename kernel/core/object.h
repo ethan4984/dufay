@@ -1,5 +1,5 @@
-#ifndef OBJECT_H_
-#define OBJECT_H_
+#ifndef CORE_OBJECT_H_
+#define CORE_OBJECT_H_
 
 #include <stddef.h>
 #include <stdint.h>

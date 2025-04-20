@@ -5,8 +5,9 @@
 #include <arch/x86/idt.h>
 #include <arch/x86/gdt.h>
 
-#include <core/mm/physical.h>
-#include <core/mm/virtual.h>
+#include <core/scheduler/processor.h>
+#include <core/memory/physical.h>
+#include <core/memory/virtual.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>

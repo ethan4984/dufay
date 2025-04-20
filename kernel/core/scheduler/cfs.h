@@ -1,12 +1,32 @@
-#ifndef SCHEDULE_H_
-#define SCHEDULE_H_
+#ifndef CORE_SCHEDULER_CFS_H_
+#define CORE_SCHEDULER_CFS_H_
 
-#include <fayt/rb_tree.h>
-#include <fayt/lock.h>
-#include <fayt/sched.h>
+#include <core/scheduler/thread.h>
+
+#include <fayt/hash.h>
 #include <fayt/time.h>
 
-#include <portal.h>
+struct cfs_unit {
+	struct time epoch;
+	int nice;
+	uint64_t weight;
+	uint64_t runtime;
+	uint64_t vruntime;
+	RB_META(struct cfs_unit);
+
+	struct thread *thread;
+};
+
+struct cfs {
+	struct cfs_unit *unit_tree;
+	struct hash_table *unit_table;
+};
+
+int cfs_enqueue(struct scheduler *, struct thread *);
+int cfs_dequeue(struct scheduler *, struct thread *);
+int cfs_traverse(struct scheduler *, struct thread **);
+int cfs_init(struct scheduler *);
+int cfs_destroy(struct scheduler *);
 
 constexpr int DEFAULT_TIME_SLICE = 10000000;
 constexpr int nice_to_weight[40] = {
@@ -21,19 +41,6 @@ constexpr int nice_to_weight[40] = {
 #define VRUNTIME(W, S) (((S) * (W)) / 1024)
 #define SCHED_DEFAULT_NICE 0
 
-struct thread {
-	struct sched_proc_id proc_id;
-	int asid;
-
-	struct time epoch;
-
-	uint64_t weight;
-	uint64_t vruntime;
-	int active;
-
-	RB_META(struct thread);
-};
-
 static inline uint64_t weight_set_nice(int nice)
 {
 	if (nice < NICE_MIN)
@@ -42,8 +49,5 @@ static inline uint64_t weight_set_nice(int nice)
 		nice = NICE_MAX;
 	return nice_to_weight[nice + 20];
 }
-
-int sched(struct portal_link *, struct portal_link *,
-		  struct sched_descriptor *);
 
 #endif

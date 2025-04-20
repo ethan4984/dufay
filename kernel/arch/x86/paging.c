@@ -1,8 +1,8 @@
 #include <arch/x86/paging.h>
 #include <arch/x86/cpu.h>
 
-#include <core/mm/physical.h>
-#include <core/mm/virtual.h>
+#include <core/memory/physical.h>
+#include <core/memory/virtual.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>

@@ -3,8 +3,7 @@
 
 #include <core/notification.h>
 #include <core/syscall.h>
-#include <core/scheduler.h>
-#include <core/mm/physical.h>
+#include <core/memory/physical.h>
 #include <core/lock.h>
 #include <core/debug.h>
 #include <core/capability.h>
@@ -63,30 +62,32 @@ finish:
 	return 0;
 }
 
-static inline int notification_check_perms(struct context *, struct context *,
+static inline int notification_check_perms(struct thread *, struct thread *,
 										   int)
 {
 	return 0;
 }
 
 static int bridge_to_destination(struct comm_bridge *bridge,
-								 struct context **dest)
+								 struct thread **dest)
 {
 	if (bridge == NULL || dest == NULL)
 		RETURN_ERROR;
-	struct context *context = CORE_LOCAL->current_context;
+	struct thread *thread = CORE_LOCAL->current_thread;
 
 	struct capability_binding *binding =
-		capability_lookup(context->handles, bridge->destination);
+		capability_lookup(thread->capability_table, bridge->destination);
 	if (binding == NULL)
 		RETURN_ERROR;
 
-	struct notification_channel_handle *channel_handle = binding->obj;
-	if (unlikely(channel_handle == NULL))
+	struct thread_capability *thread_capability = binding->obj;
+	if (thread_capability == NULL)
+		RETURN_ERROR;
+	if ((binding->access & CAPABILITY_ACCESS_WRITE) == 0)
 		RETURN_ERROR;
 
 	*dest = NULL;
-	int ret = search_context(channel_handle->proc_id, dest);
+	int ret = search_thread(thread_capability, dest);
 	if (ret == -1 || *dest == NULL)
 		RETURN_ERROR;
 
@@ -115,44 +116,44 @@ static int notification_destroy(struct notification *notification)
 	return 0;
 }
 
-static int notification_ucontext_instantiate(struct context *context,
-											 struct ucontext *ucontext,
-											 struct notification *notification,
-											 struct notification_action *action)
+static int notification_context_instantiate(struct thread *thread,
+											struct context *context,
+											struct notification *notification,
+											struct notification_action *action)
 {
-	if (context == NULL || ucontext == NULL || notification == NULL ||
+	if (thread == NULL || context == NULL || notification == NULL ||
 		action == NULL)
 		RETURN_ERROR;
 
 	struct ustack *ustack;
-	int ret = USTACK_CLAIM(context, ustack);
+	int ret = USTACK_CLAIM(thread, ustack);
 	if (ret == -1)
 		RETURN_ERROR;
 	if (ustack == NULL)
 		RETURN_ERROR;
 
-	ucontext->stack = ustack;
-	ucontext->fpu_context = alloc(CORE_LOCAL->fpu_context_size);
-	if (ucontext->fpu_context == NULL)
+	context->stack = ustack;
+	context->fpu_thread = alloc(CORE_LOCAL->fpu_thread_size);
+	if (context->fpu_thread == NULL)
 		RETURN_ERROR;
 
-	ucontext->regs.ss = 0x3b;
-	ucontext->regs.rsp = ucontext->stack->user_stack.sp;
-	ucontext->regs.rflags = 0x202 & ~(1 << 9);
-	ucontext->regs.cs = 0x43;
-	ucontext->regs.rip = (uintptr_t)action->handler;
+	context->regs.ss = 0x3b;
+	context->regs.rsp = context->stack->user_stack.sp;
+	context->regs.rflags = 0x202 & ~(1 << 9);
+	context->regs.cs = 0x43;
+	context->regs.rip = (uintptr_t)action->handler;
 
-	ucontext->regs.rdi = (uint64_t)notification->info;
-	ucontext->regs.rsi = 0;
-	ucontext->regs.rdx = notification->notnum;
+	context->regs.rdi = (uint64_t)notification->info;
+	context->regs.rsi = 0;
+	context->regs.rdx = notification->notnum;
 
 	int parameter_length = notification->parameter.page_cnt * PAGE_SIZE;
 	if (parameter_length) {
-		uintptr_t vaddr = ucontext->regs.rsp -= parameter_length;
-		x86_map_page(context->address_space->page_table, vaddr,
+		uintptr_t vaddr = context->regs.rsp -= parameter_length;
+		x86_map_page(thread->address_space->page_table, vaddr,
 					 notification->parameter.paddr,
 					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
-		ucontext->regs.rsi = ucontext->regs.rsp;
+		context->regs.rsi = context->regs.rsp;
 	}
 
 	struct portal_resp resp;
@@ -161,13 +162,13 @@ static int notification_ucontext_instantiate(struct context *context,
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
 		.share = { .identifier = NULL, .type = 0, .create = 0 },
-		.morphology = { .addr = ucontext->regs.rsp,
-						.length = ucontext->stack->user_stack.size -
-								  parameter_length }
+		.morphology = { .addr = context->regs.rsp,
+						.length =
+							context->stack->user_stack.size - parameter_length }
 	};
 
 	ret = portal(&req, &resp);
-	if (ret == -1 || resp.base != ucontext->regs.rsp) {
+	if (ret == -1 || resp.base != context->regs.rsp) {
 		print("ERROR: unable to anonymously map notification stack\n");
 		RETURN_ERROR;
 	}
@@ -175,7 +176,7 @@ static int notification_ucontext_instantiate(struct context *context,
 	return 0;
 }
 
-int notification_queue(struct context *sender, struct context *target, int not,
+int notification_queue(struct thread *sender, struct thread *target, int not,
 					   int weight, int serviceable, uintptr_t vaddr,
 					   uint64_t paddr, int page_cnt)
 {
@@ -214,27 +215,27 @@ int notification_queue(struct context *sender, struct context *target, int not,
 		RETURN_ERROR;
 
 	if (weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
-		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
-		if (ucontext == NULL)
+		struct context *context = alloc(sizeof(struct context));
+		if (context == NULL)
 			RETURN_ERROR;
 
-		ucontext->etrigger = alloc(sizeof(struct etrigger));
-		if (ucontext->etrigger == NULL)
+		context->etrigger = alloc(sizeof(struct etrigger));
+		if (context->etrigger == NULL)
 			RETURN_ERROR;
-		ucontext->etrigger->ucontext = ucontext;
-		ucontext->context = target;
-		ucontext->notification = notification;
-		ucontext->notification->serviceable = serviceable;
+		context->etrigger->context = context;
+		context->thread = target;
+		context->notification = notification;
+		context->notification->serviceable = serviceable;
 
-		int ret = UCONTEXT_PUSH(target, ucontext);
+		int ret = CONTEXT_PUSH(target, context);
 		if (ret == -1) {
-			print("ERROR: failed to push ucontext on stack\n");
+			print("ERROR: failed to push context on stack\n");
 			RETURN_ERROR;
 		}
 
-		target->ucontext_top = ucontext;
+		target->context_top = context;
 
-		ret = sched_delivery_queue_push(&CORE_LOCAL->delivery_queue, target);
+		ret = delivery_queue_push(&CORE_LOCAL->delivery_queue, target);
 		if (ret == -1)
 			RETURN_ERROR;
 	}
@@ -245,8 +246,8 @@ int notification_queue(struct context *sender, struct context *target, int not,
 }
 
 SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
-	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination;
+	struct thread *thread = CORE_LOCAL->current_thread;
+	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
 	if (ret == -1)
@@ -268,7 +269,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 		paddr = pmm_alloc(page_cnt, 1);
 		if (!paddr)
 			RETURN_ERROR;
-		x86_map_page(context->address_space->page_table, vaddr, paddr,
+		x86_map_page(thread->address_space->page_table, vaddr, paddr,
 					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
 		notification->parameter.paddr = paddr;
 		notification->parameter.page_cnt = page_cnt;
@@ -282,7 +283,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 		RETURN_ERROR;
 	notification->queue = queue;
 	notification->serviceable = false;
-	notification->source = context;
+	notification->source = thread;
 
 	ret = notification_push(queue, notification);
 	if (ret == -1)
@@ -292,8 +293,8 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 })
 
 SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge *, bridge, {
-	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination;
+	struct thread *thread = CORE_LOCAL->current_thread;
+	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
 	if (ret == -1)
@@ -314,42 +315,41 @@ SYSCALL_DEFINE1(notification_broadcast, struct comm_bridge *, bridge, {
 
 	if (bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS ||
 		bridge->weight & NOTIFY_WEIGHT_TICK) {
-		int ret =
-			sched_delivery_queue_push(&CORE_LOCAL->delivery_queue, destination);
+		int ret = delivery_queue_push(&CORE_LOCAL->delivery_queue, destination);
 		if (ret == -1)
 			RETURN_ERROR;
 	}
 	if (bridge->weight & NOTIFY_WEIGHT_INSTANTANEOUS) {
 		struct equeue equeue = { 0 };
 
-		struct ucontext *ucontext = context->ucontext_active;
-		if (ucontext == NULL)
+		struct context *context = thread->context_active;
+		if (context == NULL)
 			RETURN_ERROR;
 
-		VECTOR_PUSH(notification->etrigger, ucontext->etrigger);
+		VECTOR_PUSH(notification->etrigger, context->etrigger);
 
-		ret = equeue_add(&equeue, ucontext->etrigger);
+		ret = equeue_add(&equeue, context->etrigger);
 		if (ret == -1)
 			RETURN_ERROR;
 
 		for (;;) {
-			//print("broadcast: blocking on cid=%x\n", context->comms.proc_id.cid);
+			//print("broadcast: blocking on cid=%x\n", thread->comms.proc_id.cid);
 			int ret = equeue_block(&equeue, NULL);
 			if (ret == -1)
 				RETURN_ERROR;
-			//print("broadcast: unblocking on cid=%x\n", context->comms.proc_id.cid);
-			if (!ucontext->blocking && notification->done)
+			//print("broadcast: unblocking on cid=%x\n", thread->comms.proc_id.cid);
+			if (!context->blocking && notification->done)
 				break; // think of a better way to solve this
 		}
 	}
 })
 
-int notification_dispatch(struct context *context)
+int notification_dispatch(struct thread *thread)
 {
-	if (context == NULL)
+	if (thread == NULL)
 		RETURN_ERROR;
 
-	struct notification_queue *queue = context->notification.queue;
+	struct notification_queue *queue = thread->notification.queue;
 	if (unlikely(queue == NULL))
 		RETURN_ERROR;
 	if (unlikely(queue->active == 0)) {
@@ -363,18 +363,18 @@ int notification_dispatch(struct context *context)
 		return 0;
 	}
 
-	struct ucontext *top = context->ucontext_top;
+	struct context *top = thread->context_top;
 
 	if (top->notification && top->notification->serviceable &&
 		!top->notification->serviced) {
 		struct notification_action *action =
-			&context->notification
-				 .actions[context->ucontext_top->notification->notnum - 1];
-		int ret = notification_ucontext_instantiate(
-			context, context->ucontext_top, context->ucontext_top->notification,
+			&thread->notification
+				 .actions[thread->context_top->notification->notnum - 1];
+		int ret = notification_context_instantiate(
+			thread, thread->context_top, thread->context_top->notification,
 			action);
 		if (ret == -1) {
-			print("ERROR: failed to initialise ucontext\n");
+			print("ERROR: failed to initialise context\n");
 			spinrelease(&queue->lock);
 			RETURN_ERROR;
 		}
@@ -401,7 +401,7 @@ int notification_dispatch(struct context *context)
 			continue;
 
 		struct notification_action *action =
-			&context->notification.actions[i - 1];
+			&thread->notification.actions[i - 1];
 		struct notification *notification;
 
 		int ret = notification_pop(queue, &notification, i);
@@ -414,34 +414,34 @@ int notification_dispatch(struct context *context)
 			continue;
 		}
 
-		struct ucontext *ucontext = alloc(sizeof(struct ucontext));
-		if (ucontext == NULL)
+		struct context *context = alloc(sizeof(struct context));
+		if (context == NULL)
 			RETURN_ERROR;
 
-		ucontext->etrigger = alloc(sizeof(struct etrigger));
-		if (ucontext->etrigger == NULL)
+		context->etrigger = alloc(sizeof(struct etrigger));
+		if (context->etrigger == NULL)
 			RETURN_ERROR;
-		ucontext->etrigger->ucontext = ucontext;
-		ucontext->notification = notification;
-		ucontext->context = context;
+		context->etrigger->context = context;
+		context->notification = notification;
+		context->thread = thread;
 
-		ucontext->notification->serviceable = false;
-		ucontext->notification->serviced = true;
+		context->notification->serviceable = false;
+		context->notification->serviced = true;
 
-		ret = notification_ucontext_instantiate(context, ucontext, notification,
-												action);
+		ret = notification_context_instantiate(thread, context, notification,
+											   action);
 		if (ret == -1) {
 			spinrelease(&queue->lock);
 			RETURN_ERROR;
 		}
 
-		ret = UCONTEXT_PUSH(context, ucontext);
+		ret = CONTEXT_PUSH(thread, context);
 		if (ret == -1) {
-			print("ERROR: failed to push ucontext on stack\n");
+			print("ERROR: failed to push context on stack\n");
 			RETURN_ERROR;
 		}
 
-		context->ucontext_top = ucontext;
+		thread->context_top = context;
 
 		spinrelease(&queue->lock);
 
@@ -457,8 +457,8 @@ SYSCALL_DEFINE1(notify, struct comm_bridge *, bridge, {
 	if (bridge == NULL)
 		RETURN_ERROR;
 
-	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination;
+	struct thread *thread = CORE_LOCAL->current_thread;
+	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
 	if (ret == -1)
@@ -467,29 +467,29 @@ SYSCALL_DEFINE1(notify, struct comm_bridge *, bridge, {
 
 SYSCALL_DEFINE3(notification_action, int, not, struct notification_action *,
 				action, struct notification_action *, old, {
-					struct context *context = CORE_LOCAL->current_context;
+					struct thread *thread = CORE_LOCAL->current_thread;
 
-					if (unlikely(context == NULL))
+					if (unlikely(thread == NULL))
 						RETURN_ERROR;
 					if (unlikely(notification_is_valid(not) == -1))
 						RETURN_ERROR;
 
-					spinlock(&context->notification.lock);
+					spinlock(&thread->notification.lock);
 
 					struct notification_action *current_action =
-						&context->notification.actions[not-1];
+						&thread->notification.actions[not-1];
 
 					if (old)
 						*old = *current_action;
 					if (action)
 						*current_action = *action;
 
-					spinrelease(&context->notification.lock);
+					spinrelease(&thread->notification.lock);
 				})
 
 SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
-	struct context *context = CORE_LOCAL->current_context;
-	if (unlikely(context == NULL))
+	struct thread *thread = CORE_LOCAL->current_thread;
+	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
 	struct ustack *new_stack = alloc(sizeof(struct ustack));
@@ -507,14 +507,14 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 	new_stack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
 	new_stack->active = 0;
 
-	int ret = USTACK_PUSH(context, new_stack);
+	int ret = USTACK_PUSH(thread, new_stack);
 	if (ret == -1)
 		RETURN_ERROR;
 })
 
 SYSCALL_DEFINE1(notification_destroy, struct comm_bridge *, bridge, {
-	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination;
+	struct thread *thread = CORE_LOCAL->current_thread;
+	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
 	if (ret == -1)
@@ -542,105 +542,103 @@ SYSCALL_DEFINE1(notification_destroy, struct comm_bridge *, bridge, {
 //	NOTIFICATION, IT WILL FIND THE NEXT SCHEDULABLE UCONTEXT.
 
 SYSCALL_DEFINE0(notification_return, {
-	struct context *current_context = CORE_LOCAL->current_context;
-	if (unlikely(current_context == NULL))
+	struct thread *current_thread = CORE_LOCAL->current_thread;
+	if (unlikely(current_thread == NULL))
 		RETURN_ERROR;
 
-	struct ucontext *current_ucontext = current_context->ucontext_active;
-	if (unlikely(current_ucontext == NULL))
+	struct context *current_context = current_thread->context_active;
+	if (unlikely(current_context == NULL))
 		RETURN_ERROR;
 
 	spinlock_irqsave(&CORE_LOCAL->sched_lock);
 
 	// REFINE AND STREAMLINE HOW WE INDICIATE WHETHER OR NOT A NOTIFICATION HAS BEEN SERVICED/FINISHED
 
-	struct context *rcontext = current_ucontext->notification->source ?
-								   current_ucontext->notification->source :
-								   CORE_LOCAL->scheduling_context;
-	struct ucontext *rucontext = ({
+	struct thread *rthread = current_context->notification->source ?
+								 current_context->notification->source :
+								 NULL;
+	struct context *rcontext = ({
 		__label__ finish;
-		struct ucontext *rucontext = rcontext->ucontext_top;
+		struct context *rcontext = rthread->context_top;
 
-		for (; rucontext;) {
-			if (rucontext->notification &&
-				rucontext->notification->serviceable &&
-				!rucontext->notification->serviced) {
-				if (rucontext->notification->weight ==
+		for (; rcontext;) {
+			if (rcontext->notification && rcontext->notification->serviceable &&
+				!rcontext->notification->serviced) {
+				if (rcontext->notification->weight ==
 					NOTIFY_WEIGHT_INSTANTANEOUS)
 					goto finish;
-				rucontext = rucontext->last;
+				rcontext = rcontext->last;
 				continue;
 			}
-			if (rucontext->last)
-				rucontext = rucontext->last;
+			if (rcontext->last)
+				rcontext = rcontext->last;
 			else
 				goto finish;
 		}
-		rucontext = NULL;
+		rcontext = NULL;
 finish:
-		rucontext;
+		rcontext;
 	});
-	if (rcontext == NULL || rucontext == NULL)
+	if (rthread == NULL || rcontext == NULL)
 		RETURN_ERROR;
 
-	if (rucontext->notification)
-		rucontext->notification->serviced = true;
+	if (rcontext->notification)
+		rcontext->notification->serviced = true;
 
 	spinrelease_irqsave(&CORE_LOCAL->sched_lock);
 
 	//	print(
 	//		"notification_return: current ctx [cid=%x] going to [cid=%x] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
-	//		current_context->comms.proc_id.cid, rcontext->comms.proc_id.cid,
-	//		rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
-	//		current_ucontext->notification ? 'T' : 'F');
+	//		current_thread->comms.proc_id.cid, rthread->comms.proc_id.cid,
+	//		rcontext->regs.rip, rcontext->notification ? 'T' : 'F',
+	//		current_context->notification ? 'T' : 'F');
 
-	current_ucontext->stack->active = false;
-	current_ucontext->notification->done = true;
-	int ret = destroy_ucontext(current_context, current_ucontext);
+	current_context->stack->active = false;
+	current_context->notification->done = true;
+	int ret = destroy_context(current_thread, current_context);
 	if (ret == -1)
 		RETURN_ERROR;
 
 	//print(
 	//	"notification_return: ESCAPED DESTROY: current ctx [%x] going to [%x] [rip=%x] [NOT=%c] [INSTANT=%c]\n",
-	//	current_context->comms.proc_id.cid, rcontext->comms.proc_id.cid,
-	//	rucontext->regs.rip, rucontext->notification ? 'T' : 'F',
-	//	current_ucontext->notification ? 'T' : 'F');
+	//	current_thread->comms.proc_id.cid, rthread->comms.proc_id.cid,
+	//	rcontext->regs.rip, rcontext->notification ? 'T' : 'F',
+	//	current_context->notification ? 'T' : 'F');
 
-	if (rucontext->notification) {
+	if (rcontext->notification) {
 		struct notification_action *action =
-			&rcontext->notification
-				 .actions[NOTIFICATION_INDEX(rucontext->notification->notnum)];
-		int ret = notification_ucontext_instantiate(
-			rcontext, rucontext, rucontext->notification, action);
+			&rthread->notification
+				 .actions[NOTIFICATION_INDEX(rcontext->notification->notnum)];
+		int ret = notification_context_instantiate(
+			rthread, rcontext, rcontext->notification, action);
 		if (ret == -1)
 			RETURN_ERROR;
 	}
 
-	ret = sched_delivery_queue_remove(&CORE_LOCAL->delivery_queue,
-									  current_context);
+	ret = delivery_queue_remove(&CORE_LOCAL->delivery_queue, current_thread);
 	if (ret == -1)
 		RETURN_ERROR;
 
-	rcontext->ucontext_active = rucontext;
+	rthread->context_active = rcontext;
 
-	if (rcontext != current_context) {
-		x86_swap_tables(rcontext->address_space->page_table);
+	if (rthread != current_thread) {
+		x86_swap_tables(rthread->address_space->page_table);
 
-		set_user_fs(rcontext->user_fs_base);
-		set_user_gs(rcontext->user_gs_base);
+		set_user_fs(rthread->user_fs_base);
+		set_user_gs(rthread->user_gs_base);
 
-		CORE_LOCAL->current_context = rcontext;
+		CORE_LOCAL->current_thread = rthread;
 	}
 
-	CORE_LOCAL->kernel_stack = rucontext->stack->kernel_stack.sp;
-	CORE_LOCAL->fpu_rstor(rucontext->fpu_context);
+	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
+	CORE_LOCAL->fpu_rstor(rcontext->fpu_thread);
 
-	CORE_LOCAL->user_stack = rucontext->sysctx.user_stack;
-	CORE_LOCAL->error = rucontext->sysctx.user_stack;
+	CORE_LOCAL->user_stack = rcontext->sysctx.user_stack;
+	CORE_LOCAL->error = rcontext->sysctx.user_stack;
 
-	rucontext->blocking = false;
+	rcontext->blocking = false;
 
-	SWAP_TLS(&rucontext->regs);
+	SWAP_TLS(&rcontext->regs);
 
 	__asm__ volatile("mov %0, %%rsp\n\t"
 					 "pop %%r15\n\t"
@@ -659,12 +657,12 @@ finish:
 					 "pop %%rbx\n\t"
 					 "pop %%rax\n\t"
 					 "addq $16, %%rsp\n\t"
-					 "iretq\n\t" ::"r"(&rucontext->regs));
+					 "iretq\n\t" ::"r"(&rcontext->regs));
 })
 
 SYSCALL_DEFINE1(notification_wait, struct comm_bridge *, bridge, {
-	struct context *context = CORE_LOCAL->current_context;
-	struct context *destination;
+	struct thread *thread = CORE_LOCAL->current_thread;
+	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
 	if (ret == -1)
@@ -681,23 +679,23 @@ SYSCALL_DEFINE1(notification_wait, struct comm_bridge *, bridge, {
 	if (notification == NULL)
 		return -1;
 
-	struct ucontext *ucontext = context->ucontext_active;
-	if (ucontext == NULL) {
-		print("ERROR: ucontext is null (should not be)");
+	struct context *context = thread->context_active;
+	if (context == NULL) {
+		print("ERROR: context is null (should not be)");
 		return -1;
 	}
 
-	ucontext->blocking = true;
-	for (; ucontext->blocking;)
+	context->blocking = true;
+	for (; context->blocking;)
 		yield();
 })
 
 SYSCALL_DEFINE0(notification_unmute, {
-	struct context *current_context = CORE_LOCAL->current_context;
-	if (current_context == NULL)
+	struct thread *current_thread = CORE_LOCAL->current_thread;
+	if (current_thread == NULL)
 		RETURN_ERROR;
 
-	struct notification_queue *queue = current_context->notification.queue;
+	struct notification_queue *queue = current_thread->notification.queue;
 	if (queue == NULL)
 		RETURN_ERROR;
 
@@ -705,11 +703,11 @@ SYSCALL_DEFINE0(notification_unmute, {
 })
 
 SYSCALL_DEFINE0(notification_mute, {
-	struct context *current_context = CORE_LOCAL->current_context;
-	if (current_context == NULL)
+	struct thread *current_thread = CORE_LOCAL->current_thread;
+	if (current_thread == NULL)
 		RETURN_ERROR;
 
-	struct notification_queue *queue = current_context->notification.queue;
+	struct notification_queue *queue = current_thread->notification.queue;
 	if (queue == NULL)
 		RETURN_ERROR;
 

@@ -19,11 +19,11 @@ void capability_table_init(struct capability_table *table);
 
 // Looks up an handle in the handle table and returns the associated pointer
 struct capability_binding *capability_lookup(struct capability_table *table,
-									 capability_t handle);
+											 capability_t handle);
 
 // Allocates an handle in the table
 int capability_create(struct capability_table *table, void *obj, uint8_t access,
-				  capability_t *out_handle);
+					  capability_t *out_handle);
 
 // Destroys an handle
 int capability_destroy(struct capability_table *table, capability_t handle);

@@ -1,12 +1,12 @@
 #include <arch/x86/smp.h>
 #include <arch/x86/paging.h>
 
-#include <core/mm/physical.h>
+#include <core/memory/physical.h>
 #include <core/syscall.h>
-#include <core/mm/portal.h>
+#include <core/memory/portal.h>
 #include <core/debug.h>
-#include <core/mm/virtual.h>
-#include <core/mm/address.h>
+#include <core/memory/virtual.h>
+#include <core/memory/address.h>
 
 #include <fayt/compiler.h>
 #include <fayt/circular_queue.h>
@@ -37,7 +37,7 @@ static int portal_fault_cow(struct page_table *, uint64_t *, uintptr_t);
 struct gateway_orb {
 	const char *identifier;
 
-	VECTOR(struct context) active_contexts;
+	VECTOR(struct thread) active_threads;
 
 	int page_cnt;
 	struct page *pages;
@@ -60,12 +60,12 @@ static uint64_t portal_translate_protections(int permission)
 
 int portal_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 {
-	struct context *context = CORE_LOCAL->current_context;
+	struct thread *thread = CORE_LOCAL->current_thread;
 
-	if (unlikely(context == NULL))
+	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = context->address_space->page_table;
+	struct page_table *page_table = thread->address_space->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
@@ -496,19 +496,19 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 	if (unlikely(portal == NULL || req == NULL))
 		RETURN_ERROR;
 
-	struct context *current_context = CORE_LOCAL->current_context;
-	if (unlikely(current_context == NULL))
+	struct thread *current_thread = CORE_LOCAL->current_thread;
+	if (unlikely(current_thread == NULL))
 		panic("DUFAY: core local corrupt");
 
 	struct address_space *source_address_space = ({
-		struct capability_binding *capability_binding =
-			capability_lookup(current_context->handles, req->cow.source.capability);
+		struct capability_binding *capability_binding = capability_lookup(
+			current_thread->capability_table, req->cow.source.capability);
 		capability_binding->obj;
 	});
 
 	struct address_space *destination_address_space = ({
-		struct capability_binding *capability_binding =
-			capability_lookup(current_context->handles, req->cow.source.capability);
+		struct capability_binding *capability_binding = capability_lookup(
+			current_thread->capability_table, req->cow.source.capability);
 		capability_binding->obj;
 	});
 
@@ -629,18 +629,18 @@ int portal(struct portal_req *req, struct portal_resp *resp)
 	portal->base = req->morphology.addr;
 	portal->limit = req->morphology.length;
 
-	struct context *context = CORE_LOCAL->current_context;
+	struct thread *thread = CORE_LOCAL->current_thread;
 	struct page_table *page_table = NULL;
 
-	if (likely(context))
-		page_table = context->address_space->page_table;
-	if (unlikely(context == NULL))
+	if (likely(thread))
+		page_table = thread->address_space->page_table;
+	if (unlikely(thread == NULL))
 		page_table = kernel_mappings.page_table;
 	if (unlikely(page_table == NULL))
 		goto failure;
 
 	portal->prot = req->prot;
-	portal->context = context;
+	portal->thread = thread;
 	portal->page_table = page_table;
 
 	if (unlikely(req == NULL))

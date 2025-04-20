@@ -1,5 +1,5 @@
-#ifndef BCACHE_H_
-#define BCACHE_H_
+#ifndef CORE_BCACHE_H_
+#define CORE_BCACHE_H_
 
 #include <core/capability.h>
 

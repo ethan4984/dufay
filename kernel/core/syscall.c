@@ -1,6 +1,5 @@
-#include <arch/x86/smp.h>
-
-#include <core/scheduler.h>
+#include <core/scheduler/thread.h>
+#include <core/scheduler/processor.h>
 #include <core/syscall.h>
 
 #include <core/debug.h>
@@ -74,13 +73,13 @@ void syscall_handler(struct registers *regs, void *)
 		return;
 	}
 
-	if (unlikely(CORE_LOCAL->current_context == NULL))
+	if (unlikely(CORE_LOCAL->current_thread == NULL))
 		panic("dufay: critical error\n");
-	else if (CORE_LOCAL->current_context->comms.sysperm &
-			 (1 << syscall_index)) {
-		SYSRET(-1, 0);
-		return;
-	}
+	//	else if (CORE_LOCAL->current_thread->comms.sysperm &
+	//			 (1 << syscall_index)) {
+	//		SYSRET(-1, 0);
+	//		return;
+	//	}
 
 	int error;
 
@@ -93,5 +92,6 @@ void syscall_handler(struct registers *regs, void *)
 	}
 
 	SYSRET(error ? error : 0, error);
+
 	return;
 }

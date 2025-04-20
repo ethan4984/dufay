@@ -1,5 +1,5 @@
-#ifndef SYSCALL_H_
-#define SYSCALL_H_
+#ifndef CORE_SYSCALL_H_
+#define CORE_SYSCALL_H_
 
 #include <arch/x86/cpu.h>
 

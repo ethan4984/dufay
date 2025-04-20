@@ -3,8 +3,8 @@
 #include <arch/x86/apic.h>
 #include <arch/x86/cpu.h>
 
-#include <core/mm/virtual.h>
-#include <core/mm/address.h>
+#include <core/memory/virtual.h>
+#include <core/memory/address.h>
 
 #include <core/debug.h>
 #include <fayt/string.h>

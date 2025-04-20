@@ -1,5 +1,5 @@
-#ifndef FUTEX_H_
-#define FUTEX_H_
+#ifndef CORE_FUTEX_H_
+#define CORE_FUTEX_H_
 
 #include <core/events.h>
 

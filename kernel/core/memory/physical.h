@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CORE_MEMORY_PHYSICAL_H_
+#define CORE_MEMORY_PHYSICAL_H_
 
 #include <limine.h>
 
@@ -7,3 +8,5 @@ uint64_t pmm_alloc(uint64_t cnt, uint64_t align);
 void pmm_free(uint64_t base, uint64_t cnt);
 
 extern volatile struct limine_memmap_request limine_memmap_request;
+
+#endif

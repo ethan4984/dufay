@@ -1,8 +1,11 @@
-#ifndef MESSAGE_H_
-#define MESSAGE_H_
+#ifndef CORE_MESSAGE_H_
+#define CORE_MESSAGE_H_
+
 #include <core/capability.h>
-#include <core/scheduler.h>
+#include <core/events.h>
+
 #include <stddef.h>
+
 #include <sys/queue.h>
 
 #define OBJ_CLASS_PORT 0
@@ -41,8 +44,8 @@ struct port {
 
 int message_init();
 
-int message_send(struct message_header *message, struct context *context);
+int message_send(struct message_header *message, struct thread *thread);
 int message_receive(capability_t port, struct message_header *out,
-					struct context *context);
+					struct thread *thread);
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef PORTAL_H_
-#define PORTAL_H_
+#ifndef CORE_MEMORY_PORTAL_H_
+#define CORE_MEMORY_PORTAL_H_
 
 #include <fayt/hash.h>
 #include <fayt/bst.h>
@@ -14,7 +14,7 @@ struct portal {
 	int type;
 	int prot;
 
-	struct context *context;
+	struct thread *thread;
 	struct page_table *page_table;
 
 	struct gateway_orb *orb;

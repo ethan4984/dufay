@@ -96,7 +96,7 @@ void x86_system_init(void)
 
 void x86_fpu_init(struct cpu_local *cpu_local)
 {
-	cpu_local->fpu_context_size = 512;
+	cpu_local->fpu_thread_size = 512;
 	cpu_local->fpu_save = fxsave;
 	cpu_local->fpu_rstor = fxrstor;
 }

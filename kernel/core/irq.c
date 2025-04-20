@@ -27,11 +27,11 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 		faulting_address >= aslr_irq.maximum_vaddr)
 		return -1;
 
-	struct context *context = CORE_LOCAL->current_context;
-	if (unlikely(context == NULL))
+	struct thread *thread = CORE_LOCAL->current_thread;
+	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = context->address_space->page_table;
+	struct page_table *page_table = thread->address_space->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 

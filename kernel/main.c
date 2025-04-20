@@ -1,16 +1,17 @@
 #include <arch/x86/cpu.h>
 
+#include <core/scheduler/thread.h>
 #include <core/debug.h>
 #include <core/message.h>
 #include <core/init.h>
-#include <core/mm/physical.h>
-#include <core/scheduler.h>
-#include <core/mm/virtual.h>
+#include <core/memory/physical.h>
+#include <core/memory/virtual.h>
 
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
 
 #include <fayt/slab.h>
+#include <fayt/debug.h>
 #include <fayt/string.h>
 
 #include <limine.h>
@@ -80,8 +81,23 @@ void dufay_entry(void)
 
 	x86_system_tables();
 
-	message_init();
-	launch_init();
+	int ret = launch_schedulers();
+	if (ret == -1) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	ret = message_init();
+	if (ret == -1) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	ret = launch_init();
+	if (ret == -1) {
+		REPORT_ERROR;
+		panic("");
+	}
 
 	__asm__("sti");
 

@@ -1,9 +1,9 @@
 #include <arch/x86/smp.h>
 
+#include <core/scheduler/thread.h>
 #include <core/futex.h>
-#include <core/mm/virtual.h>
+#include <core/memory/virtual.h>
 #include <core/debug.h>
-#include <core/scheduler.h>
 #include <core/syscall.h>
 #include <core/lock.h>
 
@@ -15,12 +15,12 @@ static struct hash_table futex_table;
 
 int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 {
-	struct context *context = CORE_LOCAL->current_context;
-	if (unlikely(context == NULL))
+	struct thread *thread = CORE_LOCAL->current_thread;
+	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
 	uint64_t futex_paddr = !virtual ? uaddr : ({
-		struct page_table *page_table = context->address_space->page_table;
+		struct page_table *page_table = thread->address_space->page_table;
 		if (unlikely(page_table == NULL))
 			RETURN_ERROR;
 
@@ -86,11 +86,11 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 	case FUTEX_WAKE: {
 		*vuaddr = futex->expected;
 
-		struct ucontext *ucontext = context->ucontext_active;
-		if (unlikely(ucontext == NULL))
+		struct context *context = thread->context_active;
+		if (unlikely(context == NULL))
 			RETURN_ERROR;
 
-		ret = equeue_wake(&futex->etrigger, ucontext);
+		ret = equeue_wake(&futex->etrigger, context);
 		if (ret == -1)
 			RETURN_ERROR;
 

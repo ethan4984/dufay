@@ -2,8 +2,8 @@
 #include <arch/x86/idt.h>
 #include <arch/x86/apic.h>
 
-#include <core/scheduler.h>
-#include <core/mm/portal.h>
+#include <core/scheduler/context.h>
+#include <core/memory/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
 #include <core/syscall.h>
@@ -54,6 +54,11 @@ int idt_reserve_vector(void)
 	}
 
 	return -1;
+}
+
+void idt_release_vector(uint8_t vector)
+{
+	interrupt_vectors[vector].reserved = false;
 }
 
 int idt_instantiate_vector(uint8_t vector,

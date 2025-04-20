@@ -1,6 +1,6 @@
 #include <arch/x86/cpu.h>
 
-#include <core/mm/physical.h>
+#include <core/memory/physical.h>
 
 #include <fayt/slab.h>
 #include <fayt/debug.h>
