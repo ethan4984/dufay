@@ -107,7 +107,7 @@ int cfs_dequeue(struct scheduler *scheduler, struct thread *thread)
 
 	//print("dequeueing thread cid=%x\n", thread->proc_id.cid);
 
-	ret = RB_GENERIC_DELETE(cfs->unit_tree, vruntime, unit);
+	ret = RB_GENERIC_DELETE(cfs->unit_tree, unit);
 	if (ret == -1) {
 		spinrelease_irqsave(&scheduler->lock);
 		RETURN_ERROR;
