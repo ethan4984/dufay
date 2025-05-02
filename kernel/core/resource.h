@@ -26,7 +26,9 @@ struct rpool {
 	struct rboundary **segments;
 };
 
-int rinit(struct rpool *, uintptr_t *, size_t);
+int rinit(struct rpool *, uintptr_t, size_t);
 int rdestroy(struct rpool *);
+int ralloc(struct rpool *, uintptr_t *, size_t);
+int rfree(struct rpool *, uintptr_t);
 
 #endif
