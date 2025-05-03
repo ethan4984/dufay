@@ -11,13 +11,13 @@
 #include <fayt/debug.h>
 #include <fayt/compiler.h>
 #include <fayt/string.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 
 static struct aslr aslr_irq = { .layout = NULL,
 								.minimum_vaddr = 0xffffe00000000000,
 								.maximum_vaddr = 0xfffff00000000000 };
 
-static struct hash_table cortex_table;
+static struct dictionary cortex_table;
 
 int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 {
@@ -64,7 +64,7 @@ found:
 		page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
 	page->refcnt = alloc(sizeof(*page->refcnt));
 
-	int ret = hash_table_push(page_table->pages, &page->vaddr, page,
+	int ret = dictionary_push(page_table->pages, &page->vaddr, page,
 							  sizeof(page->vaddr));
 	if (ret == -1)
 		RETURN_ERROR;
@@ -122,7 +122,7 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (ret == -1)
 		RETURN_ERROR;
 
-	ret = hash_table_push(&cortex_table, (void *)cortex->identifier, cortex,
+	ret = dictionary_push(&cortex_table, (void *)cortex->identifier, cortex,
 						  strlen(cortex->identifier));
 	if (ret == -1)
 		RETURN_ERROR;
@@ -141,7 +141,7 @@ static int irq_cortex_anchor(const char *identifier, struct anchor *anchor)
 		RETURN_ERROR;
 
 	struct irq_cortex *cortex = NULL;
-	int ret = hash_table_search(&cortex_table, (void *)identifier,
+	int ret = dictionary_search(&cortex_table, (void *)identifier,
 								strlen(identifier), (void **)&cortex);
 	if (ret == -1 || cortex == NULL)
 		RETURN_ERROR;

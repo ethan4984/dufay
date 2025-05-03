@@ -3,7 +3,7 @@
 
 #include <core/scheduler/thread.h>
 
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 #include <fayt/time.h>
 
 struct cfs_unit {
@@ -19,7 +19,7 @@ struct cfs_unit {
 
 struct cfs {
 	struct cfs_unit *unit_tree;
-	struct hash_table *unit_table;
+	struct dictionary *unit_table;
 };
 
 int cfs_enqueue(struct scheduler *, struct thread *);

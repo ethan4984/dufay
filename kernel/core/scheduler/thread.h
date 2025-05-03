@@ -67,7 +67,7 @@ constexpr int TGID_SYSTEM = 0;
 
 struct tgroup {
 	struct bitmap tid_bitmap;
-	struct hash_table tid_table;
+	struct dictionary tid_table;
 	int tgid;
 };
 

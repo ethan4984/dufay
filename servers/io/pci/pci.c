@@ -1,7 +1,7 @@
 #include <fayt/debug.h>
 #include <fayt/portal.h>
 #include <fayt/address.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 #include <fayt/syscall.h>
 #include <fayt/string.h>
 #include <fayt/slab.h>
@@ -11,8 +11,8 @@
 
 #include <pci.h>
 
-struct hash_table device_tree;
-struct hash_table segment_tree;
+struct dictionary device_tree;
+struct dictionary segment_tree;
 
 static int pci_device_bar(volatile union pci_config *, struct pci_bar *, int);
 static int pci_device_msi(struct pci_device *, int);
@@ -35,7 +35,7 @@ static void nbar(struct notification_info *, void *data, int)
 	}
 
 	struct pci_device *device = NULL;
-	int ret = hash_table_search(&device_tree, &nbar->descriptor,
+	int ret = dictionary_search(&device_tree, &nbar->descriptor,
 								sizeof(struct pci_descriptor),
 								(void **)&device);
 	if (ret == -1 || device == NULL) {
@@ -62,7 +62,7 @@ static void nmsi(struct notification_info *, void *data, int)
 	}
 
 	struct pci_device *device = NULL;
-	int ret = hash_table_search(&device_tree, &nmsi->descriptor,
+	int ret = dictionary_search(&device_tree, &nmsi->descriptor,
 								sizeof(struct pci_descriptor),
 								(void **)&device);
 	if (ret == -1 || device == NULL) {
@@ -402,7 +402,7 @@ int pci(struct pci_server_meta *server_meta)
 		pci_segment->address_space = (void *)addr;
 		pci_segment->mcfg_entry = *mcfg_entry;
 
-		ret = hash_table_push(&segment_tree, &pci_segment->segment, pci_segment,
+		ret = dictionary_push(&segment_tree, &pci_segment->segment, pci_segment,
 							  sizeof(struct pci_segment));
 		if (ret == -1)
 			RETURN_ERROR;
@@ -426,7 +426,7 @@ int pci(struct pci_server_meta *server_meta)
 												 .device = device,
 												 .func = func };
 
-					ret = hash_table_push(&device_tree, &pci_device->descriptor,
+					ret = dictionary_push(&device_tree, &pci_device->descriptor,
 										  pci_device,
 										  sizeof(struct pci_descriptor));
 					if (ret == -1)

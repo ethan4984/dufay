@@ -29,7 +29,7 @@ int create_thread(int tgid, struct thread **thread)
 
 	(*thread)->thread_capability =
 		(struct thread_capability){ .tgid = tgid, .tid = tid };
-	ret = hash_table_push(&tgroup->tid_table, &(*thread)->thread_capability.tid,
+	ret = dictionary_push(&tgroup->tid_table, &(*thread)->thread_capability.tid,
 						  (*thread), sizeof((*thread)->thread_capability.tid));
 	if (ret == -1)
 		RETURN_ERROR;
@@ -105,7 +105,7 @@ int search_thread(struct thread_capability *thread_capability,
 	if (ret == -1)
 		RETURN_ERROR;
 
-	ret = hash_table_search(&tgroup->tid_table, &thread_capability->tid,
+	ret = dictionary_search(&tgroup->tid_table, &thread_capability->tid,
 							sizeof(thread_capability->tid), (void **)thread);
 	if (ret == -1)
 		RETURN_ERROR;
@@ -215,7 +215,7 @@ int delivery_queue_push(struct delivery_queue *queue, struct thread *thread)
 }
 
 static struct bitmap tgroup_bitmap;
-static struct hash_table tgroup_table;
+static struct dictionary tgroup_table;
 
 int tgroup_search(int tgid, struct tgroup **tgroup)
 {
@@ -223,7 +223,7 @@ int tgroup_search(int tgid, struct tgroup **tgroup)
 		RETURN_ERROR;
 
 	int ret =
-		hash_table_search(&tgroup_table, &tgid, sizeof(tgid), (void **)tgroup);
+		dictionary_search(&tgroup_table, &tgid, sizeof(tgid), (void **)tgroup);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -242,7 +242,7 @@ int tgroup_insert(struct tgroup *tgroup)
 	tgroup->tid_bitmap =
 		(struct bitmap){ .data = NULL, .size = 1, .resizable = true };
 
-	ret = hash_table_push(&tgroup_table, &tgroup->tgid, tgroup,
+	ret = dictionary_push(&tgroup_table, &tgroup->tgid, tgroup,
 						  sizeof(tgroup->tgid));
 	if (ret == -1)
 		RETURN_ERROR;
@@ -252,7 +252,7 @@ int tgroup_insert(struct tgroup *tgroup)
 
 int tgroup_remove(int tgid)
 {
-	int ret = hash_table_delete(&tgroup_table, &tgid, sizeof(tgid));
+	int ret = dictionary_delete(&tgroup_table, &tgid, sizeof(tgid));
 	if (ret == -1)
 		RETURN_ERROR;
 

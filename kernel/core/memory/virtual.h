@@ -5,7 +5,7 @@
 
 #include <fayt/vector.h>
 #include <fayt/lock.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 
 #include <stdint.h>
 #include <stddef.h>
@@ -28,7 +28,7 @@ struct page {
 
 struct page_table {
 	struct portal *portal_root;
-	struct hash_table *pages;
+	struct dictionary *pages;
 
 	uint64_t *(*map_page)(struct page_table *page_table, uint64_t vaddr,
 						  uint64_t paddr, uint64_t flags);

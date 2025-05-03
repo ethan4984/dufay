@@ -62,7 +62,7 @@ exit:
 		unit->thread = thread;
 	}
 
-	int ret = hash_table_push(cfs->unit_table, &unit->thread->thread_capability,
+	int ret = dictionary_push(cfs->unit_table, &unit->thread->thread_capability,
 							  unit, sizeof(struct thread_capability));
 	if (ret == -1) {
 		spinrelease_irqsave(&scheduler->lock);
@@ -97,7 +97,7 @@ int cfs_dequeue(struct scheduler *scheduler, struct thread *thread)
 
 	spinlock_irqsave(&scheduler->lock);
 
-	int ret = hash_table_delete(cfs->unit_table,
+	int ret = dictionary_delete(cfs->unit_table,
 								&unit->thread->thread_capability,
 								sizeof(struct thread_capability));
 	if (ret == -1) {
@@ -154,7 +154,7 @@ int cfs_init(struct scheduler *scheduler)
 
 	struct cfs *cfs = scheduler->private;
 
-	cfs->unit_table = alloc(sizeof(struct hash_table));
+	cfs->unit_table = alloc(sizeof(struct dictionary));
 	if (unlikely(cfs->unit_table == NULL))
 		RETURN_ERROR;
 

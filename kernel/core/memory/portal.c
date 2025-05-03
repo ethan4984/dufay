@@ -44,7 +44,7 @@ struct gateway_orb {
 	uint64_t **pml;
 };
 
-struct hash_table portal_gateway_map;
+struct dictionary portal_gateway_map;
 
 static uint64_t portal_translate_protections(int permission)
 {
@@ -158,7 +158,7 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 
 			page_table->map_page(page_table, page->vaddr, page->frame->paddr,
 								 flags);
-			int ret = hash_table_push(page_table->pages, &page->vaddr, page,
+			int ret = dictionary_push(page_table->pages, &page->vaddr, page,
 									  sizeof(page->vaddr));
 			if (ret == -1)
 				RETURN_ERROR;
@@ -201,7 +201,7 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 		RETURN_ERROR;
 
 	struct page *page = NULL;
-	int ret = hash_table_search(page_table->pages, &addr, sizeof(addr),
+	int ret = dictionary_search(page_table->pages, &addr, sizeof(addr),
 								(void **)page);
 	if (unlikely(ret == -1 || page == NULL))
 		RETURN_ERROR;
@@ -313,7 +313,7 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 		if (page->refcnt == NULL)
 			RETURN_ERROR;
 
-		int ret = hash_table_push(portal->page_table->pages, &page->vaddr, page,
+		int ret = dictionary_push(portal->page_table->pages, &page->vaddr, page,
 								  sizeof(page->vaddr));
 		if (ret == -1)
 			RETURN_ERROR;
@@ -331,7 +331,7 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 		RETURN_ERROR;
 
 	struct gateway_orb *orb = NULL;
-	int ret = hash_table_search(&portal_gateway_map,
+	int ret = dictionary_search(&portal_gateway_map,
 								(void *)req->share.identifier,
 								strlen(req->share.identifier), (void **)&orb);
 
@@ -352,7 +352,7 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 
 		strcpy((void *)orb->identifier, req->share.identifier);
 
-		int ret = hash_table_push(&portal_gateway_map, (void *)orb->identifier,
+		int ret = dictionary_push(&portal_gateway_map, (void *)orb->identifier,
 								  orb, strlen(orb->identifier));
 		if (ret == -1)
 			RETURN_ERROR;
@@ -546,7 +546,7 @@ skip:
 				destination_table, dest_page->vaddr, dest_page->frame->paddr,
 				dest_page->flags);
 
-			int ret = hash_table_push(destination_table->pages,
+			int ret = dictionary_push(destination_table->pages,
 									  &dest_page->vaddr, dest_page,
 									  sizeof(dest_page->vaddr));
 			if (ret == -1)
@@ -564,7 +564,7 @@ skip:
 		for (int i = 0; i < DIV_ROUNDUP(req->cow.limit, PAGE_SIZE); i++) {
 			__label__ skip;
 			struct page *src_page;
-			int ret = hash_table_search(source_table->pages, &src_vaddr,
+			int ret = dictionary_search(source_table->pages, &src_vaddr,
 										sizeof(src_vaddr), (void **)&src_page);
 			if (src_page == NULL)
 				continue;
@@ -589,7 +589,7 @@ skip:
 				destination_table, dest_page->vaddr, dest_page->frame->paddr,
 				dest_page->flags);
 
-			ret = hash_table_push(destination_table->pages, &dest_page->vaddr,
+			ret = dictionary_push(destination_table->pages, &dest_page->vaddr,
 								  dest_page, sizeof(dest_page->vaddr));
 			if (ret == -1)
 				RETURN_ERROR;
@@ -704,7 +704,7 @@ void portal_destroy(struct portal *portal)
 		}
 	}
 
-	hash_table_destroy(portal->pages);
+	dictionary_destroy(portal->pages);
 
 	free(portal);
 }

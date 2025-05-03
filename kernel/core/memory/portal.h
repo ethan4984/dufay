@@ -1,7 +1,7 @@
 #ifndef CORE_MEMORY_PORTAL_H_
 #define CORE_MEMORY_PORTAL_H_
 
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 #include <fayt/bst.h>
 #include <fayt/portal.h>
 
@@ -23,7 +23,7 @@ struct portal {
 	uintptr_t limit;
 	uint64_t flags;
 
-	struct hash_table *pages;
+	struct dictionary *pages;
 
 	struct portal *left;
 	struct portal *right;

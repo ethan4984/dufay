@@ -7,7 +7,7 @@
 #include <core/debug.h>
 
 #include <fayt/string.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 #include <fayt/debug.h>
 
 #include <limine.h>
@@ -26,7 +26,7 @@ int vmm_default_table(struct page_table *page_table)
 	page_table->map_page = x86_map_page;
 	page_table->unmap_page = x86_unmap_page;
 	page_table->page_entry = x86_page_entry;
-	page_table->pages = alloc(sizeof(struct hash_table));
+	page_table->pages = alloc(sizeof(struct dictionary));
 	if (page_table->pages == NULL)
 		RETURN_ERROR;
 

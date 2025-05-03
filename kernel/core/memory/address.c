@@ -8,7 +8,7 @@
 #include <fayt/debug.h>
 #include <fayt/address.h>
 
-static struct hash_table as_table;
+static struct dictionary as_table;
 static int asid_bump;
 
 int address_find_as(int asid, struct address_space **as)
@@ -16,7 +16,7 @@ int address_find_as(int asid, struct address_space **as)
 	if (as == NULL)
 		RETURN_ERROR;
 
-	int ret = hash_table_search(&as_table, &asid, sizeof(asid), (void **)as);
+	int ret = dictionary_search(&as_table, &asid, sizeof(asid), (void **)as);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -30,7 +30,7 @@ int address_push_as(struct address_space *as)
 
 	as->asid = asid_bump++;
 
-	int ret = hash_table_push(&as_table, &as->asid, as, sizeof(as->asid));
+	int ret = dictionary_push(&as_table, &as->asid, as, sizeof(as->asid));
 	if (ret == -1)
 		RETURN_ERROR;
 

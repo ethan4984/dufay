@@ -7,9 +7,9 @@
 #include <fayt/debug.h>
 #include <fayt/string.h>
 #include <fayt/compiler.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 
-static struct hash_table bcache_table;
+static struct dictionary bcache_table;
 
 static int bcache_register(capability_t handle)
 {
@@ -26,7 +26,7 @@ static int bcache_lookup(capability_t handle, struct bcache **bcache)
 	if (capability_binding == NULL)
 		RETURN_ERROR;
 
-	int ret = hash_table_search(&bcache_table, capability_binding,
+	int ret = dictionary_search(&bcache_table, capability_binding,
 								sizeof(struct capability_binding),
 								(void **)bcache);
 	if (ret == -1)

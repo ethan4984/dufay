@@ -11,7 +11,7 @@
 #include <fayt/compiler.h>
 #include <fayt/sched.h>
 
-static struct hash_table futex_table;
+static struct dictionary futex_table;
 
 int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 {
@@ -26,7 +26,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 
 		uint64_t uaddr_vaddr = uaddr & ~(0xfff);
 		struct page *page = NULL;
-		int ret = hash_table_search(page_table->pages, &uaddr_vaddr,
+		int ret = dictionary_search(page_table->pages, &uaddr_vaddr,
 									sizeof(uaddr_vaddr), (void **)&page);
 		if (ret == -1 || page == NULL)
 			RETURN_ERROR;
@@ -35,7 +35,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 
 	struct futex *futex = NULL;
 	volatile uint32_t *vuaddr;
-	int ret = hash_table_search(&futex_table, &futex_paddr, sizeof(futex_paddr),
+	int ret = dictionary_search(&futex_table, &futex_paddr, sizeof(futex_paddr),
 								(void **)&futex);
 	if (futex == NULL && (ops == FUTEX_WAIT || ops == FUTEX_WAKE)) {
 		futex = alloc(sizeof(struct futex));
@@ -50,7 +50,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 		if (ret == -1)
 			RETURN_ERROR;
 
-		ret = hash_table_push(&futex_table, &futex->paddr, futex,
+		ret = dictionary_push(&futex_table, &futex->paddr, futex,
 							  sizeof(futex->paddr));
 		if (ret == -1)
 			RETURN_ERROR; // TODO keep track of active locks per page
@@ -75,7 +75,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 		}
 
 		if (--futex->refcnt <= 0) {
-			int ret = hash_table_delete(&futex_table, &futex_paddr,
+			int ret = dictionary_delete(&futex_table, &futex_paddr,
 										sizeof(futex_paddr));
 			if (ret == -1)
 				RETURN_ERROR;

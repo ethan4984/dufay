@@ -16,7 +16,7 @@
 #include <fayt/compiler.h>
 #include <fayt/portal.h>
 #include <fayt/debug.h>
-#include <fayt/hash.h>
+#include <fayt/dictionary.h>
 
 int destroy_context(struct thread *thread, struct context *context)
 {
