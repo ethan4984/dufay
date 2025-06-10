@@ -6,6 +6,7 @@
 #include <core/init.h>
 #include <core/memory/physical.h>
 #include <core/memory/virtual.h>
+#include <core/memory/slab.h>
 
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
@@ -80,6 +81,8 @@ void dufay_entry(void)
 	fadt = acpi_find_sdt("FACP");
 
 	x86_system_tables();
+
+	kmem_init();
 
 	int ret = launch_schedulers();
 	if (ret == -1) {

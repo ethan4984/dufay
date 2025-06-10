@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <core/memory/slab.h>
 
 struct object_header {
 	// Which class is the object?
@@ -13,11 +14,18 @@ struct object_header {
 };
 
 struct object_class {
+	/* Short but descriptive name */
+	char name[8];
 	void (*constructor)(void *ptr);
 	void (*destructor)(void *ptr);
 	size_t size;
+	struct kmem_cache *cache;
 };
 
+/*
+  Register a new object class
+  NOTE: the kmem cache will be initialized by this function if `data.cache` is NULL
+*/
 int object_register_class(uint8_t class, struct object_class data);
 
 int object_new(void **out, uint8_t class);
