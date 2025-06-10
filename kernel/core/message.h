@@ -20,7 +20,7 @@
 struct message_header {
 	capability_t destination; // Whom to send the message to
 	capability_t reply; // A SEND or SEND-ONCE right that is sent along with the
-		// message, to allow for reply
+	// message, to allow for reply
 
 	size_t size;
 

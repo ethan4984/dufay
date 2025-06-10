@@ -12,6 +12,7 @@
 #include <fayt/string.h>
 
 #include <sys/queue.h>
+#include <core/memory/slab.h>
 
 static struct port *lookup_port(capability_t port, struct thread *ctx,
 								uint8_t *rights)
@@ -41,23 +42,25 @@ static void port_destructor(void *obj)
 
 	TAILQ_FOREACH(msg, &port->queue, queue_hook)
 	{
-		free(msg->header);
-		free(msg);
+		kmem_free(msg->header);
+		kmem_free(msg);
 	}
 }
 
 int message_init()
 {
-	struct object_class class = { .constructor = port_constructor,
+	struct object_class class = { .name = "port",
+								  .constructor = port_constructor,
 								  .destructor = port_destructor,
-								  .size = sizeof(struct port) };
+								  .size = sizeof(struct port),
+								  .cache = NULL };
 
 	return object_register_class(OBJ_CLASS_PORT, class);
 }
 
 int message_send(struct message_header *message, struct thread *thread)
 {
-	struct kernel_message *msg = alloc(sizeof(struct kernel_message));
+	struct kernel_message *msg = kmem_malloc(sizeof(struct kernel_message));
 	if (msg == NULL)
 		RETURN_ERROR;
 	uint8_t dest_rights = 0, reply_rights = 0;
@@ -75,7 +78,7 @@ int message_send(struct message_header *message, struct thread *thread)
 		!(dest_rights & PORT_RIGHT_SEND_ONCE))
 		RETURN_ERROR;
 
-	msg->header = alloc(message->size);
+	msg->header = kmem_malloc(message->size);
 	if (msg->header == NULL)
 		RETURN_ERROR;
 
@@ -90,7 +93,6 @@ int message_send(struct message_header *message, struct thread *thread)
 
 	equeue_wake(&destination->trigger,
 				CORE_LOCAL->current_thread->context_active);
-
 	return 0;
 }
 
@@ -122,8 +124,8 @@ int message_receive(capability_t port, struct message_header *out,
 
 	TAILQ_REMOVE(&actual_port->queue, first, queue_hook);
 
-	free(first->header);
-	free(first);
+	kmem_free(first->header);
+	kmem_free(first);
 
 	return 0;
 }
