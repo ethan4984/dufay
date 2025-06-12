@@ -1,0 +1,23 @@
+#!/bin/bash
+
+frontend="${FRONTEND:-kconfig-nconf}"
+
+has_kconfig_frontends=true
+
+if ! command -v kconfig-mconf &> /dev/null
+then
+    has_kconfig_frontends=false
+fi
+
+
+if [ "$has_kconfig_frontends" = false ]; then
+    if ! command -v python3 -m menuconfig -h &> /dev/null
+    then
+	echo "No Kconfig frontend found. Please install kconfig-frontends or python3-kconfiglib"
+	exit 1
+    fi
+    
+    python3 -m menuconfig 
+else
+ $frontend Kconfig
+fi

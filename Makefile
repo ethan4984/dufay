@@ -8,7 +8,7 @@ all: $(DISK_IMAGE)
 
 QEMUFLAGS = \
 	-m 2G \
-	-smp 1 \
+	-smp 2 \
 	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
 	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
 	-device intel-iommu,aw-bits=48 \
@@ -17,7 +17,7 @@ QEMUFLAGS = \
 
 QEMUFLAGS_ISO = \
 	-m 2G \
-	-smp 1 \
+	-smp 2 \
 	-cdrom $(ISO_IMAGE) \
 	-boot d \
 	-machine type=q35,accel=kvm \
@@ -111,6 +111,12 @@ clean:
 .PHONY: format
 format:
 	find kernel servers -iname '*.h' -o -iname '*.c' | xargs clang-format -i
+
+.PHONY: kconfig
+kconfig:
+	$(MAKE) -C kernel menuconfig
+
+
 
 .PHONY: distclean
 distclean: clean

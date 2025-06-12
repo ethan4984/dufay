@@ -12,3 +12,5 @@ io/pci/pci
 io/nvme/controller/nvme
 io/nvme/irq/nvme_irq
 compile_commands.json
+.config
+.config.old
