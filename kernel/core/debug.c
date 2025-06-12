@@ -10,13 +10,19 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <core/lock.h>
 
 static void print_write(struct stream_info *, char);
 
 struct stream_info print_stream = { .write = print_write };
 
-SYSCALL_DEFINE1(log, char, character,
-				({ print_stream.write(&print_stream, character); }))
+static struct spinlock print_lock;
+
+SYSCALL_DEFINE1(log, char, character, ({
+					spinlock_irqsave(&print_lock);
+					print_stream.write(&print_stream, character);
+					spinrelease_irqsave(&print_lock);
+				}))
 
 void print_unlocked(const char *str, ...)
 {
@@ -33,6 +39,7 @@ void print(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
+	spinlock_irqsave(&print_lock);
 	const char *prefix = "DUFAY: [KERNEL] ";
 	for (; *prefix;) {
 		print_stream.write(&print_stream, *prefix);
@@ -42,6 +49,8 @@ void print(const char *str, ...)
 	stream_print(&print_stream, str, arg);
 
 	va_end(arg);
+
+	spinrelease_irqsave(&print_lock);
 }
 
 void panic(const char *str, ...)

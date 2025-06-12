@@ -29,6 +29,44 @@ int main()
 	slab_cache_create(&pool, "CACHE4096", 4096);
 
 	print("Slab cache directory initialised\n");
+
+	struct syscall_response response = SYSCALL2(17, 0, (1 << 0) | (1 << 1));
+
+	if (response.ret == -1) {
+		print("create failed");
+		goto failure;
+	}
+
+	uint32_t port = response.code;
+
+	print("Created port %d\n", response.code);
+	struct msg {
+		struct message_header hdr;
+		char str[16];
+	};
+
+	struct msg *msg = alloc(sizeof(*msg));
+	struct msg *omsg = alloc(sizeof(*msg));
+
+	omsg->str[0] = 'h';
+	omsg->hdr.destination = port;
+	omsg->hdr.size = sizeof(*msg);
+	omsg->hdr.reply = port;
+
+	// send
+	response = SYSCALL1(16, (uintptr_t)omsg);
+
+	// recv
+	response = SYSCALL2(15, port, (uintptr_t)msg);
+
+	if (response.ret == -1) {
+		print("recv failed!");
+	}
+
+	print("got: %c\n", msg->str[0]);
+
+	// destroy port
+	SYSCALL1(19, port);
 failure:
 	for (;;)
 		;

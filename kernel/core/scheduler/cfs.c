@@ -15,6 +15,7 @@ int cfs_enqueue(struct scheduler *scheduler, struct thread *thread)
 
 static int cfs_internal_enqueue(struct scheduler *scheduler,
 								struct thread *thread, int offload)
+
 {
 	if (unlikely(thread == NULL))
 		RETURN_ERROR;
@@ -105,8 +106,6 @@ int cfs_dequeue(struct scheduler *scheduler, struct thread *thread)
 		RETURN_ERROR;
 	}
 
-	//print("dequeueing thread cid=%x\n", thread->proc_id.cid);
-
 	ret = RB_GENERIC_DELETE(cfs->unit_tree, unit);
 	if (ret == -1) {
 		spinrelease_irqsave(&scheduler->lock);
@@ -136,6 +135,7 @@ int cfs_traverse(struct scheduler *scheduler, struct thread **thread)
 	struct cfs_unit *enqueue = cfs->unit_tree;
 	while (enqueue && enqueue->left)
 		enqueue = enqueue->left;
+
 	*thread = enqueue->thread;
 
 	spinrelease_irqsave(&scheduler->lock);

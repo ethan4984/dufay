@@ -22,6 +22,7 @@ static void core_bootstrap(struct cpu_local *);
 static struct spinlock core_init_lock;
 
 size_t logical_processor_cnt = 0;
+static _Atomic int cpus_up = 0;
 struct cpu_local *logical_processor_locales;
 
 static void core_bootstrap(struct cpu_local *cpu_local)
@@ -43,9 +44,12 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 
 	apic_timer_init(SCHED_TICK_RATE_MS);
 
-	__asm__ volatile("mov %0, %%cr8\nsti" ::"r"(0ull));
+	atomic_fetch_add(&cpus_up, 1);
 
 	logical_processor_cnt++;
+
+	__asm__ volatile("mov %0, %%cr8\nsti" ::"r"(0ull));
+
 	chain_aps();
 
 	for (;;) {
@@ -88,6 +92,7 @@ static void chain_aps()
 		x86_fpu_init(cpu_local);
 		wrmsr(MSR_GS_BASE, (uintptr_t)cpu_local);
 		logical_processor_cnt++;
+
 		return chain_aps();
 	}
 
@@ -130,10 +135,19 @@ void boot_aps(void)
 	bootable_processor_cnt = madt_ent0_list.length;
 	logical_processor_locales =
 		alloc(sizeof(struct cpu_local) * (bootable_processor_cnt + 1));
+
 	if (logical_processor_locales == NULL) {
 		REPORT_ERROR;
 		panic("");
 	}
 
+	atomic_store(&cpus_up, 1);
+	logical_processor_cnt = 0;
+
 	chain_aps();
+
+	while (atomic_load(&cpus_up) != bootable_processor_cnt) {
+	}
+
+	print("All %d logical processors are up\n", logical_processor_cnt);
 }

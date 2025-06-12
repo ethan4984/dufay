@@ -1,3 +1,4 @@
+#include "arch/x86/cpu.h"
 #include <arch/x86/smp.h>
 #include <arch/x86/paging.h>
 
@@ -20,22 +21,29 @@ struct tgroup tgroup_system;
 
 static int launch_server(const char *, struct thread *, void *, int);
 
-int launch_init(void)
-{
-	if (limine_module_request.response == NULL)
-		RETURN_ERROR;
+struct thread *new_kernel_thread(uintptr_t entry);
 
+int init_system_tgroup()
+{
 	int ret = tgroup_insert(&tgroup_system);
 	if (ret == -1)
 		RETURN_ERROR;
 	if (tgroup_system.tgid != TGID_SYSTEM)
 		RETURN_ERROR;
 
+	return 0;
+}
+
+int launch_init(void)
+{
+	if (limine_module_request.response == NULL)
+		RETURN_ERROR;
+
 	struct limine_file **modules = limine_module_request.response->modules;
 	int module_count = limine_module_request.response->module_count;
 
 	struct thread *thread_init;
-	ret = create_thread(TGID_SYSTEM, &thread_init);
+	int ret = create_thread(TGID_SYSTEM, &thread_init);
 	if (ret == -1)
 		RETURN_ERROR;
 
@@ -48,6 +56,52 @@ int launch_init(void)
 		RETURN_ERROR;
 
 	return 0;
+}
+
+struct thread *new_kernel_thread(uintptr_t entry)
+{
+	struct thread *thread;
+	int ret = create_thread(TGID_SYSTEM, &thread);
+	if (ret == -1)
+		return NULL;
+
+	struct ustack *ustack = alloc(sizeof(struct ustack));
+
+	ustack->kernel_stack.sp =
+		pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE), 1) +
+		CONTEXT_DEFAULT_STACK_SIZE + HIGH_VMA;
+	ustack->kernel_stack.size = CONTEXT_DEFAULT_STACK_SIZE;
+	ustack->active = 1;
+
+	ret = USTACK_PUSH(thread, ustack);
+	if (ret == -1) {
+		print("ERROR: unable to push ustack\n");
+	}
+
+	struct context *context = alloc(sizeof(struct context));
+
+	context->fpu_thread = alloc(CORE_LOCAL->fpu_thread_size);
+	context->stack = ustack;
+	context->thread = thread;
+	context->etrigger = alloc(sizeof(struct etrigger));
+	context->etrigger->context = context;
+
+	ret = CONTEXT_PUSH(thread, context);
+
+	thread->context_top = context;
+
+	context->regs.rip = entry;
+	context->regs.cs = 0x28; // kernel code segment
+	context->regs.rflags = 0x202;
+	context->regs.ss = 0x30; // kernel data segment
+	context->regs.rsp = ustack->kernel_stack.sp;
+
+	thread->user_fs_base = rdmsr(MSR_FS_BASE);
+	thread->user_gs_base = rdmsr(MSR_GS_BASE);
+
+	thread->address_space = &kernel_mappings;
+
+	return thread;
 }
 
 static int launch_server(const char *identifier, struct thread *thread,
