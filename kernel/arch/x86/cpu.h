@@ -130,7 +130,7 @@ static inline void swapgs(void)
 
 static inline void invlpg(uint64_t vaddr)
 {
-	__asm__ volatile("invlpg %0" ::"m"((*((int(*)[])((void *)vaddr))))
+	__asm__ volatile("invlpg %0" ::"m"((*((int (*)[])((void *)vaddr))))
 					 : "memory");
 }
 

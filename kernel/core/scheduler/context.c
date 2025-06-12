@@ -83,10 +83,9 @@ static int fetch_thread(struct thread **next_thread,
 find_thread:
 	struct scheduler *scheduler = CORE_LOCAL->scheduler;
 
-	if (unlikely(scheduler == NULL))
-	  {
-	    return 1;
-	   }
+	if (unlikely(scheduler == NULL)) {
+		return 1;
+	}
 
 	ret = scheduler->traverse(scheduler, next_thread);
 
@@ -142,9 +141,9 @@ void reschedule(struct registers *regs, void *)
 		panic("");
 	}
 
-	if(ret == 1) {
-	  spinrelease(&CORE_LOCAL->sched_lock);
-	  return;
+	if (ret == 1) {
+		spinrelease(&CORE_LOCAL->sched_lock);
+		return;
 	}
 
 	void **fpu_thread;
@@ -187,8 +186,6 @@ void reschedule(struct registers *regs, void *)
 	/* print( */
 	/* 	"Rescheduling to thread %x, on scheduler %x (CORE_LOCAL->scheduler is %x) rip is %x\n", */
 	/* 	next_thread, next_thread->scheduler, CORE_LOCAL->scheduler, next_context->regs.rip); */
-
-
 
 	/* print("rescheduling to rip=%x, rsp=%x, rflags=%x, CORE_LOCAL is %x\n",
 	/* 	  (void *)next_context->regs.rip, (void *)next_context->regs.rsp, */

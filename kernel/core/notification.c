@@ -15,7 +15,7 @@
 
 static inline int notification_is_valid(int not)
 {
-	if (not< 0 || not> NOTIFICATION_MAX)
+	if (not < 0 || not > NOTIFICATION_MAX)
 		RETURN_ERROR;
 	else
 		return 0;
@@ -477,7 +477,7 @@ SYSCALL_DEFINE3(notification_action, int, not, struct notification_action *,
 					spinlock(&thread->notification.lock);
 
 					struct notification_action *current_action =
-						&thread->notification.actions[not-1];
+						&thread->notification.actions[not - 1];
 
 					if (old)
 						*old = *current_action;
