@@ -82,11 +82,17 @@ static int fetch_thread(struct thread **next_thread,
 
 find_thread:
 	struct scheduler *scheduler = CORE_LOCAL->scheduler;
-	if (unlikely(scheduler == NULL))
-		RETURN_ERROR;
+
+	if (unlikely(scheduler == NULL)) {
+		return 1;
+	}
 
 	ret = scheduler->traverse(scheduler, next_thread);
-	if (ret == -1 || *next_thread == NULL)
+
+	if (*next_thread == NULL) {
+		RETURN_ERROR;
+	}
+	if (ret == -1)
 		RETURN_ERROR;
 find_context:
 	notification_dispatch(*next_thread);
@@ -135,6 +141,11 @@ void reschedule(struct registers *regs, void *)
 		panic("");
 	}
 
+	if (ret == 1) {
+		spinrelease(&CORE_LOCAL->sched_lock);
+		return;
+	}
+
 	void **fpu_thread;
 	struct registers *r;
 
@@ -172,7 +183,13 @@ void reschedule(struct registers *regs, void *)
 
 	CORE_LOCAL->current_thread = next_thread;
 
-	//print("rescheduling to: rip=%x on cid=%x [%s] with [%x]\n", r->rip, next_thread->comms.proc_id.cid, next_thread->comms.server ? next_thread->comms.server : "NULL", r->rflags);
+	/* print( */
+	/* 	"Rescheduling to thread %x, on scheduler %x (CORE_LOCAL->scheduler is %x) rip is %x\n", */
+	/* 	next_thread, next_thread->scheduler, CORE_LOCAL->scheduler, next_context->regs.rip); */
+
+	/* print("rescheduling to rip=%x, rsp=%x, rflags=%x, CORE_LOCAL is %x\n",
+	/* 	  (void *)next_context->regs.rip, (void *)next_context->regs.rsp, */
+	/* 	  next_context->regs.rflags, CORE_LOCAL); */
 
 	//if (next_context->notification)
 	//	next_context->delivered = 1;

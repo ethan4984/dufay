@@ -259,6 +259,7 @@ int tgroup_remove(int tgid)
 	return 0;
 }
 
+#include <core/scheduler/rr.h>
 struct scheduler **scheduler_table;
 
 int launch_schedulers(void)
@@ -281,11 +282,22 @@ int launch_schedulers(void)
 		scheduler->slice =
 			(struct time){ .sec = 0, .nsec = MS_TO_NS(SCHED_TICK_RATE_MS) };
 
+#if defined(CONFIG_SCHED_RR)
+		scheduler->enqueue = rr_enqueue;
+		scheduler->dequeue = rr_dequeue;
+		scheduler->traverse = rr_traverse;
+		scheduler->init = rr_init;
+		scheduler->destroy = rr_destroy;
+#elif defined(CONFIG_SCHED_CFS)
 		scheduler->enqueue = cfs_enqueue;
 		scheduler->dequeue = cfs_dequeue;
 		scheduler->traverse = cfs_traverse;
 		scheduler->init = cfs_init;
 		scheduler->destroy = cfs_destroy;
+#else
+#error \
+	"No scheduler configured. Please define CONFIG_SCHEDULER_RR or CONFIG_SCHEDULER_CFS."
+#endif
 
 		int ret = scheduler->init(scheduler);
 		if (ret == -1)

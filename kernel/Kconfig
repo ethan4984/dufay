@@ -1,0 +1,17 @@
+mainmenu "Dufay Kernel Configuration"
+
+choice
+    prompt "Scheduling Algorithm"
+    default SCHED_RR
+
+    config SCHED_RR
+        bool "Round-Robin"
+        help
+          Enable this option to select the Round-Robin scheduler.
+        
+    config SCHED_CFS
+        bool "Completely Fair Scheduler"
+        help
+          Enable this option to select the Shortest Job First scheduler.
+
+endchoice

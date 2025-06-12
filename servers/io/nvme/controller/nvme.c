@@ -446,7 +446,7 @@ static int nvme_initialise_irq(struct pci_info *pci_info, int *irq,
 	}
 
 	struct comm_bridge bridge = {
-		.not= NOT_PCI_MSI,
+		.not = NOT_PCI_MSI,
 		.weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 		.data = { .base = &nmsi, .limit = sizeof(struct pci_nmsi) }
 	};
@@ -481,7 +481,7 @@ int nvme(struct pci_info *pci_info)
 		struct pci_nbar nbar = { .descriptor = pci_info->descriptor,
 								 .bar_index = NVME_PCI_BAR };
 
-		struct comm_bridge bridge = { .not= NOT_PCI_BAR,
+		struct comm_bridge bridge = { .not = NOT_PCI_BAR,
 									  .weight = NOTIFY_WEIGHT_INSTANTANEOUS,
 									  .data = { .base = &nbar,
 												.limit = sizeof(nbar) } };

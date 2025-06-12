@@ -1,3 +1,5 @@
+-include .config
+
 BUILD = build
 KERNEL := $(BUILD)/dufay.elf
 
@@ -37,7 +39,15 @@ OBJ := $(CFILES:%=$(BUILD)/%.o) $(ASMFILES:%=$(BUILD)/%.o)
 BINS := $(REALFILES:%=$(BUILD)/%.bin)
 HEADER_DEPS := $(CFILES:%=$(BUILD)/%.d)
 
-.PHONY: all
+ifeq ($(CONFIG_SCHED_RR),y)
+INTERNALCFLAGS += -DCONFIG_SCHED_RR
+endif
+ifeq ($(CONFIG_SCHED_CFS),y)
+INTERNALCFLAGS += -DCONFIG_SCHED_CFS
+endif
+
+
+.PHONY: all 
 all: $(KERNEL)
 
 limine.h:
@@ -64,6 +74,13 @@ $(BUILD)/%.asm.o: %.asm
 	@echo "NASM $<"
 	nasm -felf64 $< -o $@
 
+.PHONY: menuconfig
+menuconfig:
+	./menuconfig
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD)
+
+
+

@@ -2,7 +2,7 @@
 #define CORE_SCHEDULER_THREAD_H_
 
 #include <core/scheduler/context.h>
-
+#include <core/wait.h>
 #include <fayt/rb_tree.h>
 
 struct thread_capability {
@@ -44,6 +44,9 @@ struct thread {
 
 	struct thread *next;
 	struct thread *last;
+
+	_Atomic enum wait_status wait_status;
+	struct waitblock waitblocks[4];
 };
 
 struct scheduler {

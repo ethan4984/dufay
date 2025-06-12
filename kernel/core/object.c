@@ -11,6 +11,10 @@ static void obj_constructor(void *obj)
 {
 	struct object_header *hdr = (struct object_header *)(obj);
 	struct object_class class = classes[hdr->class];
+
+	/* We pre-initialize objects as the allocator does not guarantee zero-initialization */
+	memset(obj, 0, sizeof(struct object_header) + class.size);
+
 	if (class.constructor != NULL) {
 		/* Call the constructor for this object */
 		class.constructor((char *)obj + sizeof(struct object_header));

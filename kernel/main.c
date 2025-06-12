@@ -1,3 +1,4 @@
+#include "fayt/lock.h"
 #include <arch/x86/cpu.h>
 
 #include <core/scheduler/thread.h>
@@ -16,6 +17,7 @@
 #include <fayt/string.h>
 
 #include <limine.h>
+#include <core/mutex.h>
 
 struct limine_hhdm_request limine_hhdm_request = { .id = LIMINE_HHDM_REQUEST,
 												   .revision = 0 };
@@ -36,6 +38,10 @@ static void spfree(void *addr, uint64_t s, uint64_t)
 
 #include <arch/x86/hpet.h>
 #include <fayt/time.h>
+
+int init_system_tgroup();
+
+void do_sync_test(void);
 
 void dufay_entry(void)
 {
@@ -84,7 +90,15 @@ void dufay_entry(void)
 
 	kmem_init();
 
+	init_system_tgroup();
+
 	int ret = launch_schedulers();
+	if (ret == -1) {
+		REPORT_ERROR;
+		panic("");
+	}
+
+	ret = launch_init();
 	if (ret == -1) {
 		REPORT_ERROR;
 		panic("");
@@ -96,11 +110,9 @@ void dufay_entry(void)
 		panic("");
 	}
 
-	ret = launch_init();
-	if (ret == -1) {
-		REPORT_ERROR;
-		panic("");
-	}
+#if 0
+	do_sync_test();
+#endif
 
 	__asm__("sti");
 
