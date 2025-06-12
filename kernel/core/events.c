@@ -10,6 +10,36 @@
 #include <fayt/debug.h>
 #include <fayt/sched.h>
 #include <fayt/compiler.h>
+#include <core/wait.h>
+
+void event_init(struct event *event, const char *name, bool notification)
+{
+	dispatch_object_init(
+		&event->hdr,
+		notification ? DISPATCH_NOTIFICATION : DISPATCH_SYNCHRONIZATION, name);
+}
+
+void event_signal(struct event *event)
+{
+	spinlock_irqsave(&event->hdr.lock);
+
+	/* Event was already signaled */
+	if (event->hdr.signaled_count > 0) {
+		spinrelease_irqsave(&event->hdr.lock);
+		return;
+	}
+
+	/* Try to satisfy waits */
+	struct thread *ret = try_satisfy_dispatch_object(&event->hdr);
+
+	if (!ret) {
+		/*
+		 * If this is a synchronization object, no one is waiting for us.
+		 * If this is a notification object, just keep the signaled count high
+		 */
+		event->hdr.signaled_count = 1;
+	}
+}
 
 int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 {
@@ -26,6 +56,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 
 	for (int i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
+
 		if (equeue == NULL)
 			continue;
 
@@ -33,6 +64,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 
 		for (int j = 0; j < equeue->context.length; j++) {
 			struct context *context = equeue->context.data[j];
+
 			if (context == NULL)
 				continue;
 
@@ -49,7 +81,6 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 		}
 
 		VECTOR_CLEAR(equeue->context);
-
 		spinrelease_irqsave(&equeue->lock);
 	}
 
