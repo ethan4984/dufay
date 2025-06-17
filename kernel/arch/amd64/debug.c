@@ -1,7 +1,7 @@
-#include <arch/x86/debug.h>
-#include <arch/x86/cpu.h>
+#include <arch/amd64/debug.h>
+#include <arch/amd64/cpu.h>
 
-void serial_write(char data)
+static void serial_write(char data)
 {
 	for (;;) {
 		if (inb(COM1 + 5) & (1 << 5)) {
@@ -24,4 +24,9 @@ void serial_init(void)
 	outb(COM1 + 0x3, 0x03);
 	outb(COM1 + 0x2, 0xc7);
 	outb(COM1 + 0x4, 0x00);
+}
+
+void arch_debug_write(char c)
+{
+	serial_write(c);
 }

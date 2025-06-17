@@ -3,6 +3,7 @@
 
 #include <core/scheduler/thread.h>
 #include <core/memory/portal.h>
+#include <arch/port.h>
 
 #include <fayt/circular_queue.h>
 
@@ -10,9 +11,8 @@
 #include <stdint.h>
 
 struct cpu_local {
-	uintptr_t kernel_stack;
-	uintptr_t user_stack;
-	uint64_t error;
+	struct arch_cpu_cb
+		arch_cb; /* Architecture-dependent CPU control-block. This must ALWAYS be the first member of the struct */
 	// EVERYTHING ABOVE MUST REMAIN IN ORDER
 
 	struct scheduler *scheduler;
@@ -21,11 +21,7 @@ struct cpu_local {
 
 	struct thread *current_thread;
 
-	int fpu_thread_size;
-	void (*fpu_save)(void *);
-	void (*fpu_rstor)(void *);
-
-	int apic_id;
+	int core_id;
 };
 
 extern size_t logical_processor_cnt;

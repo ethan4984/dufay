@@ -1,4 +1,4 @@
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/scheduler/thread.h>
 #include <core/futex.h>
@@ -65,7 +65,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 		futex->refcnt++;
 
 		for (;;) {
-			if (*vuaddr == expected)
+			if (*vuaddr == (uint32_t)expected)
 				break;
 
 			raw_spinrelease(&futex->lock);

@@ -1,5 +1,4 @@
-#include <arch/x86/cpu.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/object.h>
 #include <core/scheduler/thread.h>
@@ -20,7 +19,7 @@ void capability_table_init(struct capability_table *table)
 struct capability_binding *capability_lookup(struct capability_table *table,
 											 capability_t handle)
 {
-	if (table->bitmap.size < handle || !table->bitmap.data) {
+	if (table->bitmap.size < (int)handle || !table->bitmap.data) {
 		return NULL;
 	}
 
@@ -35,9 +34,7 @@ struct capability_binding *capability_lookup(struct capability_table *table,
 int capability_create(struct capability_table *table, void *obj, uint8_t access,
 					  capability_t *out_handle)
 {
-	size_t i;
 	int free_bit = -1;
-	uint64_t *bitmap = NULL;
 
 	if (bitmap_alloc(&table->bitmap, &free_bit) == -1)
 		return -1;
@@ -111,7 +108,6 @@ SYSCALL_DEFINE2(duplicate_obj, capability_t, handle, uint8_t, access, {
 SYSCALL_DEFINE1(destroy_obj, capability_t, handle, {
 	struct capability_binding *binding =
 		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
-	capability_t out_handle;
 
 	if (!binding)
 		RETURN_ERROR;

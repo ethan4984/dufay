@@ -1,7 +1,6 @@
-#include <arch/x86/debug.h>
-
 #include <core/syscall.h>
 #include <core/debug.h>
+#include <arch/port.h>
 
 #include <fayt/lock.h>
 #include <fayt/string.h>
@@ -70,8 +69,10 @@ void panic(const char *str, ...)
 	//	__asm__ volatile ("mov %%rbp, %0" : "=r"(rbp));
 	//	stacktrace((void*)rbp);
 
-	for (;;)
-		__asm__ volatile("cli\nhlt");
+	for (;;) {
+		arch_disable_interrupts();
+		arch_halt();
+	}
 }
 
 void stacktrace(uint64_t *rbp)
@@ -97,5 +98,5 @@ void stacktrace(uint64_t *rbp)
 
 static void print_write(struct stream_info *, char c)
 {
-	serial_write(c);
+	arch_debug_write(c);
 }

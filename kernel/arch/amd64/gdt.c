@@ -1,4 +1,5 @@
-#include <arch/x86/cpu.h>
+#include <arch/port.h>
+#include <arch/amd64/cpu.h>
 
 #include <core/memory/physical.h>
 
@@ -103,17 +104,17 @@ void gdt_init(void)
 		panic("");
 	}
 
-	tss->rsp0 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	tss->rsp0 = P2V(pmm_alloc(4, 1)) + 0x4000;
 	if (!tss->rsp0) {
 		REPORT_ERROR;
 		panic("");
 	}
-	tss->rsp1 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	tss->rsp1 = P2V(pmm_alloc(4, 1)) + 0x4000;
 	if (!tss->rsp1) {
 		REPORT_ERROR;
 		panic("");
 	}
-	tss->rsp2 = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	tss->rsp2 = P2V(pmm_alloc(4, 1)) + 0x4000;
 	if (!tss->rsp2) {
 		REPORT_ERROR;
 		panic("");

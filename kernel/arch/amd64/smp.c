@@ -1,9 +1,9 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/smp.h>
-#include <arch/x86/apic.h>
-#include <arch/x86/cpu.h>
-#include <arch/x86/idt.h>
-#include <arch/x86/gdt.h>
+#include <arch/amd64/paging.h>
+#include <arch/amd64/smp.h>
+#include <arch/amd64/apic.h>
+#include <arch/amd64/cpu.h>
+#include <arch/amd64/idt.h>
+#include <arch/amd64/gdt.h>
 
 #include <core/scheduler/processor.h>
 #include <core/memory/physical.h>
@@ -22,12 +22,12 @@ static void core_bootstrap(struct cpu_local *);
 static struct spinlock core_init_lock;
 
 size_t logical_processor_cnt = 0;
-static _Atomic int cpus_up = 0;
+static _Atomic size_t cpus_up = 0;
 struct cpu_local *logical_processor_locales;
 
 static void core_bootstrap(struct cpu_local *cpu_local)
 {
-	x86_system_init();
+	amd64_system_init();
 	gdt_init();
 
 	print("initialising core: apic_id %x\n",
@@ -35,7 +35,7 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 
 	spinrelease(&core_init_lock);
 
-	x86_fpu_init(cpu_local);
+	amd64_fpu_init(cpu_local);
 
 	wrmsr(MSR_GS_BASE, (uintptr_t)cpu_local);
 
@@ -58,7 +58,7 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 }
 
 __asm__(".global smp_init_begin\n\t"
-		"smp_init_begin: .incbin \"build/arch/x86/smp.real.bin\"\n\t"
+		"smp_init_begin: .incbin \"build/smp.real.bin\"\n\t"
 		".global smp_init_end\n\t"
 		"smp_init_end:\n\t");
 
@@ -73,7 +73,7 @@ static void chain_aps()
 	__asm__("sidtq %0" ::"m"(idtr));
 
 	if ((logical_processor_cnt) >= bootable_processor_cnt) {
-		kernel_mappings.page_table->unmap_page(kernel_mappings.page_table, 0);
+		pmap_unmap(kernel_mappings.page_table->pmap, 0);
 		return;
 	}
 
@@ -81,15 +81,15 @@ static void chain_aps()
 	struct cpu_local *cpu_local =
 		&logical_processor_locales[logical_processor_cnt];
 
-	cpu_local->kernel_stack = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
-	if (!cpu_local->kernel_stack) {
+	cpu_local->arch_cb.kernel_stack = pmm_alloc(4, 1) + HIGH_VMA + 0x4000;
+	if (!cpu_local->arch_cb.kernel_stack) {
 		REPORT_ERROR;
 		panic("");
 	}
-	cpu_local->apic_id = madt0->apic_id;
+	cpu_local->core_id = madt0->apic_id;
 
-	if (cpu_local->apic_id == (xapic_read(XAPIC_ID_REG_OFF) >> 24)) {
-		x86_fpu_init(cpu_local);
+	if (cpu_local->core_id == (xapic_read(XAPIC_ID_REG_OFF) >> 24)) {
+		amd64_fpu_init(cpu_local);
 		wrmsr(MSR_GS_BASE, (uintptr_t)cpu_local);
 		logical_processor_cnt++;
 
@@ -100,8 +100,8 @@ static void chain_aps()
 
 	uint64_t *parameters = (uint64_t *)0x81000;
 
-	*(parameters + 0) = cpu_local->kernel_stack;
-	*(parameters + 1) = (uint64_t)kernel_mappings.page_table->pmlt - HIGH_VMA;
+	*(parameters + 0) = cpu_local->arch_cb.kernel_stack;
+	*(parameters + 1) = (uint64_t)kernel_mappings.page_table->pmap->pmlt;
 	*(parameters + 2) = (uint64_t)core_bootstrap;
 	*(parameters + 3) = (uint64_t)cpu_local;
 	*(parameters + 4) = (uint64_t)&idtr;
@@ -126,9 +126,9 @@ static void chain_aps()
 
 void boot_aps(void)
 {
-	kernel_mappings.page_table->map_page(kernel_mappings.page_table, 0, 0,
-										 X86_FLAGS_P | X86_FLAGS_RW |
-											 X86_FLAGS_PS);
+	pmap_map(kernel_mappings.page_table->pmap, 0, 0,
+			 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_EXECUTE, VM_LARGE_PAGE);
+
 	memcpy8((void *)0x80000, (void *)(uintptr_t)smp_init_begin,
 			(uintptr_t)smp_init_end - (uintptr_t)smp_init_begin);
 

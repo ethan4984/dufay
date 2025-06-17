@@ -1,7 +1,8 @@
 #ifndef CORE_SCHEDULER_CONTEXT_H_
 #define CORE_SCHEDULER_CONTEXT_H_
 
-#include <arch/x86/cpu.h>
+#include "arch/amd64/port.h"
+#include <arch/amd64/cpu.h>
 
 #include <core/capability.h>
 #include <core/events.h>
@@ -72,8 +73,7 @@ struct thread;
 struct context {
 	struct ustack *stack;
 
-	struct registers regs;
-	void *fpu_thread;
+	struct arch_thread_context arch_context;
 
 	struct etrigger *last_etrigger;
 	struct etrigger *etrigger;

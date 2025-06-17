@@ -58,7 +58,7 @@ int ralloc(struct rpool *rpool, uintptr_t *resource, size_t length)
 		return -1;
 
 	struct rboundary *boundary = NULL;
-	for (; boundary_index < rpool->total_depth;) {
+	for (; (size_t)boundary_index < rpool->total_depth;) {
 		boundary = rpool->boundary_segments[boundary_index];
 		if (boundary)
 			goto found;
@@ -195,7 +195,7 @@ int rdestroy(struct rpool *rpool)
 	if (unlikely(rpool == NULL))
 		RETURN_ERROR;
 
-	for (int i = 0; i < rpool->total_depth; i++) {
+	for (size_t i = 0; i < rpool->total_depth; i++) {
 		struct rboundary *node = rpool->boundary_segments[i];
 		for (; node;) {
 			struct rboundary *tmp = node->next;
@@ -214,7 +214,7 @@ static int rpool_boundary_index(struct rpool *rpool, size_t n)
 	if (!n)
 		return 0;
 
-	int ret = 0;
+	size_t ret = 0;
 	for (; n;) {
 		ret++;
 		n >>= 1;

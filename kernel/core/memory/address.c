@@ -1,4 +1,4 @@
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/memory/address.h>
 #include <core/syscall.h>
@@ -130,6 +130,8 @@ int address_space_free(struct address_space *as, uintptr_t address,
 		RETURN_ERROR;
 	if (!length)
 		return 0;
+
+	(void)address;
 
 	return 0;
 }

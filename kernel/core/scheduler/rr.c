@@ -2,12 +2,12 @@
 #include <core/scheduler/rr.h>
 #include <fayt/slab.h>
 #include <fayt/debug.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 #include <fayt/compiler.h>
 #include <core/lock.h>
 
 static struct spinlock rr_lock;
-int last_used = 0;
+size_t last_used = 0;
 
 int rr_enqueue(struct scheduler *sched, struct thread *t)
 {

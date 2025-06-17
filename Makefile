@@ -27,7 +27,7 @@ QEMUFLAGS_ISO = \
 
 .PHONY: run
 run: $(DISK_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio -display none
+	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio  -no-reboot -no-shutdown
 
 .PHONY: run_initrd
 run_initrd: $(ISO_IMAGE)
@@ -72,7 +72,7 @@ $(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel build_servers
 	mkdir disk_image/boot
 	mkdir disk_image/servers/
 	$(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-	cp kernel/build/dufay.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
+	cp kernel/build/dufay initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
 	./limine/limine bios-install dufay.iso
 	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
@@ -92,7 +92,7 @@ $(DISK_IMAGE): $(BUILD) limine kernel build_servers
 	sudo mkdir disk_image/boot
 	sudo mkdir disk_image/servers/
 	sudo $(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-	sudo cp kernel/build/dufay.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
+	sudo cp kernel/build/dufay limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	sync
 	sudo umount disk_image/
 	sudo losetup -d `cat loopback_dev`
@@ -115,8 +115,6 @@ format:
 .PHONY: kconfig
 kconfig:
 	$(MAKE) -C kernel menuconfig
-
-
 
 .PHONY: distclean
 distclean: clean

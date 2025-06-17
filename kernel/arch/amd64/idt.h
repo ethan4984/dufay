@@ -3,7 +3,7 @@
 
 #include <core/irq.h>
 
-#include <arch/x86/cpu.h>
+#include <arch/amd64/cpu.h>
 
 struct idtr {
 	uint16_t limit;

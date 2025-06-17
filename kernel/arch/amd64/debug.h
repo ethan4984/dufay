@@ -7,6 +7,5 @@
 #define COM4 0x2e8
 
 void serial_init(void);
-void serial_write(char data);
 
 #endif

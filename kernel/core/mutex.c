@@ -1,6 +1,5 @@
 #include <core/wait.h>
-#include <arch/x86/cpu.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 #include <core/lock.h>
 #include <core/mutex.h>
 

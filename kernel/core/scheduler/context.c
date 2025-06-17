@@ -1,8 +1,8 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/cpu.h>
-#include <arch/x86/apic.h>
-#include <arch/x86/smp.h>
-#include <arch/x86/idt.h>
+#include <arch/amd64/paging.h>
+#include <arch/amd64/cpu.h>
+#include <arch/amd64/apic.h>
+#include <arch/amd64/smp.h>
+#include <arch/amd64/idt.h>
 
 #include <core/scheduler/thread.h>
 #include <core/memory/virtual.h>
@@ -55,7 +55,7 @@ int destroy_context(struct thread *thread, struct context *context)
 		if (current_context == NULL)
 			RETURN_ERROR;
 
-		for (int i = 0; i < notification->etrigger.length; i++) {
+		for (size_t i = 0; i < notification->etrigger.length; i++) {
 			struct etrigger *etrigger = notification->etrigger.data[i];
 			if (etrigger == NULL)
 				continue;
@@ -152,13 +152,13 @@ void reschedule(struct registers *regs, void *)
 	if (likely(current_thread && current_thread->context_active)) {
 		struct context *context = current_thread->context_active;
 
-		fpu_thread = &context->fpu_thread;
-		r = &context->regs;
+		fpu_thread = &context->arch_context.fpu_thread;
+		r = &context->arch_context.regs;
 
-		context->sysctx.user_stack = CORE_LOCAL->user_stack;
-		context->sysctx.error = CORE_LOCAL->error;
+		context->sysctx.user_stack = CORE_LOCAL->arch_cb.user_stack;
+		context->sysctx.error = CORE_LOCAL->arch_cb.error;
 
-		CORE_LOCAL->fpu_save(*fpu_thread);
+		CORE_LOCAL->arch_cb.fpu_save(*fpu_thread);
 
 		*r = *regs;
 		current_thread->user_fs_base = get_user_fs();
@@ -166,17 +166,17 @@ void reschedule(struct registers *regs, void *)
 	}
 
 	next_thread->context_active = next_context;
-	CORE_LOCAL->kernel_stack = next_context->stack->kernel_stack.sp;
+	CORE_LOCAL->arch_cb.kernel_stack = next_context->stack->kernel_stack.sp;
 
-	fpu_thread = &next_context->fpu_thread;
-	r = &next_context->regs;
+	fpu_thread = &next_context->arch_context.fpu_thread;
+	r = &next_context->arch_context.regs;
 
-	x86_swap_tables(next_thread->address_space->page_table);
+	pmap_activate(next_thread->address_space->page_table->pmap);
 
-	CORE_LOCAL->fpu_rstor(*fpu_thread);
+	CORE_LOCAL->arch_cb.fpu_rstor(*fpu_thread);
 
-	CORE_LOCAL->user_stack = next_context->sysctx.user_stack;
-	CORE_LOCAL->error = next_context->sysctx.user_stack;
+	CORE_LOCAL->arch_cb.user_stack = next_context->sysctx.user_stack;
+	CORE_LOCAL->arch_cb.error = next_context->sysctx.user_stack;
 
 	set_user_fs(next_thread->user_fs_base);
 	set_user_gs(next_thread->user_gs_base);
@@ -187,7 +187,7 @@ void reschedule(struct registers *regs, void *)
 	/* 	"Rescheduling to thread %x, on scheduler %x (CORE_LOCAL->scheduler is %x) rip is %x\n", */
 	/* 	next_thread, next_thread->scheduler, CORE_LOCAL->scheduler, next_context->regs.rip); */
 
-	/* print("rescheduling to rip=%x, rsp=%x, rflags=%x, CORE_LOCAL is %x\n",
+	/* print("rescheduling to rip=%x, rsp=%x, rflags=%x, CORE_LOCAL is %x\n", */
 	/* 	  (void *)next_context->regs.rip, (void *)next_context->regs.rsp, */
 	/* 	  next_context->regs.rflags, CORE_LOCAL); */
 

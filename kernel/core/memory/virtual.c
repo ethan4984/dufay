@@ -1,5 +1,5 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/cpu.h>
+#include <arch/port.h>
+#include <fayt/lock.h>
 
 #include <core/memory/virtual.h>
 #include <core/memory/physical.h>
@@ -21,73 +21,50 @@ int vmm_default_table(struct page_table *page_table)
 	if (page_table == NULL)
 		RETURN_ERROR;
 
-	x86_paging_init();
-
-	page_table->map_page = x86_map_page;
-	page_table->unmap_page = x86_unmap_page;
-	page_table->page_entry = x86_page_entry;
 	page_table->pages = alloc(sizeof(struct dictionary));
 	if (page_table->pages == NULL)
 		RETURN_ERROR;
 
-	page_table->pmlt = (uint64_t *)(pmm_alloc(1, 1) + HIGH_VMA);
-	if (page_table->pmlt == (void *)HIGH_VMA)
-		RETURN_ERROR;
-
-	uintptr_t kernel_vaddr =
-		limine_kernel_address_request.response->virtual_base;
-	uintptr_t kernel_paddr =
-		limine_kernel_address_request.response->physical_base;
-
-	for (size_t i = 0; i < 0x6400; i++) {
-		page_table->map_page(page_table, kernel_vaddr, kernel_paddr,
-							 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G |
-								 X86_FLAGS_US);
-		kernel_vaddr += 0x1000;
-		kernel_paddr += 0x1000;
-	}
-
-	uint64_t phys = 0;
-	for (size_t i = 0; i < 0x800; i++) {
-		page_table->map_page(page_table, phys + HIGH_VMA, phys,
-							 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_PS |
-								 X86_FLAGS_G | X86_FLAGS_US);
-		phys += 0x200000;
-	}
-
-	struct limine_memmap_entry **mmap = limine_memmap_request.response->entries;
-	uint64_t entry_count = limine_memmap_request.response->entry_count;
-
-	for (uint64_t i = 0; i < entry_count; i++) {
-		phys = (mmap[i]->base / 0x200000) * 0x200000;
-		for (size_t j = 0; j < DIV_ROUNDUP(mmap[i]->length, 0x200000); j++) {
-			page_table->map_page(page_table, phys + HIGH_VMA, phys,
-								 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_PS |
-									 X86_FLAGS_G | X86_FLAGS_US);
-			phys += 0x200000;
-		}
-	}
+	page_table->pmap = pmap_new();
 
 	return 0;
 }
 
 int vmm_map_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt,
-				  uint64_t flags)
+				  enum vm_prot prot, enum vm_flags flags)
 {
 	if (page_table == NULL)
 		RETURN_ERROR;
 
-	if (flags & X86_FLAGS_PS) {
+	size_t max_page_size = arch_largest_page_size();
+	spinlock(&page_table->lock);
+
+	if (flags & VM_HUGE_PAGE) {
 		for (size_t i = 0; i < cnt; i++) {
-			page_table->map_page(page_table, vaddr, pmm_alloc(1, 0x200), flags);
-			vaddr += 0x200000;
-		}
-	} else {
-		for (size_t i = 0; i < cnt; i++) {
-			page_table->map_page(page_table, vaddr, pmm_alloc(1, 1), flags);
-			vaddr += 0x1000;
+			pmap_map(page_table->pmap, vaddr,
+					 pmm_alloc(1, max_page_size / PAGE_SIZE), prot, flags);
+
+			vaddr += max_page_size;
 		}
 	}
+
+	else if (flags & VM_LARGE_PAGE) {
+		for (size_t i = 0; i < cnt; i++) {
+			pmap_map(page_table->pmap, vaddr,
+					 pmm_alloc(1, LARGE_PAGE_SIZE / PAGE_SIZE), prot, flags);
+
+			vaddr += LARGE_PAGE_SIZE;
+		}
+	}
+
+	else {
+		for (size_t i = 0; i < cnt; i++) {
+			pmap_map(page_table->pmap, vaddr, pmm_alloc(1, 1), prot, flags);
+			vaddr += PAGE_SIZE;
+		}
+	}
+
+	spinrelease(&page_table->lock);
 
 	return 0;
 }
@@ -97,13 +74,9 @@ int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt)
 	if (page_table == NULL)
 		RETURN_ERROR;
 
-	for (size_t i = 0; i < cnt; i++) {
-		size_t page_size = page_table->unmap_page(page_table, vaddr);
-		if (!page_size)
-			return -1;
-
-		vaddr += page_size;
-	}
+	// TODO
+	(void)vaddr;
+	(void)cnt;
 
 	return 0;
 }
@@ -111,16 +84,58 @@ int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt)
 int vmm_init(void)
 {
 	kernel_mappings.page_table = alloc(sizeof(struct page_table));
-	if (kernel_mappings.page_table == NULL)
-		RETURN_ERROR;
+
 	if (kernel_mappings.page_table == NULL)
 		RETURN_ERROR;
 
-	int ret = vmm_default_table(kernel_mappings.page_table);
-	if (ret == -1)
-		RETURN_ERROR;
+	spinlock(&kernel_mappings.lock);
 
-	x86_swap_tables(kernel_mappings.page_table);
+	pmap_init_kernel();
+
+	uintptr_t kernel_vaddr =
+		limine_kernel_address_request.response->virtual_base;
+	uintptr_t kernel_paddr =
+		limine_kernel_address_request.response->physical_base;
+
+	// FIXME: actually map the kernel properly!
+	for (size_t i = 0; i < 0x6400; i++) {
+		pmap_map(kernel_mappings.page_table->pmap, kernel_vaddr, kernel_paddr,
+				 VM_PROT_ALL, VM_GLOBAL);
+
+		kernel_vaddr += PAGE_SIZE;
+		kernel_paddr += PAGE_SIZE;
+	}
+
+	uint64_t phys = 0;
+	size_t max_page_size = arch_largest_page_size();
+	size_t gib4 = (4 * (1UL << 30UL));
+	uint64_t highest_page = 0;
+
+	struct limine_memmap_entry **mmap = limine_memmap_request.response->entries;
+	uint64_t entry_count = limine_memmap_request.response->entry_count;
+	for (uint64_t i = 0; i < entry_count; i++) {
+		if ((mmap[i]->base + mmap[i]->length) > highest_page &&
+			mmap[i]->type != LIMINE_MEMMAP_RESERVED)
+			highest_page = mmap[i]->base + mmap[i]->length;
+	}
+
+	size_t identity_map_size = (highest_page > gib4) ? highest_page : gib4;
+
+	print("Identity mapping %d bytes of memory using %d bytes pages\n",
+		  identity_map_size, max_page_size);
+
+	for (size_t i = 0; i < identity_map_size / max_page_size; i++) {
+		pmap_map(kernel_mappings.page_table->pmap, P2V(phys), phys, VM_PROT_ALL,
+				 VM_GLOBAL | VM_HUGE_PAGE);
+
+		phys += max_page_size;
+	}
+
+	kernel_mappings.page_table->pages = alloc(sizeof(struct dictionary));
+
+	spinrelease(&kernel_mappings.lock);
+
+	pmap_activate(kernel_mappings.page_table->pmap);
 
 	return 0;
 }

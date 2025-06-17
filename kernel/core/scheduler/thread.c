@@ -268,7 +268,7 @@ int launch_schedulers(void)
 	if (scheduler_table == NULL)
 		RETURN_ERROR;
 
-	for (int i = 0; i < logical_processor_cnt; i++) {
+	for (size_t i = 0; i < logical_processor_cnt; i++) {
 		struct scheduler *scheduler = alloc(sizeof(struct scheduler));
 		if (scheduler == NULL)
 			RETURN_ERROR;
@@ -296,7 +296,7 @@ int launch_schedulers(void)
 		scheduler->destroy = cfs_destroy;
 #else
 #error \
-	"No scheduler configured. Please define CONFIG_SCHEDULER_RR or CONFIG_SCHEDULER_CFS."
+	"No scheduler configured. Please define CONFIG_SCHED_RR or CONFIG_SCHED_CFS."
 #endif
 
 		int ret = scheduler->init(scheduler);

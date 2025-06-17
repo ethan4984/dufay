@@ -2,7 +2,7 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <sys/queue.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 #include <core/lock.h>
 #include <fayt/debug.h>
 
@@ -27,24 +27,14 @@ static void dispatch_object_consume(struct dispatch_header *hdr)
 	}
 }
 
-static void dispatch_object_signal(struct dispatch_header *hdr)
-{
-	switch (hdr->type) {
-	case DISPATCH_NOTIFICATION:
-		hdr->signaled_count = 1;
-		break;
-	case DISPATCH_SYNCHRONIZATION:
-		hdr->signaled_count++;
-		break;
-	}
-}
-
 #define CAS(ptr, old, new)                 \
 	atomic_compare_exchange_weak_explicit( \
 		(ptr), &(old), (new), memory_order_acquire, memory_order_relaxed)
 
 int wait_any(int count, void *objects[], long timeout)
 {
+	(void)timeout;
+
 	/* This isn't actually used for synchronization, but rather for preserving interrupt state */
 	/* FIXME: add ipldpc() */
 	struct spinlock irq_lock = {};

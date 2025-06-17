@@ -7,10 +7,10 @@
 #include <fayt/string.h>
 #include <fayt/compiler.h>
 
-#define SYSRET(RET, ERROR)         \
-	({                             \
-		CORE_LOCAL->error = ERROR; \
-		ERROR ? ERROR : RET;       \
+#define SYSRET(RET, ERROR)                 \
+	({                                     \
+		CORE_LOCAL->arch_cb.error = ERROR; \
+		ERROR ? ERROR : RET;               \
 	})
 
 struct syscall_handle {
@@ -65,7 +65,8 @@ static struct syscall_handle syscall_handles[] = {
 
 void syscall_handler(struct registers *regs, void *)
 {
-	int syscall_index = regs->rax;
+#if defined(__amd64__)
+	size_t syscall_index = regs->rax;
 
 	if (syscall_index >= LENGTHOF(syscall_handles)) {
 		print("SYSCALL: unknown index %x\n", syscall_index);
@@ -92,6 +93,7 @@ void syscall_handler(struct registers *regs, void *)
 	}
 
 	SYSRET(error ? error : 0, error);
+#endif
 
 	return;
 }

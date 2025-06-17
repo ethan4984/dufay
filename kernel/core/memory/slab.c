@@ -8,7 +8,6 @@
 
 #include <stdint.h>
 #include "physical.h"
-#include <arch/x86/cpu.h>
 #include <core/scheduler/processor.h>
 
 #define SLAB_ALIGN 8
@@ -173,7 +172,7 @@ static void slab_destroy(struct kmem_cache *cp, struct kmem_slab *slab)
 
 static inline size_t get_curr_cpu()
 {
-	return CORE_LOCAL->apic_id;
+	return CORE_LOCAL->core_id;
 }
 
 static void cpu_reload(struct kmem_cpu *cpu, struct kmem_magazine *mag,
@@ -513,7 +512,7 @@ static inline void *slab_alloc(size_t size)
 {
 	size_t index = get_cache_index(size);
 
-	if (index == -1) {
+	if (index == (size_t)-1) {
 		return alloc_pages(ALIGN_UP(size, PAGE_SIZE) / PAGE_SIZE);
 	}
 
@@ -533,7 +532,7 @@ static void do_slab_free(void *ptr, size_t size)
 {
 	size_t index = get_cache_index(size);
 
-	if (index == -1) {
+	if (index == (size_t)-1) {
 		return free_pages(ptr, ALIGN_UP(size, PAGE_SIZE) / PAGE_SIZE);
 	}
 
@@ -633,11 +632,6 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size,
 
 	return cache;
 }
-
-#define TAILQ_FOREACH_SAFE(var, head, field, tvar)              \
-	for ((var) = TAILQ_FIRST(head);                             \
-		 (var) != NULL && ((tvar) = TAILQ_NEXT(var, field), 1); \
-		 (var) = (tvar))
 
 void kmem_cache_destroy(struct kmem_cache *cp)
 {

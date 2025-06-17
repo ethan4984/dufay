@@ -1,5 +1,5 @@
-#include <arch/x86/smp.h>
-#include <arch/x86/paging.h>
+#include <core/memory/virtual.h>
+#include <arch/amd64/smp.h>
 
 #include <core/notification.h>
 #include <core/syscall.h>
@@ -133,27 +133,28 @@ static int notification_context_instantiate(struct thread *thread,
 		RETURN_ERROR;
 
 	context->stack = ustack;
-	context->fpu_thread = alloc(CORE_LOCAL->fpu_thread_size);
-	if (context->fpu_thread == NULL)
+	context->arch_context.fpu_thread =
+		alloc(CORE_LOCAL->arch_cb.fpu_thread_size);
+	if (context->arch_context.fpu_thread == NULL)
 		RETURN_ERROR;
 
-	context->regs.ss = 0x3b;
-	context->regs.rsp = context->stack->user_stack.sp;
-	context->regs.rflags = 0x202 & ~(1 << 9);
-	context->regs.cs = 0x43;
-	context->regs.rip = (uintptr_t)action->handler;
+	context->arch_context.regs.ss = 0x3b;
+	context->arch_context.regs.rsp = context->stack->user_stack.sp;
+	context->arch_context.regs.rflags = 0x202 & ~(1 << 9);
+	context->arch_context.regs.cs = 0x43;
+	context->arch_context.regs.rip = (uintptr_t)action->handler;
 
-	context->regs.rdi = (uint64_t)notification->info;
-	context->regs.rsi = 0;
-	context->regs.rdx = notification->notnum;
+	context->arch_context.regs.rdi = (uint64_t)notification->info;
+	context->arch_context.regs.rsi = 0;
+	context->arch_context.regs.rdx = notification->notnum;
 
 	int parameter_length = notification->parameter.page_cnt * PAGE_SIZE;
 	if (parameter_length) {
-		uintptr_t vaddr = context->regs.rsp -= parameter_length;
-		x86_map_page(thread->address_space->page_table, vaddr,
-					 notification->parameter.paddr,
-					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
-		context->regs.rsi = context->regs.rsp;
+		uintptr_t vaddr = context->arch_context.regs.rsp -= parameter_length;
+		pmap_map(thread->address_space->page_table->pmap, vaddr,
+				 notification->parameter.paddr,
+				 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_USER, 0);
+		context->arch_context.regs.rsi = context->arch_context.regs.rsp;
 	}
 
 	struct portal_resp resp;
@@ -162,13 +163,13 @@ static int notification_context_instantiate(struct thread *thread,
 		.prot = PORTAL_PROT_READ | PORTAL_PROT_WRITE,
 		.length = sizeof(struct portal_req),
 		.share = { .identifier = NULL, .type = 0, .create = 0 },
-		.morphology = { .addr = context->regs.rsp,
+		.morphology = { .addr = context->arch_context.regs.rsp,
 						.length =
 							context->stack->user_stack.size - parameter_length }
 	};
 
 	ret = portal(&req, &resp);
-	if (ret == -1 || resp.base != context->regs.rsp) {
+	if (ret == -1 || resp.base != context->arch_context.regs.rsp) {
 		print("ERROR: unable to anonymously map notification stack\n");
 		RETURN_ERROR;
 	}
@@ -206,8 +207,8 @@ int notification_queue(struct thread *sender, struct thread *target, int not,
 		notification->parameter.page_cnt = page_cnt;
 
 		if (vaddr)
-			x86_map_page(sender->address_space->page_table, vaddr, paddr,
-						 X86_FLAGS_PS | X86_FLAGS_US | X86_FLAGS_NX);
+			pmap_map(sender->address_space->page_table->pmap, vaddr, paddr,
+					 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_USER, 0);
 	}
 
 	int ret = notification_push(queue, notification);
@@ -269,8 +270,10 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 		paddr = pmm_alloc(page_cnt, 1);
 		if (!paddr)
 			RETURN_ERROR;
-		x86_map_page(thread->address_space->page_table, vaddr, paddr,
-					 X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US | X86_FLAGS_NX);
+
+		pmap_map(thread->address_space->page_table->pmap, vaddr, paddr,
+				 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_USER, 0);
+
 		notification->parameter.paddr = paddr;
 		notification->parameter.page_cnt = page_cnt;
 	}
@@ -457,7 +460,6 @@ SYSCALL_DEFINE1(notify, struct comm_bridge *, bridge, {
 	if (bridge == NULL)
 		RETURN_ERROR;
 
-	struct thread *thread = CORE_LOCAL->current_thread;
 	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
@@ -513,7 +515,6 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 })
 
 SYSCALL_DEFINE1(notification_destroy, struct comm_bridge *, bridge, {
-	struct thread *thread = CORE_LOCAL->current_thread;
 	struct thread *destination;
 
 	int ret = bridge_to_destination(bridge, &destination);
@@ -622,7 +623,7 @@ finish:
 	rthread->context_active = rcontext;
 
 	if (rthread != current_thread) {
-		x86_swap_tables(rthread->address_space->page_table);
+		pmap_activate(rthread->address_space->page_table->pmap);
 
 		set_user_fs(rthread->user_fs_base);
 		set_user_gs(rthread->user_gs_base);
@@ -630,15 +631,15 @@ finish:
 		CORE_LOCAL->current_thread = rthread;
 	}
 
-	CORE_LOCAL->kernel_stack = rcontext->stack->kernel_stack.sp;
-	CORE_LOCAL->fpu_rstor(rcontext->fpu_thread);
+	CORE_LOCAL->arch_cb.kernel_stack = rcontext->stack->kernel_stack.sp;
+	CORE_LOCAL->arch_cb.fpu_rstor(rcontext->arch_context.fpu_thread);
 
-	CORE_LOCAL->user_stack = rcontext->sysctx.user_stack;
-	CORE_LOCAL->error = rcontext->sysctx.user_stack;
+	CORE_LOCAL->arch_cb.user_stack = rcontext->sysctx.user_stack;
+	CORE_LOCAL->arch_cb.error = rcontext->sysctx.user_stack;
 
 	rcontext->blocking = false;
 
-	SWAP_TLS(&rcontext->regs);
+	SWAP_TLS(&rcontext->arch_context.regs);
 
 	__asm__ volatile("mov %0, %%rsp\n\t"
 					 "pop %%r15\n\t"
@@ -657,7 +658,7 @@ finish:
 					 "pop %%rbx\n\t"
 					 "pop %%rax\n\t"
 					 "addq $16, %%rsp\n\t"
-					 "iretq\n\t" ::"r"(&rcontext->regs));
+					 "iretq\n\t" ::"r"(&rcontext->arch_context.regs));
 })
 
 SYSCALL_DEFINE1(notification_wait, struct comm_bridge *, bridge, {

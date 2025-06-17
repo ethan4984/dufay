@@ -4,6 +4,8 @@
 #include <fayt/lock.h>
 #include <stdatomic.h>
 
+#define INTERNAL_WAITBLOCKS_N 4
+
 /*
  * This is loosely based on Arun Kishan's work on Windows 7:
  * https://www.youtube.com/watch?v=OAAiOEQhsK0

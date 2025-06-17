@@ -1,4 +1,4 @@
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/syscall.h>
 #include <core/debug.h>

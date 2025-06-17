@@ -1,5 +1,22 @@
 mainmenu "Dufay Kernel Configuration"
 
+
+choice
+    prompt "CPU Architecture"
+    default ARCH_AMD64
+
+    config ARCH_AMD64
+        bool "amd64"
+        help
+          Enable this option to select the AMD64 (x86_64) architecture.
+        
+    config ARCH_AARCH64
+        bool "aarch64"
+        help
+          Enable this option to select the AARCH64 architecture.
+
+endchoice
+
 choice
     prompt "Scheduling Algorithm"
     default SCHED_RR
@@ -14,4 +31,19 @@ choice
         help
           Enable this option to select the Shortest Job First scheduler.
 
+endchoice
+
+choice
+    prompt "Build toolchain"
+    default LLVM 
+
+    config LLVM 
+        bool "LLVM"
+        help
+          Enable this option to select an LLVM-based toolchain.
+        
+    config GCC
+        bool "GCC"
+        help
+          Enable this option to select a GCC-based toolchain.
 endchoice

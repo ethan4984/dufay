@@ -1,13 +1,14 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/hpet.h>
-#include <arch/x86/apic.h>
-#include <arch/x86/cpu.h>
+#include <arch/amd64/paging.h>
+#include <arch/amd64/hpet.h>
+#include <arch/amd64/apic.h>
+#include <arch/amd64/cpu.h>
 
 #include <core/memory/virtual.h>
 #include <core/memory/address.h>
 
 #include <core/debug.h>
 #include <fayt/string.h>
+#include <arch/port.h>
 
 typeof(madt_ent0_list) madt_ent0_list;
 typeof(madt_ent1_list) madt_ent1_list;
@@ -32,14 +33,14 @@ void ioapic_write(struct ioapic *ioapic, uint32_t reg, uint32_t data)
 
 void xapic_write(uint32_t reg, uint32_t data)
 {
-	*(volatile uint32_t *)((rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + HIGH_VMA +
-						   reg) = data;
+	*(volatile uint32_t *)(P2V(rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + reg) =
+		data;
 }
 
 uint32_t xapic_read(uint32_t reg)
 {
-	return *(volatile uint32_t *)((rdmsr(MSR_LAPIC_BASE) & 0xfffff000) +
-								  HIGH_VMA + reg);
+	return *(volatile uint32_t *)(P2V(rdmsr(MSR_LAPIC_BASE) & 0xfffff000) +
+								  reg);
 }
 
 void ioapic_write_redirection_table(struct ioapic *ioapic,
@@ -158,16 +159,13 @@ void apic_init()
 	for (size_t i = 0; i < madt_ent1_list.length; i++) {
 		struct madt_ent1 *madt1 = &madt_ent1_list.data[i];
 
-		struct ioapic ioapic = {
-			.ioapic_base =
-				(volatile uint32_t *)((uintptr_t)madt1->ioapic_addr + HIGH_VMA),
-			.madt1 = madt1
-		};
+		struct ioapic ioapic = { .ioapic_base = (volatile uint32_t *)(P2V(
+									 madt1->ioapic_addr)),
+								 .madt1 = madt1 };
 
-		kernel_mappings.page_table->map_page(
-			kernel_mappings.page_table, (uintptr_t)ioapic.ioapic_base,
-			((uintptr_t)ioapic.ioapic_base - HIGH_VMA),
-			X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
+		pmap_map(kernel_mappings.page_table->pmap,
+				 (uintptr_t)ioapic.ioapic_base, V2P(ioapic.ioapic_base),
+				 VM_PROT_PRESENT | VM_PROT_WRITE, VM_GLOBAL | VM_LARGE_PAGE);
 
 		ioapic.ioapic_id = ioapic_read(&ioapic, 0);
 		ioapic.ioapic_version = ioapic_read(&ioapic, 1) & 0xff;
@@ -207,11 +205,10 @@ void apic_init()
 		}
 	}
 
-	kernel_mappings.page_table->map_page(
-		kernel_mappings.page_table,
-		(rdmsr(MSR_LAPIC_BASE) & 0xfffff000) + HIGH_VMA,
-		(rdmsr(MSR_LAPIC_BASE) & 0xfffff000),
-		X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_G | X86_FLAGS_PS);
+	pmap_map(kernel_mappings.page_table->pmap,
+			 (P2V(rdmsr(MSR_LAPIC_BASE) & 0xfffff000)),
+			 (rdmsr(MSR_LAPIC_BASE) & 0xfffff000),
+			 VM_PROT_PRESENT | VM_PROT_WRITE, VM_GLOBAL | VM_LARGE_PAGE);
 
 	xapic_write(XAPIC_TPR_OFF, 0);
 	xapic_write(XAPIC_SINT_OFF, xapic_read(XAPIC_SINT_OFF) | 0x1ff);

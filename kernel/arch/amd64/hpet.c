@@ -1,5 +1,6 @@
-#include <arch/x86/hpet.h>
-#include <arch/x86/cpu.h>
+#include <arch/amd64/hpet.h>
+#include <arch/amd64/cpu.h>
+#include <arch/port.h>
 
 #include <core/debug.h>
 
@@ -45,7 +46,7 @@ void hpet_nsleep(size_t ns)
 void hpet_init(void)
 {
 	hpet_table = acpi_find_sdt("HPET");
-	hpet_regs = (struct hpet_regs *)(hpet_table->address + HIGH_VMA);
+	hpet_regs = (struct hpet_regs *)(P2V(hpet_table->address));
 
 	hpet_regs->counter_value = 0;
 	hpet_regs->general_config = 1;

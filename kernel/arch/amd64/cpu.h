@@ -7,11 +7,6 @@
 
 #include <fayt/time.h>
 
-#define PAGE_SIZE 0x1000ull
-#define KERNEL_HIGH_VMA 0xffffffff80000000
-
-extern uint64_t HIGH_VMA;
-
 #define MSR_LAPIC_BASE 0x1b
 #define MSR_EFER 0xc0000080
 #define MSR_STAR 0xc0000081
@@ -30,8 +25,6 @@ extern uint64_t HIGH_VMA;
 #define MSR_PACKAGE_THERM_STATUS 0x1b1
 #define MSR_PACKAGE_THERM_INTERRUPT 0x1b2
 
-#define CORE_LOCAL ({ (struct cpu_local *)(rdmsr(MSR_GS_BASE)); })
-
 #define SWAP_TLS(regisers)                   \
 	({                                       \
 		if (((regisers)->cs & 0x3) == 0x3) { \
@@ -39,7 +32,7 @@ extern uint64_t HIGH_VMA;
 		}                                    \
 	})
 
-struct registers {
+struct __attribute__((packed)) registers {
 	uint64_t r15;
 	uint64_t r14;
 	uint64_t r13;
@@ -130,8 +123,7 @@ static inline void swapgs(void)
 
 static inline void invlpg(uint64_t vaddr)
 {
-	__asm__ volatile("invlpg %0" ::"m"((*((int (*)[])((void *)vaddr))))
-					 : "memory");
+	__asm__ volatile("invlpg %0" ::"m"(vaddr) : "memory");
 }
 
 static inline bool get_interrupt_state(void)
@@ -200,11 +192,11 @@ static inline uint64_t rdtsc(void)
 struct cpuid_state cpuid(size_t leaf, size_t subleaf);
 
 struct cpu_local;
-void x86_fpu_init(struct cpu_local *);
-void x86_system_init(void);
-void x86_system_tables(void);
+void amd64_fpu_init(struct cpu_local *);
+void amd64_system_init(void);
+void amd64_system_tables(void);
 
-void x86_tsc_calibrate(void);
+void amd64_tsc_calibrate(void);
 extern struct timer invariant_tsc;
 
 #endif

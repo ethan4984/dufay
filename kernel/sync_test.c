@@ -87,8 +87,8 @@ static void sem_test()
 
 void do_sync_test()
 {
-#if 0
-  	mutex_test();
+#if 1
+	mutex_test();
 #else
 	sem_test();
 #endif

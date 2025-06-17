@@ -1,0 +1,12 @@
+src += files('apic.c', 
+'context.c', 
+'cpu.c', 
+'debug.c', 
+'entry.c',
+'gdt.c',
+'idt.c',
+'paging.c', 
+'smp.c',
+'hpet.c',
+'isr.asm', 
+'syscall.asm')

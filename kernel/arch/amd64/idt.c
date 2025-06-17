@@ -1,6 +1,6 @@
-#include <arch/x86/cpu.h>
-#include <arch/x86/idt.h>
-#include <arch/x86/apic.h>
+#include <arch/amd64/cpu.h>
+#include <arch/amd64/idt.h>
+#include <arch/amd64/apic.h>
 
 #include <core/scheduler/context.h>
 #include <core/memory/portal.h>

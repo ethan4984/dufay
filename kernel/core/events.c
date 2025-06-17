@@ -1,5 +1,4 @@
-#include <arch/x86/cpu.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/events.h>
 #include <core/scheduler/thread.h>
@@ -54,7 +53,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 	if (unlikely(scheduler == NULL || scheduler->enqueue == NULL))
 		RETURN_ERROR;
 
-	for (int i = 0; i < etrigger->equeue.length; i++) {
+	for (size_t i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
 
 		if (equeue == NULL)
@@ -62,7 +61,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 
 		spinlock_irqsave(&equeue->lock);
 
-		for (int j = 0; j < equeue->context.length; j++) {
+		for (size_t j = 0; j < equeue->context.length; j++) {
 			struct context *context = equeue->context.data[j];
 
 			if (context == NULL)

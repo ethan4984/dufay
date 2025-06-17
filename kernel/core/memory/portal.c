@@ -1,5 +1,5 @@
-#include <arch/x86/smp.h>
-#include <arch/x86/paging.h>
+#include <arch/amd64/smp.h>
+#include <arch/amd64/paging.h>
 
 #include <core/memory/physical.h>
 #include <core/syscall.h>
@@ -101,12 +101,12 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 			goto next;
 
 		if (root->base <= addr && (root->base + root->limit) >= addr) {
-			uintptr_t flags = X86_FLAGS_P | X86_FLAGS_US | X86_FLAGS_NX;
+			uintptr_t flags = VM_PROT_USER | VM_PROT_PRESENT;
 
 			if (root->prot & PORTAL_PROT_WRITE)
-				flags |= X86_FLAGS_RW;
+				flags |= VM_PROT_WRITE;
 			if (root->prot & PORTAL_PROT_EXEC)
-				flags &= ~(X86_FLAGS_NX);
+				flags |= VM_PROT_EXECUTE;
 
 			uintptr_t misalignment = addr & (PAGE_SIZE - 1);
 			uintptr_t vaddr = addr - misalignment;
@@ -156,8 +156,9 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 				page->vaddr = vaddr;
 			}
 
-			page_table->map_page(page_table, page->vaddr, page->frame->paddr,
-								 flags);
+			pmap_map(page_table->pmap, page->vaddr, page->frame->paddr, flags,
+					 0);
+
 			int ret = dictionary_push(page_table->pages, &page->vaddr, page,
 									  sizeof(page->vaddr));
 			if (ret == -1)
@@ -249,14 +250,12 @@ static int portal_handle_direct(struct portal *portal, struct portal_req *req,
 	uintptr_t vaddr = req->morphology.addr;
 
 	for (size_t i = 0; i < page_cnt; i++) {
-		uint64_t permissions = portal_translate_protections(req->prot);
-
 		struct page *page = alloc(sizeof(struct page));
 		if (page == NULL)
 			RETURN_ERROR;
 
-		portal->page_table->map_page(portal->page_table, vaddr, paddr,
-									 permissions);
+		pmap_map(portal->page_table->pmap, page->vaddr, page->frame->paddr,
+				 req->prot | VM_PROT_USER, 0);
 
 		vaddr += PAGE_SIZE;
 		paddr += PAGE_SIZE;
@@ -284,9 +283,9 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 		permissions |= X86_FLAGS_P;
 
 		for (size_t i = 0; i < req->morphology.pcnt; i++) {
-			portal->page_table->map_page(portal->page_table,
-										 vaddr + i * PAGE_SIZE,
-										 paddr + i * PAGE_SIZE, permissions);
+			pmap_map(portal->page_table->pmap, vaddr + i * PAGE_SIZE,
+					 paddr + i * PAGE_SIZE,
+					 (req->prot | VM_PROT_USER) & ~VM_PROT_PRESENT, 0);
 		}
 
 		portal->type |= PORTAL_REQ_CONTINUOUS;
@@ -429,8 +428,7 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 map:
 		uint64_t permissions = portal_translate_protections(req->prot);
 
-		portal->page_table->map_page(portal->page_table, vaddr, paddr,
-									 permissions);
+		pmap_map(portal->page_table->pmap, vaddr, paddr, req->prot, 0);
 		vaddr += PAGE_SIZE;
 	}
 	struct portal_link *link = (void *)req->morphology.addr;
@@ -542,9 +540,11 @@ skip:
 				RETURN_ERROR;
 			*dest_page = *src_page;
 
-			dest_page->pmle = destination_table->map_page(
-				destination_table, dest_page->vaddr, dest_page->frame->paddr,
-				dest_page->flags);
+			panic("not implemented");
+
+			// dest_page->pmle = destination_table->map_page(
+			// 	destination_table, dest_page->vaddr, dest_page->frame->paddr,
+			// 	dest_page->flags);
 
 			int ret = dictionary_push(destination_table->pages,
 									  &dest_page->vaddr, dest_page,
@@ -585,9 +585,11 @@ skip:
 			*dest_page = *src_page;
 
 			dest_page->vaddr = dest_vaddr;
-			dest_page->pmle = destination_table->map_page(
-				destination_table, dest_page->vaddr, dest_page->frame->paddr,
-				dest_page->flags);
+			panic("not implemented");
+
+			// dest_page->pmle = destination_table->map_page(
+			// 	destination_table, dest_page->vaddr, dest_page->frame->paddr,
+			// 	dest_page->flags);
 
 			ret = dictionary_push(destination_table->pages, &dest_page->vaddr,
 								  dest_page, sizeof(dest_page->vaddr));

@@ -1,8 +1,6 @@
 #ifndef X86_PAGING_H_
 #define X86_PAGING_H_
 
-#include <core/memory/virtual.h>
-
 #include <stdint.h>
 
 #define X86_FLAGS_P (1 << 0)
@@ -23,12 +21,10 @@
 #define X86_PAT_WB 6
 #define X86_PAT_UCM 7
 
-extern uint64_t *(*x86_map_page)(struct page_table *, uint64_t, uint64_t,
-								 uint64_t);
-extern uint64_t *(*x86_page_entry)(struct page_table *, uint64_t);
-extern uint64_t (*x86_unmap_page)(struct page_table *, uint64_t);
+struct pmap {
+	uint64_t *pmlt;
+};
 
-void x86_paging_init();
-void x86_swap_tables(struct page_table *);
+void amd64_paging_init();
 
 #endif

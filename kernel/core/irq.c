@@ -1,6 +1,7 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/smp.h>
-#include <arch/x86/idt.h>
+#include "core/memory/virtual.h"
+#include <arch/amd64/paging.h>
+#include <arch/amd64/smp.h>
+#include <arch/amd64/idt.h>
 
 #include <core/irq.h>
 #include <core/debug.h>
@@ -21,6 +22,8 @@ static struct dictionary cortex_table;
 
 int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 {
+	panic("");
+
 	if ((error_code & X86_FLAGS_P) != 0)
 		RETURN_ERROR;
 	if (faulting_address < aslr_irq.minimum_vaddr ||
@@ -60,8 +63,8 @@ found:
 	page->paddr = *pml_entry & ~(0xfff);
 	page->flags = *pml_entry & 0xfff;
 	page->frame = NULL;
-	page->pmle = page_table->map_page(
-		page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
+	//page->pmle = page_table->map_page(
+	//page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
 	page->refcnt = alloc(sizeof(*page->refcnt));
 
 	int ret = dictionary_push(page_table->pages, &page->vaddr, page,

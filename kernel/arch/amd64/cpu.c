@@ -1,10 +1,10 @@
-#include <arch/x86/cpu.h>
-#include <arch/x86/idt.h>
-#include <arch/x86/gdt.h>
-#include <arch/x86/apic.h>
-#include <arch/x86/hpet.h>
-#include <arch/x86/smp.h>
-#include <arch/x86/debug.h>
+#include <arch/amd64/cpu.h>
+#include <arch/amd64/idt.h>
+#include <arch/amd64/gdt.h>
+#include <arch/amd64/apic.h>
+#include <arch/amd64/hpet.h>
+#include <arch/amd64/smp.h>
+#include <arch/amd64/debug.h>
 
 #include <core/debug.h>
 
@@ -16,7 +16,7 @@ extern void syscall_main(void);
 
 struct cpuid_state cpuid(size_t leaf, size_t subleaf)
 {
-	struct cpuid_state ret = { .leaf = leaf, subleaf = subleaf };
+	struct cpuid_state ret = { .leaf = leaf, .subleaf = subleaf };
 
 	uint64_t cpuid_max;
 	__asm__ volatile("cpuid"
@@ -37,7 +37,7 @@ struct cpuid_state cpuid(size_t leaf, size_t subleaf)
 
 struct timer invariant_tsc;
 
-void x86_tsc_calibrate(void)
+void amd64_tsc_calibrate(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
 	if ((cpuid_state.rdx & (1 << 4)) == 0)
@@ -58,7 +58,7 @@ void x86_tsc_calibrate(void)
 									.read = invariant_tsc_read };
 }
 
-void x86_system_init(void)
+void amd64_system_init(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
 	if ((cpuid_state.rdx & (1 << 25)) == 0)
@@ -94,20 +94,40 @@ void x86_system_init(void)
 	serial_init();
 }
 
-void x86_fpu_init(struct cpu_local *cpu_local)
+void amd64_fpu_init(struct cpu_local *cpu_local)
 {
-	cpu_local->fpu_thread_size = 512;
-	cpu_local->fpu_save = fxsave;
-	cpu_local->fpu_rstor = fxrstor;
+	cpu_local->arch_cb.fpu_thread_size = 512;
+	cpu_local->arch_cb.fpu_save = fxsave;
+	cpu_local->arch_cb.fpu_rstor = fxrstor;
 }
 
-void x86_system_tables(void)
+void amd64_system_tables(void)
 {
 	gdt_init();
 	idt_init();
 	hpet_init();
 	apic_init();
 	apic_timer_init(SCHED_TICK_RATE_MS);
-	x86_tsc_calibrate();
+	amd64_tsc_calibrate();
 	boot_aps();
+}
+
+void arch_enable_interrupts(void)
+{
+	__asm__ volatile("sti");
+}
+
+void arch_disable_interrupts(void)
+{
+	__asm__ volatile("cli");
+}
+
+void arch_halt()
+{
+	__asm__ volatile("hlt");
+}
+
+bool arch_interrupt_state(void)
+{
+	return get_interrupt_state();
 }

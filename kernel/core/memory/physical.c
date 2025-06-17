@@ -1,5 +1,4 @@
-#include <arch/x86/cpu.h>
-
+#include <arch/port.h>
 #include <core/memory/physical.h>
 #include <core/debug.h>
 
@@ -192,7 +191,7 @@ uint64_t pmm_alloc(uint64_t cnt, uint64_t align)
 	do {
 		uint64_t alloc = pmm_module_alloc(module, cnt, align);
 
-		if (alloc == -1) {
+		if (alloc == (uint64_t)-1) {
 			module = module->next;
 			continue;
 		}
