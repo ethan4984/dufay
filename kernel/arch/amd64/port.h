@@ -12,7 +12,6 @@
 #define HZ 100
 
 #define KERNEL_HIGH_VMA 0xffffffff80000000
-#define CORE_LOCAL ({ (struct cpu_local *)(rdmsr(MSR_GS_BASE)); })
 
 extern uint64_t HIGH_VMA;
 
@@ -27,11 +26,31 @@ struct __attribute__((packed)) arch_cpu_cb {
 	int fpu_thread_size;
 	void (*fpu_save)(void *);
 	void (*fpu_rstor)(void *);
+	struct cpu_local *self;
 };
 
 struct arch_thread_context {
 	struct registers regs;
 	void *fpu_thread;
 };
+
+/* This is faster than reading from an MSR everytime we access CORE_LOCAL...  */
+static inline struct cpu_local *amd64_get_cpu()
+{
+	struct cpu_local *value;
+	asm volatile("mov %%gs:%c1, %0"
+				 : "=a"(value)
+				 : "i"(offsetof(struct arch_cpu_cb, self)));
+	return value;
+}
+
+#define CORE_LOCAL ({ amd64_get_cpu(); })
+
+typedef enum : uint8_t {
+	IPL_ZERO = 0, /* All interrupts enabled */
+	IPL_DISPATCH, /* Preemption disabled */
+	IPL_DEVICE = 13, /* Device interrupts disabled */
+	IPL_HIGH = 15, /* All interrupts disabled */
+} ipl_t;
 
 #endif

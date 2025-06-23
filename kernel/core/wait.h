@@ -60,21 +60,24 @@ struct dispatch_header {
 void dispatch_object_init(struct dispatch_header *hdr,
 						  enum dispatch_object_type type, const char *name);
 
-/* Tries to satisfy a wait on an object
+/* 
+ * Tries to satisfy a wait on an object.
  * Returns the thread that was satisfied, or NULL if no thread was satisfied.
  * If the object is a notification object, it will satisfy all waiting threads.
  * If the object is a synchronization object, it will satisfy only one thread.
  */
 struct thread *try_satisfy_dispatch_object(struct dispatch_header *hdr);
 
-/* Waits for any of the provided objects to be signaled.
+/* 
+ * Waits for any of the provided objects to be signaled.
  * Returns the index of the object that was signaled, or -1 on error.
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.
  */
 int wait_any(int count, void *objects[], long timeout);
 
-/* * Waits for a single object to be signaled.
+/* 
+ * Waits for a single object to be signaled.
  * Returns 0 on success, or -1 on error.
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.

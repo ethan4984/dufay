@@ -1,12 +1,15 @@
+#include "arch/port.h"
 #include <arch/amd64/cpu.h>
 #include <arch/amd64/idt.h>
 #include <arch/amd64/apic.h>
+#include <core/scheduler/processor.h>
 
 #include <core/scheduler/context.h>
 #include <core/memory/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
 #include <core/syscall.h>
+#include <core/ipl.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>
@@ -113,6 +116,11 @@ extern void isr_handler_main(struct registers *regs)
 {
 	SWAP_TLS(regs);
 
+	/** TODO: Make this architecture-independant somewhat and support setting different priorities for different vectors */
+	//	ipl_t oldipl = CORE_LOCAL->ipl;
+
+	//arch_set_hardware_ipl(IPL_DEVICE);
+
 	if (regs->isr_number < 32) {
 		static struct spinlock exception_lock;
 
@@ -176,6 +184,12 @@ extern void isr_handler_main(struct registers *regs)
 		}
 	}
 done:
+	//arch_set_hardware_ipl(oldipl);
+
+	// if (is_softint_pending(oldipl)) {
+	// 	dispatch_software_interrupts(oldipl);
+	// }
+
 	SWAP_TLS(regs);
 
 	xapic_write(XAPIC_EOI_OFF, 0);

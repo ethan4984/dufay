@@ -13,6 +13,7 @@ void arch_devices_init(void);
 void arch_enable_interrupts(void);
 void arch_disable_interrupts(void);
 bool arch_interrupt_state(void);
+void arch_set_hardware_ipl(ipl_t ipl);
 void arch_halt(void);
 
 void arch_context_init(struct arch_thread_context *context,

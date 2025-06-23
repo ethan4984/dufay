@@ -36,6 +36,7 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 	spinrelease(&core_init_lock);
 
 	amd64_fpu_init(cpu_local);
+	cpu_local->ipl = 0;
 
 	wrmsr(MSR_GS_BASE, (uintptr_t)cpu_local);
 
@@ -87,6 +88,7 @@ static void chain_aps()
 		panic("");
 	}
 	cpu_local->core_id = madt0->apic_id;
+	cpu_local->ipl = 0;
 
 	if (cpu_local->core_id == (xapic_read(XAPIC_ID_REG_OFF) >> 24)) {
 		amd64_fpu_init(cpu_local);
@@ -139,6 +141,12 @@ void boot_aps(void)
 	if (logical_processor_locales == NULL) {
 		REPORT_ERROR;
 		panic("");
+	}
+
+	for (size_t i = 0; i < bootable_processor_cnt; i++) {
+		logical_processor_locales[i].arch_cb.self =
+			&logical_processor_locales[i];
+		logical_processor_locales[i].ipl = 0;
 	}
 
 	atomic_store(&cpus_up, 1);

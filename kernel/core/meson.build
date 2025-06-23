@@ -13,7 +13,8 @@ src += files('bcache.c', 'capability.c',
     'semaphore.c',
     'syscall.c',
     'timer.c',
-    'wait.c')
+    'wait.c',
+    'ipl.c')
 
 subdir('scheduler')
 subdir('memory')

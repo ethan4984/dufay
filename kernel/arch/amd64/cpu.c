@@ -131,3 +131,8 @@ bool arch_interrupt_state(void)
 {
 	return get_interrupt_state();
 }
+
+void arch_set_hardware_ipl(ipl_t ipl)
+{
+	asm volatile("mov %0, %%cr8" : : "a"((uint64_t)ipl));
+}

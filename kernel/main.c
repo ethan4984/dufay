@@ -1,3 +1,4 @@
+#include "arch/amd64/port.h"
 #include <fayt/lock.h>
 #include <arch/port.h>
 
@@ -7,6 +8,7 @@
 #include <core/init.h>
 #include <core/memory/physical.h>
 #include <core/memory/virtual.h>
+#include <core/ipl.h>
 #include <core/memory/slab.h>
 
 #include <acpi/madt.h>

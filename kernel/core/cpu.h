@@ -11,12 +11,18 @@
 
 #include <fayt/pairing_heap.h>
 #include <arch/port.h>
+#include <core/ipl.h>
 
 struct cpu_local {
 	struct arch_cpu_cb
 		arch_cb; /* Architecture-dependent CPU control-block. This must ALWAYS be the first member of the struct */
 
 	int core_id; /* ID of this CPU */
+
+	_Atomic(uint8_t)
+		pending_softints; /* Bitmask of pending software interrupts on this CPU */
+
+	ipl_t ipl; /* Current interrupt priority level of this CPU */
 
 	struct thread
 		*current_thread; /* Thread that's currently running on this CPU */

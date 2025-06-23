@@ -10,6 +10,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct dpc {
+	TAILQ_ENTRY(dpc) queue_hook;
+	void (*routine)(void);
+};
+
 struct cpu_local {
 	struct arch_cpu_cb
 		arch_cb; /* Architecture-dependent CPU control-block. This must ALWAYS be the first member of the struct */
@@ -22,6 +27,9 @@ struct cpu_local {
 	struct thread *current_thread;
 
 	int core_id;
+	uint8_t ipl;
+	_Atomic(uint8_t) pending_softints;
+	TAILQ_HEAD(, dpc) dpcs;
 };
 
 extern size_t logical_processor_cnt;
