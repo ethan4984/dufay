@@ -1,4 +1,4 @@
-#include "core/memory/virtual.h"
+#include "mm/virtual.h"
 #include <arch/amd64/paging.h>
 #include <arch/amd64/smp.h>
 #include <arch/amd64/idt.h>
@@ -22,7 +22,7 @@ static struct dictionary cortex_table;
 
 int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 {
-	panic("");
+	panic("irq resolve, faulting addr = %x\n", faulting_address);
 
 	if ((error_code & X86_FLAGS_P) != 0)
 		RETURN_ERROR;
@@ -34,7 +34,7 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = thread->address_space->page_table;
+	struct page_table *page_table = thread->process->as->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
