@@ -1,5 +1,5 @@
 #include <core/semaphore.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 #include <core/wait.h>
 #include <core/lock.h>
 

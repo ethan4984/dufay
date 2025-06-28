@@ -1,4 +1,4 @@
-#include <arch/x86/cpu.h>
+#include <arch/port.h>
 
 #include <acpi/rsdp.h>
 
@@ -16,7 +16,7 @@ void *acpi_find_sdt(const char *signature)
 		for (size_t i = 0;
 			 i < (xsdt->acpi_hdr.length - sizeof(struct acpi_hdr)); i++) {
 			struct acpi_hdr *acpi_hdr =
-				(struct acpi_hdr *)(xsdt->acpi_ptr[i] + HIGH_VMA);
+				(struct acpi_hdr *)(P2V(xsdt->acpi_ptr[i]));
 			if (strncmp(acpi_hdr->signature, signature, 4) == 0) {
 				print("ACPI: %s found\n", signature);
 				return acpi_hdr;
@@ -28,7 +28,7 @@ void *acpi_find_sdt(const char *signature)
 		for (size_t i = 0;
 			 i < (rsdt->acpi_hdr.length - sizeof(struct acpi_hdr)); i++) {
 			struct acpi_hdr *acpi_hdr =
-				(struct acpi_hdr *)(rsdt->acpi_ptr[i] + HIGH_VMA);
+				(struct acpi_hdr *)(P2V(rsdt->acpi_ptr[i]));
 			if (strncmp(acpi_hdr->signature, signature, 4) == 0) {
 				print("ACPI: %s found\n", signature);
 				return acpi_hdr;

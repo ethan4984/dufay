@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <core/memory/slab.h>
+#include <mm/slab.h>
 
 struct object_header {
 	// Which class is the object?

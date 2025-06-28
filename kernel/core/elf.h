@@ -1,7 +1,7 @@
 #ifndef ELF_H_
 #define ELF_H_
 
-#include <core/memory/address.h>
+#include <mm/address.h>
 
 #include <aria/elf.h>
 

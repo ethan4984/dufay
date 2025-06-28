@@ -1,4 +1,4 @@
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/bcache.h>
 #include <core/capability.h>
@@ -13,16 +13,19 @@ static struct dictionary bcache_table;
 
 static int bcache_register(capability_t handle)
 {
+	(void)handle;
 	return 0;
 }
 
 static int bcache_lookup(capability_t handle, struct bcache **bcache)
 {
+	(void)bcache_register;
+
 	if (bcache == NULL)
 		RETURN_ERROR;
 
-	struct capability_binding *capability_binding =
-		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
+	struct capability_binding *capability_binding = capability_lookup(
+		CORE_LOCAL->current_thread->process->capability_table, handle);
 	if (capability_binding == NULL)
 		RETURN_ERROR;
 
@@ -109,7 +112,7 @@ static int bcache_consult_read(capability_t handle, size_t offset, int count,
 		size_t byte_cnt = blk_handle->lba_size - index_into_blk;
 
 		bytes_read += byte_cnt;
-		if (unlikely(bytes_read > count)) {
+		if (unlikely(bytes_read > (size_t)count)) {
 			byte_cnt = count - bytes_read - byte_cnt;
 			bytes_read -= byte_cnt;
 		}
@@ -166,7 +169,7 @@ static int bcache_consult_write(capability_t handle, size_t offset, int count,
 		size_t byte_cnt = blk_handle->lba_size - index_into_blk;
 
 		bytes_read += byte_cnt;
-		if (unlikely(bytes_read > count)) {
+		if (unlikely(bytes_read > (size_t)count)) {
 			byte_cnt = count - bytes_read - byte_cnt;
 			bytes_read -= byte_cnt;
 		}

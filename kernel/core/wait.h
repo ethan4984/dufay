@@ -2,7 +2,10 @@
 #define CORE_WAIT_H_
 #include <sys/queue.h>
 #include <aria/lock.h>
+#include <core/clock.h>
 #include <stdatomic.h>
+
+#define INTERNAL_WAITBLOCKS_N 4
 
 /*
  * This is loosely based on Arun Kishan's work on Windows 7:
@@ -58,25 +61,28 @@ struct dispatch_header {
 void dispatch_object_init(struct dispatch_header *hdr,
 						  enum dispatch_object_type type, const char *name);
 
-/* Tries to satisfy a wait on an object
+/* 
+ * Tries to satisfy a wait on an object.
  * Returns the thread that was satisfied, or NULL if no thread was satisfied.
  * If the object is a notification object, it will satisfy all waiting threads.
  * If the object is a synchronization object, it will satisfy only one thread.
  */
 struct thread *try_satisfy_dispatch_object(struct dispatch_header *hdr);
 
-/* Waits for any of the provided objects to be signaled.
+/* 
+ * Waits for any of the provided objects to be signaled.
  * Returns the index of the object that was signaled, or -1 on error.
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.
  */
-int wait_any(int count, void *objects[], long timeout);
+int wait_any(int count, void *objects[], nanoseconds_t timeout);
 
-/* * Waits for a single object to be signaled.
+/* 
+ * Waits for a single object to be signaled.
  * Returns 0 on success, or -1 on error.
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.
  */
-int wait_one(struct dispatch_header *hdr, long timeout);
+int wait_one(struct dispatch_header *hdr, nanoseconds_t timeout);
 
 #endif

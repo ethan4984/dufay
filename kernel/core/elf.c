@@ -1,8 +1,7 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/cpu.h>
+#include <arch/port.h>
 
-#include <core/memory/virtual.h>
-#include <core/memory/physical.h>
+#include <mm/virtual.h>
+#include <mm/physical.h>
 #include <core/elf.h>
 #include <core/debug.h>
 
@@ -19,7 +18,7 @@ int elf64_read(struct elf64_file *file, void *buffer, int offset, size_t cnt)
 
 	if (unlikely(file_buffer->data == NULL || buffer == NULL))
 		RETURN_ERROR;
-	if (unlikely(file_buffer->length < offset))
+	if (unlikely(file_buffer->length < (size_t)offset))
 		return 0;
 
 	int data_to_read = (file_buffer->length < (offset + cnt)) ?
@@ -39,7 +38,7 @@ int elf64_write(struct elf64_file *file, const void *buffer, int offset,
 
 	if (unlikely(file_buffer->data == NULL || buffer == NULL))
 		RETURN_ERROR;
-	if (unlikely(file_buffer->length < offset))
+	if (unlikely(file_buffer->length < (size_t)offset))
 		return 0;
 
 	int data_to_write = (file_buffer->length < (offset + cnt)) ?
@@ -76,23 +75,23 @@ int elf64_map(struct elf64_file *file, struct elf64_phdr *phdr,
 		return 0;
 	uintptr_t physical[page_cnt];
 
-	for (int j = 0; j < page_cnt; j++) {
+	for (size_t j = 0; j < page_cnt; j++) {
 		physical[j] = pmm_alloc(1, 1);
 		uintptr_t virtual = addr - misalignment + j * PAGE_SIZE;
 
-		uint64_t page_flags = X86_FLAGS_P | X86_FLAGS_US | X86_FLAGS_NX;
-		if ((flags & ELF_PF_W) == ELF_PF_W)
-			page_flags |= X86_FLAGS_RW;
-		if ((flags & ELF_PF_X) == ELF_PF_X)
-			page_flags &= ~X86_FLAGS_NX;
+		enum vm_prot prot = VM_PROT_PRESENT | VM_PROT_USER;
 
-		file_buffer->address_space->page_table->map_page(
-			file_buffer->address_space->page_table, virtual, physical[j],
-			page_flags);
+		if ((flags & ELF_PF_W) == ELF_PF_W)
+			prot |= VM_PROT_WRITE;
+		if ((flags & ELF_PF_X) == ELF_PF_X)
+			prot |= VM_PROT_EXECUTE;
+
+		pmap_map(file_buffer->address_space->page_table->pmap, virtual,
+				 physical[j], prot, 0);
 	}
 
 	if (place) {
-		for (int j = 0; j < page_cnt; j++) {
+		for (size_t j = 0; j < page_cnt; j++) {
 			size_t cnt = ((PAGE_SIZE + j * PAGE_SIZE) > size) ?
 							 (size % (j * PAGE_SIZE)) :
 							 PAGE_SIZE;

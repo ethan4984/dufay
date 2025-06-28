@@ -1,13 +1,17 @@
-#include "aria/lock.h"
-#include <arch/x86/cpu.h>
+#include "arch/amd64/cpu.h"
+#include "core/sched.h"
+#include "mm/address.h"
+#include <aria/lock.h>
+#include <arch/port.h>
 
-#include <core/scheduler/thread.h>
+#include <core/cpu.h>
 #include <core/debug.h>
 #include <core/message.h>
 #include <core/init.h>
-#include <core/memory/physical.h>
-#include <core/memory/virtual.h>
-#include <core/memory/slab.h>
+#include <mm/physical.h>
+#include <mm/virtual.h>
+#include <core/ipl.h>
+#include <mm/slab.h>
 
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
@@ -19,39 +23,26 @@
 #include <limine.h>
 #include <core/mutex.h>
 
-struct limine_hhdm_request limine_hhdm_request = { .id = LIMINE_HHDM_REQUEST,
-												   .revision = 0 };
-
-static volatile struct limine_rsdp_request limine_rsdp_request = {
-	.id = LIMINE_RSDP_REQUEST,
-	.revision = 0
-};
+#include <aria/time.h>
 
 static void *spalloc(void *, uint64_t s)
 {
-	return (void *)pmm_alloc(s, 1) + HIGH_VMA;
+	return (void *)P2V(pmm_alloc(s, 1));
 }
 static void spfree(void *addr, uint64_t s, uint64_t)
 {
-	pmm_free((uint64_t)addr - HIGH_VMA, s);
+	pmm_free(V2P(addr), s);
 }
-
-#include <arch/x86/hpet.h>
-#include <aria/time.h>
 
 int init_system_tgroup();
 
 void do_sync_test(void);
 
+void sched_init();
+void sched_cpu_init();
+
 void fuga_entry(void)
 {
-	if (limine_hhdm_request.response)
-		HIGH_VMA = limine_hhdm_request.response->offset;
-
-	print("welcome\n");
-
-	x86_system_init();
-
 	pmm_init();
 
 	struct slab_pool pool = { .page_size = PAGE_SIZE,
@@ -74,48 +65,35 @@ void fuga_entry(void)
 
 	vmm_init();
 
-	rsdp = limine_rsdp_request.response->address;
-
-	if (rsdp->xsdt_addr) {
-		xsdt = (struct xsdt *)(rsdp->xsdt_addr + HIGH_VMA);
-		print("ACPI: xsdt found at %x\n", (uintptr_t)xsdt);
-	} else {
-		rsdt = (struct rsdt *)(rsdp->rsdt_addr + HIGH_VMA);
-		print("ACPI: rsdt found at %x\n", (uintptr_t)rsdt);
-	}
-
-	fadt = acpi_find_sdt("FACP");
-
-	x86_system_tables();
+	arch_devices_init();
 
 	kmem_init();
 
-	init_system_tgroup();
+	//init_system_tgroup();
 
-	int ret = launch_schedulers();
+	int ret = message_init();
 	if (ret == -1) {
 		REPORT_ERROR;
-		panic("");
+		panic("message init failed!");
 	}
 
+	sched_init();
+	sched_cpu_init();
+
+#if 1
+	do_sync_test();
+#else
 	ret = launch_init();
 	if (ret == -1) {
 		REPORT_ERROR;
 		panic("");
 	}
-
-	ret = message_init();
-	if (ret == -1) {
-		REPORT_ERROR;
-		panic("");
-	}
-
-#if 0
-	do_sync_test();
 #endif
 
-	__asm__("sti");
+	/* Liftoff! */
+	ipl_lower(IPL_ZERO);
 
-	for (;;)
-		__asm__("hlt");
+	for (;;) {
+		arch_halt();
+	}
 }
