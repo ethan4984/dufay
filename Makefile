@@ -77,15 +77,9 @@ $(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel build_servers
 	mkdir disk_image/boot
 	mkdir disk_image/servers/
 	$(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-<<<<<<< HEAD
-	cp kernel/build/dufay initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
-	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
-	./limine/limine bios-install dufay.iso
-=======
-	cp kernel/build/fuga.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
+	cp kernel/build/fuga initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o fuga.iso
 	./limine/limine bios-install fuga.iso
->>>>>>> upstream/dufay
 	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
 	parted -s disk.img mklabel msdos
 	parted -s disk.img mkpart primary 1 100%
@@ -103,11 +97,7 @@ $(DISK_IMAGE): $(BUILD) limine kernel build_servers
 	sudo mkdir disk_image/boot
 	sudo mkdir disk_image/servers/
 	sudo $(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-<<<<<<< HEAD
-	sudo cp kernel/build/dufay limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
-=======
-	sudo cp kernel/build/fuga.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
->>>>>>> upstream/dufay
+	sudo cp kernel/build/fuga limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	sync
 	sudo umount disk_image/
 	sudo losetup -d `cat loopback_dev`

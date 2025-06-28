@@ -1,11 +1,7 @@
 -include .config
 
 BUILD = build
-<<<<<<< HEAD
 ARCH ?= amd64
-=======
-KERNEL := $(BUILD)/fuga.elf
->>>>>>> upstream/dufay
 
 ifeq ($(CONFIG_ARCH_AMD64), y)
 ARCH = amd64

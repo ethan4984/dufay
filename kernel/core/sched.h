@@ -1,7 +1,7 @@
 #ifndef CORE_SCHED_H_
 #define CORE_SCHED_H_
 #include "core/capability.h"
-#include <arialock.h>
+#include <aria/lock.h>
 #include <stdatomic.h>
 #include <stdint.h>
 #include <sys/queue.h>

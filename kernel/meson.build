@@ -1,4 +1,4 @@
-project('dufay', ['c', 'nasm'], default_options: ['c_std=gnu23', 'warning_level=2', 'buildtype=debugoptimized'])
+project('fuga', ['c', 'nasm'], default_options: ['c_std=gnu23', 'warning_level=2', 'buildtype=debugoptimized'])
 
 c_args = [
     '-D__DUFAY__',
@@ -31,8 +31,8 @@ endif
 
 subdir('core')
 subdir('arch')
-subdir('fayt')
+subdir('aria')
 subdir('acpi')
 subdir('mm')
 
-executable('dufay', src, include_directories: inc, c_args: c_args)
+executable('fuga', src, include_directories: inc, c_args: c_args)

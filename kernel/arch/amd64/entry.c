@@ -4,7 +4,7 @@
 #include <limine.h>
 #include <acpi/rsdp.h>
 
-void dufay_entry(void);
+void fuga_entry(void);
 
 struct limine_hhdm_request limine_hhdm_request = { .id = LIMINE_HHDM_REQUEST,
 												   .revision = 0 };
@@ -23,7 +23,7 @@ void amd64_entry(void)
 
 	print("amd64: welcome\n");
 
-	dufay_entry();
+	fuga_entry();
 }
 
 void arch_devices_init()

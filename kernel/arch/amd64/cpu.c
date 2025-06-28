@@ -11,6 +11,7 @@
 #include <aria/sched.h>
 #include <aria/time.h>
 #include <core/debug.h>
+#include <aria/string.h>
 
 uint64_t HIGH_VMA = 0xffff800000000000;
 

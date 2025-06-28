@@ -1,5 +1,5 @@
 #include <arch/port.h>
-#include <arialock.h>
+#include <aria/lock.h>
 
 #include <mm/virtual.h>
 #include <mm/physical.h>

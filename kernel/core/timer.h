@@ -2,7 +2,7 @@
 #define CORE_TIMER_H_
 #include <core/wait.h>
 #include <core/clock.h>
-#include <ariapairing_heap.h>
+#include <aria/pairing_heap.h>
 #include <stdatomic.h>
 
 enum timer_state {

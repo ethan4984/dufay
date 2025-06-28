@@ -1,6 +1,6 @@
 #ifndef CORE_SCHED_ULE_H_
 #define CORE_SCHED_ULE_H_
-#include <arialock.h>
+#include <aria/lock.h>
 #include <sys/queue.h>
 #include <stdint.h>
 #include <stddef.h>
