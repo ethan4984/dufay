@@ -8,7 +8,7 @@ struct mutex {
 };
 
 void mutex_init(struct mutex *mutex, const char *name);
-void mutex_lock(struct mutex *mutex);
+void mutex_lock(struct mutex *mutex, nanoseconds_t timeout);
 void mutex_unlock(struct mutex *mutex);
 
 #endif

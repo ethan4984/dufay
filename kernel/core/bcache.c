@@ -24,8 +24,8 @@ static int bcache_lookup(capability_t handle, struct bcache **bcache)
 	if (bcache == NULL)
 		RETURN_ERROR;
 
-	struct capability_binding *capability_binding =
-		capability_lookup(CORE_LOCAL->current_thread->capability_table, handle);
+	struct capability_binding *capability_binding = capability_lookup(
+		CORE_LOCAL->current_thread->process->capability_table, handle);
 	if (capability_binding == NULL)
 		RETURN_ERROR;
 

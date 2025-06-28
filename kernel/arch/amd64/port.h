@@ -30,7 +30,10 @@ struct __attribute__((packed)) arch_cpu_cb {
 };
 
 struct arch_thread_context {
-	struct registers regs;
+	struct arch_thread_regs {
+		uint64_t rbp, rbx, r12, r13, r14, r15, rip;
+	} regs;
+	uint64_t rsp;
 	void *fpu_thread;
 };
 
@@ -48,7 +51,7 @@ static inline struct cpu_local *amd64_get_cpu()
 
 typedef enum : uint8_t {
 	IPL_ZERO = 0, /* All interrupts enabled */
-	IPL_DISPATCH, /* Preemption disabled */
+	IPL_DISPATCH = 1, /* Preemption disabled */
 	IPL_DEVICE = 13, /* Device interrupts disabled */
 	IPL_HIGH = 15, /* All interrupts disabled */
 } ipl_t;

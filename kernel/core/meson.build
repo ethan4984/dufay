@@ -7,14 +7,17 @@ src += files('bcache.c', 'capability.c',
     'irq.c',
     'message.c',
     'mutex.c',
-    'notification.c',
+  #  'notification.c',
     'object.c',
     'resource.c',
     'semaphore.c',
     'syscall.c',
     'timer.c',
     'wait.c',
-    'ipl.c')
+    'ipl.c',
+    'dpc.c',
+    'clock.c',
+    'thread.c',
+    )
 
-subdir('scheduler')
-subdir('memory')
+subdir('sched')

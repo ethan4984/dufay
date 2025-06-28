@@ -20,9 +20,9 @@ ipl_t ipl_get();
 
 void dispatch_software_interrupts(ipl_t newipl);
 
-bool is_softint_pending(ipl_t ipl);
-void clear_softint_pending(ipl_t ipl);
-void set_softint_pending(ipl_t ipl);
+bool is_softint_pending(struct cpu_local *cpu, ipl_t ipl);
+void clear_softint_pending(struct cpu_local *cpu, ipl_t ipl);
+void set_softint_pending(struct cpu_local *cpu, ipl_t ipl);
 
 #define ipldispatch() ipl_raise(IPL_DISPATCH)
 #define ipldevice() ipl_raise(IPL_DEVICE)

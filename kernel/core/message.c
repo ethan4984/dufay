@@ -12,13 +12,13 @@
 #include <fayt/string.h>
 
 #include <sys/queue.h>
-#include <core/memory/slab.h>
+#include <mm/slab.h>
 
 static struct port *lookup_port(capability_t port, struct thread *ctx,
 								uint8_t *rights)
 {
 	struct capability_binding *binding =
-		capability_lookup(ctx->capability_table, port);
+		capability_lookup(ctx->process->capability_table, port);
 
 	if (!binding)
 		return NULL;
@@ -91,8 +91,10 @@ int message_send(struct message_header *message, struct thread *thread)
 
 	VECTOR_PUSH(destination->trigger.equeue, &destination->equeue);
 
+#if 0
 	equeue_wake(&destination->trigger,
 				CORE_LOCAL->current_thread->context_active);
+#endif
 	return 0;
 }
 

@@ -1,1 +1,0 @@
-src += files('rr.c', 'cfs.c', 'context.c', 'thread.c')

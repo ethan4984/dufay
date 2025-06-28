@@ -1,8 +1,8 @@
 #ifndef CORE_CPU_H_
 #define CORE_CPU_H_
 
-#include <core/sched/sched.h>
-#include <core/memory/portal.h>
+#include <core/sched.h>
+#include <mm/portal.h>
 
 #include <fayt/circular_queue.h>
 
@@ -12,6 +12,14 @@
 #include <fayt/pairing_heap.h>
 #include <arch/port.h>
 #include <core/ipl.h>
+#include <core/dpc.h>
+
+enum preemption_reason : uint8_t {
+	PREEMPT_NONE, /* Dummy value to avoid quantum end to be set when = 0 */
+	PREEMPT_QUANTUM_END, /* A thread's quantum has expired */
+	PREEMPT_HIGHER_PRIORITY, /* An higher priority thread has been readied */
+	PREEMPT_MIGRATION, /* The thread is being migrated */
+};
 
 struct cpu_local {
 	struct arch_cpu_cb
@@ -22,48 +30,30 @@ struct cpu_local {
 	_Atomic(uint8_t)
 		pending_softints; /* Bitmask of pending software interrupts on this CPU */
 
+	_Atomic(uint64_t) ticks; /* Ticks elapsed on this CPU */
+
 	ipl_t ipl; /* Current interrupt priority level of this CPU */
 
 	struct thread
 		*current_thread; /* Thread that's currently running on this CPU */
 
+	struct thread *next_thread; /* Thread that will run next on this CPU */
+
 	struct spinlock timers_lock;
-	struct pairing_heap timers;
+	struct pairing_heap timers; /* Timers enqueued on this CPU */
 
-	struct thread
-		idle_thread; /* Per-CPU idle thread, executed when there's nothing else to do */
+	struct dpc timer_dpc; /* Timer expiry DPC */
+	struct dpc balance_dpc; /* Load balancing DPC */
 
-	struct spinlock thread_queues_lock;
+	struct sched_percpu sched_data; /* Per-CPU scheduler data */
 
-	/*
-	  * Array of runqueues from which to pick PRIO_REALTIME-priority threads from. The scheduler will always try to pick
-	  * from these queues in priority order before moving on to the calendar queue.
-	*/
-	struct runqueue realtime_runq;
+	struct thread idle_thread; /* Per-CPU idle thread, executed when there's
+                                nothing else to do */
 
-	/*
-	 * Threads are picked from the queue pointed by `calendar_queue_runidx`, and when the queue is exhausted, the index is incremented.
-	 * Threads that get inserted are inserted into the index calculated via `calendar_queue_insq`:
-	 * (calendar_queue_insidx + N_PRIO_BATCH - thread::priority) % RUNQUEUES_N.
-	 * This ensures that threads with lower priority are put further away on the array and are ran less frequently than threads with higher priority.
-	 * If `calendar_queue_insidx` is equal to `calendar_queue_runidx`, the insert head will be incremented.
-	 * `calendar_queue_insidx` is also incremented on every tick (10ms).
-	 * So `insix` is ALWAYS at least one queue ahead of `runidx`,
-	 * this ensures that if a new thread gets enqueued it is not inserted in the queue that is currently being looked at by the scheduler.
-	 * See `sched/ule.c` for more details regarding scheduling.
-	*/
-	struct runqueue calendar_queue;
+	enum preemption_reason preemption_reason; /* Preemption reason */
 
-	size_t
-		calendar_queue_runidx; /* The index of the queue from which to pick the next thread */
-	size_t
-		calendar_queue_insidx; /* The index of the queue where the next thread is going to be inserted */
-
-	/*
-	 * Queue of idle priority threads (PRIO_IDLE).
-	 * Threads from this queue are only picked when both the realtime queues and calendar queues are exhausted.
-	 */
-	TAILQ_HEAD(, thread) idle_queue;
+	TAILQ_HEAD(, dpc) dpc_queue; /* Queue of DPCs on this CPU */
+	struct spinlock dpc_queue_lock;
 };
 
 extern size_t logical_processor_cnt;

@@ -1,10 +1,10 @@
 #include <arch/amd64/smp.h>
 
 #include <core/events.h>
-#include <core/scheduler/thread.h>
+#include <core/sched.h>
 #include <core/notification.h>
 #include <core/lock.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 
 #include <fayt/debug.h>
 #include <fayt/sched.h>
@@ -42,9 +42,11 @@ void event_signal(struct event *event)
 
 int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 {
+	panic("not implemented");
+
 	if (etrigger == NULL || waking_context == NULL)
 		RETURN_ERROR;
-
+#if 0
 	etrigger->context = waking_context;
 
 	spinlock_irqsave(&etrigger->lock);
@@ -84,12 +86,15 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 	}
 
 	spinrelease_irqsave(&etrigger->lock);
-
+#endif
 	return 0;
 }
 
 int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 {
+	panic("not impl");
+
+#if 0
 	if (equeue == NULL)
 		RETURN_ERROR;
 
@@ -127,7 +132,7 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 
 	if (waking_object)
 		*waking_object = context->last_etrigger;
-
+#endif
 	return 0;
 }
 

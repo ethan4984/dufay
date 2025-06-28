@@ -1,5 +1,4 @@
-#include <core/scheduler/thread.h>
-#include <core/scheduler/processor.h>
+#include <core/cpu.h>
 #include <core/syscall.h>
 
 #include <core/debug.h>
@@ -42,16 +41,16 @@ extern int syscall_as_action(struct registers *);
 static struct syscall_handle syscall_handles[] = {
 	{ .handler = syscall_log }, // 0
 	{ .handler = syscall_portal }, // 1
-	{ .handler = syscall_archctl }, // 2
-	{ .handler = syscall_notification_action }, // 3
-	{ .handler = syscall_notification_define_stack }, // 4
-	{ .handler = syscall_notification_return }, // 5
-	{ .handler = syscall_notification_mute }, // 6
-	{ .handler = syscall_notification_unmute }, // 7
-	{ .handler = syscall_notification_build }, // 8
-	{ .handler = syscall_notification_broadcast }, // 9
-	{ .handler = syscall_notification_wait }, // 10
-	{ .handler = syscall_notification_destroy }, // 11
+	//{ .handler = syscall_archctl }, // 2
+	//	{ .handler = syscall_notification_action }, // 3
+	//{ .handler = syscall_notification_define_stack }, // 4
+	//{ .handler = syscall_notification_return }, // 5
+	//{ .handler = syscall_notification_mute }, // 6
+	//{ .handler = syscall_notification_unmute }, // 7
+	//{ .handler = syscall_notification_build }, // 8
+	//{ .handler = syscall_notification_broadcast }, // 9
+	//{ .handler = syscall_notification_wait }, // 10
+	//{ .handler = syscall_notification_destroy }, // 11
 	{ .handler = syscall_irq_cortex_instantiate }, // 12
 	{ .handler = syscall_irq_cortex_anchor }, // 13
 	{ .handler = syscall_futex }, // 14

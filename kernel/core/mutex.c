@@ -9,20 +9,20 @@ void mutex_init(struct mutex *mutex, const char *name)
 	mutex->hdr.signaled_count = 1;
 }
 
-void mutex_lock(struct mutex *mutex)
+void mutex_lock(struct mutex *mutex, nanoseconds_t timeout)
 {
-	wait_one(&mutex->hdr, 0);
+	wait_one(&mutex->hdr, timeout);
 
 	mutex->owner = CORE_LOCAL->current_thread;
 }
 
 void mutex_unlock(struct mutex *mutex)
 {
-	spinlock_irqsave(&mutex->hdr.lock);
+	ipl_t ipl = spinlock_acquire(&mutex->hdr.lock);
 
 	mutex->hdr.signaled_count = 1;
 
 	mutex->owner = try_satisfy_dispatch_object(&mutex->hdr);
 
-	spinrelease_irqsave(&mutex->hdr.lock);
+	spinlock_release(&mutex->hdr.lock, ipl);
 }

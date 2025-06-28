@@ -2,6 +2,7 @@
 #define CORE_WAIT_H_
 #include <sys/queue.h>
 #include <fayt/lock.h>
+#include <core/clock.h>
 #include <stdatomic.h>
 
 #define INTERNAL_WAITBLOCKS_N 4
@@ -74,7 +75,7 @@ struct thread *try_satisfy_dispatch_object(struct dispatch_header *hdr);
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.
  */
-int wait_any(int count, void *objects[], long timeout);
+int wait_any(int count, void *objects[], nanoseconds_t timeout);
 
 /* 
  * Waits for a single object to be signaled.
@@ -82,6 +83,6 @@ int wait_any(int count, void *objects[], long timeout);
  * If timeout is -1, it will wait indefinitely.
  * If timeout is 0, it will return immediately.
  */
-int wait_one(struct dispatch_header *hdr, long timeout);
+int wait_one(struct dispatch_header *hdr, nanoseconds_t timeout);
 
 #endif

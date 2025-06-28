@@ -17,13 +17,16 @@ void arch_set_hardware_ipl(ipl_t ipl);
 void arch_halt(void);
 
 void arch_context_init(struct arch_thread_context *context,
-					   uintptr_t entry_point, uintptr_t stack, bool user);
+					   uintptr_t kernel_stack, uintptr_t entry);
 
-void arch_context_set_arg(struct arch_thread_context *context, uint64_t arg);
+struct thread;
 
-void arch_context_save(struct arch_thread_context *in,
-					   struct arch_thread_context *out);
+void arch_context_switch(struct thread *old, struct thread *next);
 
-void arch_context_restore(struct arch_thread_context *context);
+void arch_load_context(struct thread *td);
+
+#define IPI_DPC 47 /* Disabled when CR8=IPLDPC */
+
+void arch_send_ipi(struct cpu_local *cpu, uint8_t ipi);
 
 #endif

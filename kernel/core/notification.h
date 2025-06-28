@@ -1,7 +1,7 @@
 #ifndef NOTIFICATION_H_
 #define NOTIFICATION_H_
 
-#include <core/scheduler/thread.h>
+#include <core/sched.h>
 #include <core/events.h>
 
 #include <fayt/lock.h>

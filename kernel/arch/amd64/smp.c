@@ -6,14 +6,15 @@
 #include <arch/amd64/idt.h>
 #include <arch/amd64/gdt.h>
 
-#include <core/scheduler/processor.h>
-#include <core/memory/physical.h>
-#include <core/memory/virtual.h>
+#include <core/cpu.h>
+#include <mm/physical.h>
+#include <mm/virtual.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>
 #include <fayt/lock.h>
 #include <fayt/debug.h>
+#include <core/thread.h>
 
 #include <acpi/madt.h>
 
@@ -25,6 +26,8 @@ static struct spinlock core_init_lock;
 size_t logical_processor_cnt = 0;
 static _Atomic size_t cpus_up = 0;
 struct cpu_local *logical_processor_locales;
+
+void sched_cpu_init();
 
 static void core_bootstrap(struct cpu_local *cpu_local)
 {
@@ -44,15 +47,19 @@ static void core_bootstrap(struct cpu_local *cpu_local)
 	xapic_write(XAPIC_TPR_OFF, 0);
 	xapic_write(XAPIC_SINT_OFF, xapic_read(XAPIC_SINT_OFF) | 0x1ff);
 
-	apic_timer_init(SCHED_TICK_RATE_MS);
+	apic_timer_init(1000 / HZ);
 
 	atomic_fetch_add(&cpus_up, 1);
 
 	logical_processor_cnt++;
 
+	sched_cpu_init();
+
 	__asm__ volatile("mov %0, %%cr8\nsti" ::"r"(0ull));
 
 	chain_aps();
+
+	thread_load(&CORE_LOCAL->idle_thread);
 
 	for (;;) {
 		__asm__("hlt");

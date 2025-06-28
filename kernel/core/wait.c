@@ -1,3 +1,4 @@
+#include <core/sched.h>
 #include <core/wait.h>
 #include <stdatomic.h>
 #include <stddef.h>
@@ -5,6 +6,8 @@
 #include <arch/amd64/smp.h>
 #include <core/lock.h>
 #include <fayt/debug.h>
+#include <core/ipl.h>
+#include <core/timer.h>
 
 void dispatch_object_init(struct dispatch_header *hdr,
 						  enum dispatch_object_type type, const char *name)
@@ -13,6 +16,7 @@ void dispatch_object_init(struct dispatch_header *hdr,
 	hdr->type = type;
 	hdr->name = name;
 	hdr->signaled_count = 0;
+	hdr->lock.lock = 0;
 }
 
 static void dispatch_object_consume(struct dispatch_header *hdr)
@@ -31,26 +35,32 @@ static void dispatch_object_consume(struct dispatch_header *hdr)
 	atomic_compare_exchange_weak_explicit( \
 		(ptr), &(old), (new), memory_order_acquire, memory_order_relaxed)
 
-int wait_any(int count, void *objects[], long timeout)
+int wait_any(int count, void *objects[], nanoseconds_t timeout)
 {
-	(void)timeout;
-
-	/* This isn't actually used for synchronization, but rather for preserving interrupt state */
-	/* FIXME: add ipldpc() */
-	struct spinlock irq_lock = {};
-
-	spinlock_irqsave(&irq_lock);
+	ipl_t ipl = ipldispatch();
 
 	struct thread *thread = CORE_LOCAL->current_thread;
 	_Atomic enum wait_status *status = &thread->wait_status;
 	enum wait_status in_progress = WAIT_IN_PROGRESS;
 	int satisfier = -1;
+	int timer_i = -1;
+	struct ktimer timer;
+	struct waitblock timer_wb = { 0 };
 
 	atomic_store(status, WAIT_IN_PROGRESS);
 
+	if (timeout != 0 && timeout != -1UL) {
+		timer_init(&timer, "timeout");
+		timer_i = (count = count + 1) - 1;
+	}
+
 	for (int i = 0; i < count; i++) {
-		struct dispatch_header *obj = (struct dispatch_header *)objects[i];
-		struct waitblock *waitblock = &thread->waitblocks[i];
+		bool is_timer = i == timer_i;
+
+		struct dispatch_header *obj =
+			is_timer ? &timer.hdr : (struct dispatch_header *)objects[i];
+
+		struct waitblock *wb = is_timer ? &timer_wb : &thread->waitblocks[i];
 
 		spinlock(&obj->lock);
 
@@ -69,19 +79,21 @@ int wait_any(int count, void *objects[], long timeout)
 		}
 
 		/* We are not satisfied yet, so add a waitblock to the object's waitblocks */
-		TAILQ_INSERT_TAIL(&obj->waitblocks, waitblock, queue_hook);
+		TAILQ_INSERT_TAIL(&obj->waitblocks, wb, queue_hook);
 
-		waitblock->object = obj;
-		waitblock->thread = thread;
-		waitblock->status = WAITBLOCK_ACTIVE;
+		wb->object = obj;
+		wb->thread = thread;
+		wb->status = WAITBLOCK_ACTIVE;
 
 		spinrelease(&obj->lock);
 	}
 
 	/* Wait was already satisfied, back out  */
-	if (satisfier != -1) {
+	if (satisfier != -1 || timeout == 0) {
 		if (atomic_load(status) != WAIT_SATISFIED) {
-			panic("wait_any: satisfied but status is not WAIT_SATISFIED");
+			panic(
+				"wait_any: satisfied but status is not WAIT_SATISFIED (status=%d)",
+				atomic_load(status));
 		}
 
 		/* Remove any waitblock we might've installed */
@@ -95,8 +107,14 @@ int wait_any(int count, void *objects[], long timeout)
 			spinrelease(&obj->lock);
 		}
 
-		spinrelease_irqsave(&irq_lock);
+		ipl_lower(ipl);
+
+		/* This will return -1 in case of timeout */
 		return satisfier;
+	}
+
+	if (timeout != -1UL) {
+		timer_start(&timer, timeout);
 	}
 
 	/*
@@ -107,26 +125,31 @@ int wait_any(int count, void *objects[], long timeout)
 
 	if (CAS(status, in_progress, WAIT_COMMITTED)) {
 		/* We're good, now actually block */
-		spinlock(&thread->lock);
-
-		struct scheduler *scheduler = thread->scheduler;
-		scheduler->dequeue(scheduler, thread);
-
-		yield();
-
-		spinrelease(&thread->lock);
+		sched_wait();
 	}
 
-	/* We're back (or not)! Find the object that satisfied us */
+	/*
+	 * We're back (or we never went to sleep)!
+	 * Stop the timer if it was set
+	 */
+	if (timeout != -1UL) {
+		timer_stop(&timer);
+	}
+
+	/* Find the object that satisfied us */
 	for (int i = 0; i < count; i++) {
-		struct dispatch_header *obj = (struct dispatch_header *)objects[i];
-		struct waitblock *waitblock = &thread->waitblocks[i];
+		bool is_timer = i == timer_i;
+
+		struct dispatch_header *obj =
+			is_timer ? &timer.hdr : (struct dispatch_header *)objects[i];
+
+		struct waitblock *wb = is_timer ? &timer_wb : &thread->waitblocks[i];
 
 		spinlock(&obj->lock);
 
 		/* Waitblock is still active, remove it from the list */
-		if (waitblock->status == WAITBLOCK_ACTIVE) {
-			TAILQ_REMOVE(&obj->waitblocks, waitblock, queue_hook);
+		if (wb->status == WAITBLOCK_ACTIVE) {
+			TAILQ_REMOVE(&obj->waitblocks, wb, queue_hook);
 		}
 
 		/*
@@ -134,7 +157,7 @@ int wait_any(int count, void *objects[], long timeout)
 		 * Now, this is a simplification over Windows 7's model where Wait blocks have the state WaitBlockBypassStart when they have interrupted a wait while it was being prepared
 		 * Instead, we keep the same logic for both code paths (where a wait actually happened, or where it was interrupted before it could be committed) and just check whether or not the waitblock was signaled
 		*/
-		if (waitblock->status == WAITBLOCK_SIGNALED) {
+		if (wb->status == WAITBLOCK_SIGNALED) {
 			if (satisfier != -1) {
 				panic("wait_any: multiple satisfiers found");
 			}
@@ -142,17 +165,16 @@ int wait_any(int count, void *objects[], long timeout)
 		}
 
 		/* Inactive waitblocks are ignored */
-
 		spinrelease(&obj->lock);
 	}
 
 	/* Restore interrupt state */
-	spinrelease_irqsave(&irq_lock);
+	ipl_lower(ipl);
 
-	return satisfier;
+	return satisfier == timer_i ? -1 : satisfier;
 }
 
-int wait_one(struct dispatch_header *hdr, long timeout)
+int wait_one(struct dispatch_header *hdr, nanoseconds_t timeout)
 {
 	return wait_any(1, (void *[]){ hdr }, timeout);
 }
@@ -186,18 +208,11 @@ struct thread *try_satisfy_dispatch_object(struct dispatch_header *hdr)
 		/* 2. */
 		else if (CAS(status, committed, WAIT_SATISFIED)) {
 			/* Wait is committed and the thread is blocked. Enqueue the thread */
-			struct scheduler *scheduler = waitblock->thread->scheduler;
-
 			dispatch_object_consume(hdr);
 
 			waitblock->status = WAITBLOCK_SIGNALED;
 
-			int ret = scheduler->enqueue(scheduler, waitblock->thread);
-
-			if (ret < 0) {
-				REPORT_ERROR;
-				panic("signal: failed to enqueue thread");
-			}
+			sched_wake(waitblock->thread);
 		}
 
 		/* 3. */

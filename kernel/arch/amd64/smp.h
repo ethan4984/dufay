@@ -1,10 +1,9 @@
-#ifndef X86_SMP_H_
-#define X86_SMP_H_
-
-#include <core/scheduler/processor.h>
+#ifndef AMD64_SMP_H_
+#define AMD64_SMP_H_
 
 #include <stddef.h>
 #include <stdint.h>
+#include <core/cpu.h>
 
 void boot_aps(void);
 

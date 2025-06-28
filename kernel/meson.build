@@ -22,9 +22,9 @@ if (kconfig.has('CONFIG_SCHED_RR'))
     c_args += [
         '-DCONFIG_SCHED_RR',
     ]
-elif (kconfig.has('CONFIG_SCHED_CFS'))
+elif (kconfig.has('CONFIG_SCHED_ULE'))
     c_args += [
-        '-DCONFIG_SCHED_CFS',
+        '-DCONFIG_SCHED_ULE',
     ]
 endif
 

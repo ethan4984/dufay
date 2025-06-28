@@ -1,8 +1,9 @@
+#include "mm/address.h"
 #include <arch/amd64/smp.h>
 
-#include <core/scheduler/thread.h>
+#include <core/sched.h>
 #include <core/futex.h>
-#include <core/memory/virtual.h>
+#include <mm/virtual.h>
 #include <core/debug.h>
 #include <core/syscall.h>
 #include <core/lock.h>
@@ -20,7 +21,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 		RETURN_ERROR;
 
 	uint64_t futex_paddr = !virtual ? uaddr : ({
-		struct page_table *page_table = thread->address_space->page_table;
+		struct page_table *page_table = thread->process->as->page_table;
 		if (unlikely(page_table == NULL))
 			RETURN_ERROR;
 
@@ -85,7 +86,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 	}
 	case FUTEX_WAKE: {
 		*vuaddr = futex->expected;
-
+#if 0
 		struct context *context = thread->context_active;
 		if (unlikely(context == NULL))
 			RETURN_ERROR;
@@ -93,7 +94,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 		ret = equeue_wake(&futex->etrigger, context);
 		if (ret == -1)
 			RETURN_ERROR;
-
+#endif
 		break;
 	}
 	default:

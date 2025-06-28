@@ -2,13 +2,14 @@
 #include <arch/amd64/cpu.h>
 #include <arch/amd64/idt.h>
 #include <arch/amd64/apic.h>
-#include <core/scheduler/processor.h>
+#include <core/cpu.h>
 
 #include <mm/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
 #include <core/syscall.h>
 #include <core/ipl.h>
+#include <core/clock.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>
@@ -116,9 +117,10 @@ extern void isr_handler_main(struct registers *regs)
 	SWAP_TLS(regs);
 
 	/** TODO: Make this architecture-independant somewhat and support setting different priorities for different vectors */
-	//	ipl_t oldipl = CORE_LOCAL->ipl;
+	ipl_t oldipl = CORE_LOCAL->ipl;
 
-	//arch_set_hardware_ipl(IPL_DEVICE);
+	arch_set_hardware_ipl(IPL_DEVICE);
+	CORE_LOCAL->ipl = IPL_DEVICE;
 
 	if (regs->isr_number < 32) {
 		static struct spinlock exception_lock;
@@ -132,7 +134,7 @@ extern void isr_handler_main(struct registers *regs)
 		if (regs->isr_number == 0xe) {
 			uint64_t faulting_address;
 			__asm__ volatile("mov %%cr2, %0" : "=a"(faulting_address));
-
+#if 0
 			int ret =
 				irq_cortex_resolve_fault(faulting_address, regs->error_code);
 			if (ret == 0)
@@ -141,23 +143,26 @@ extern void isr_handler_main(struct registers *regs)
 			ret = portal_resolve_fault(faulting_address, regs->error_code);
 			if (ret == 0)
 				goto done;
+#endif
 		}
 
 		spinlock(&exception_lock);
 
-		print("DEBUG: Kowalski analysis: \"%s\" with error code: %x\n",
-			  exception_messages[regs->isr_number], regs->error_code);
-		print("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n", regs->rax,
-			  regs->rbx, regs->rcx, regs->rdx);
-		print("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n", regs->rsi,
-			  regs->rdi, regs->rbp, regs->rsp);
-		print("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8,
-			  regs->r9, regs->r10, regs->r11);
-		print("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n", regs->r12,
-			  regs->r13, regs->r14, regs->r15);
-		print("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs,
-			  regs->ss, cr2, regs->rip);
-		print("DEBUG: cr3: %x\n", cr3);
+		print_unlocked(
+			"DEBUG: on CPU%d Kowalski analysis: \"%s\" with error code: %x\n",
+			CORE_LOCAL->core_id, exception_messages[regs->isr_number],
+			regs->error_code);
+		print_unlocked("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n",
+					   regs->rax, regs->rbx, regs->rcx, regs->rdx);
+		print_unlocked("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n",
+					   regs->rsi, regs->rdi, regs->rbp, regs->rsp);
+		print_unlocked("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8,
+					   regs->r9, regs->r10, regs->r11);
+		print_unlocked("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n",
+					   regs->r12, regs->r13, regs->r14, regs->r15);
+		print_unlocked("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs,
+					   regs->ss, cr2, regs->rip);
+		print_unlocked("DEBUG: cr3: %x\n", cr3);
 
 		spinrelease(&exception_lock);
 
@@ -182,19 +187,25 @@ extern void isr_handler_main(struct registers *regs)
 				regs, interrupt_vectors[regs->isr_number].ptr);
 		}
 	}
-done:
-	//arch_set_hardware_ipl(oldipl);
-
-	// if (is_softint_pending(oldipl)) {
-	// 	dispatch_software_interrupts(oldipl);
-	// }
-
-	SWAP_TLS(regs);
 
 	xapic_write(XAPIC_EOI_OFF, 0);
+done:
+	arch_set_hardware_ipl(oldipl);
+	CORE_LOCAL->ipl = oldipl;
+
+	if (oldipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, oldipl)) {
+		dispatch_software_interrupts(oldipl);
+	}
+
+	SWAP_TLS(regs);
 }
 
 void syscall_handler(struct registers *, void *);
+
+static void amd64_hardclock(struct registers *, void *)
+{
+	hardclock();
+}
 
 void idt_init()
 {
@@ -202,7 +213,7 @@ void idt_init()
 		interrupt_vectors[i].reserved = 1;
 	}
 
-	interrupt_vectors[32].handler = reschedule;
+	interrupt_vectors[32].handler = amd64_hardclock;
 	interrupt_vectors[32].ptr = NULL;
 	interrupt_vectors[32].reserved = 1;
 

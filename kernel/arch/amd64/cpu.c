@@ -1,3 +1,5 @@
+#include "arch/amd64/port.h"
+#include "arch/port.h"
 #include <arch/amd64/cpu.h>
 #include <arch/amd64/idt.h>
 #include <arch/amd64/gdt.h>
@@ -5,10 +7,12 @@
 #include <arch/amd64/hpet.h>
 #include <arch/amd64/smp.h>
 #include <arch/amd64/debug.h>
+#include <core/cpu.h>
 
 #include <core/debug.h>
 
 #include <fayt/sched.h>
+#include <fayt/string.h>
 
 uint64_t HIGH_VMA = 0xffff800000000000;
 
@@ -107,7 +111,7 @@ void amd64_system_tables(void)
 	idt_init();
 	hpet_init();
 	apic_init();
-	apic_timer_init(SCHED_TICK_RATE_MS);
+	apic_timer_init(1000 / HZ);
 	amd64_tsc_calibrate();
 	boot_aps();
 }
@@ -135,4 +139,44 @@ bool arch_interrupt_state(void)
 void arch_set_hardware_ipl(ipl_t ipl)
 {
 	asm volatile("mov %0, %%cr8" : : "a"((uint64_t)ipl));
+}
+
+extern void amd64_context_switch(struct thread *old, struct thread *new);
+extern void amd64_load_context(struct thread *td);
+
+extern void _amd64_thread_entry(void);
+
+void amd64_thread_entry(void (*fn)(void), struct thread *prev)
+{
+	if (prev)
+		spinrelease(&prev->lock);
+	ipl_lower(IPL_ZERO);
+
+	fn();
+	panic("thread shouldn't return!");
+}
+
+void arch_context_switch(struct thread *old, struct thread *next)
+{
+	/// FIXME: do FPU save/restore here
+	amd64_context_switch(old, next);
+}
+
+void arch_load_context(struct thread *td)
+{
+	amd64_load_context(td);
+}
+
+void arch_context_init(struct arch_thread_context *context,
+					   uintptr_t kernel_stack, uintptr_t entry)
+{
+	struct arch_thread_regs *sp =
+		(struct arch_thread_regs *)(kernel_stack -
+									sizeof(struct arch_thread_regs));
+
+	memset(sp, 0, sizeof(*sp));
+
+	context->rsp = (uintptr_t)sp;
+	sp->rip = (uintptr_t)_amd64_thread_entry;
+	sp->r12 = (uintptr_t)entry;
 }

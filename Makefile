@@ -6,9 +6,14 @@ BUILD = build
 .PHONY: all
 all: $(DISK_IMAGE)
 
+#-object memory-backend-ram,id=mem0,size=1024M -numa node,memdev=mem0,nodeid=0,cpus=0\
+#-object memory-backend-ram,id=mem1,size=1024M -numa node,memdev=mem1,nodeid=1,cpus=1\
+#	-numa dist,src=0,dst=1,val=15\
+#	-numa dist,src=1,dst=0,val=15
+
 QEMUFLAGS = \
 	-m 2G \
-	-smp 2 \
+	-smp 2\
 	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
 	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
 	-device intel-iommu,aw-bits=48 \
@@ -27,7 +32,7 @@ QEMUFLAGS_ISO = \
 
 .PHONY: run
 run: $(DISK_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio  -no-reboot -no-shutdown
+	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -serial stdio -no-reboot -no-shutdown
 
 .PHONY: run_initrd
 run_initrd: $(ISO_IMAGE)

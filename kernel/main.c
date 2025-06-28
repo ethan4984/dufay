@@ -1,15 +1,17 @@
-#include "arch/amd64/port.h"
+#include "arch/amd64/cpu.h"
+#include "core/sched.h"
+#include "mm/address.h"
 #include <fayt/lock.h>
 #include <arch/port.h>
 
-#include <core/scheduler/thread.h>
+#include <core/cpu.h>
 #include <core/debug.h>
 #include <core/message.h>
 #include <core/init.h>
-#include <core/memory/physical.h>
-#include <core/memory/virtual.h>
+#include <mm/physical.h>
+#include <mm/virtual.h>
 #include <core/ipl.h>
-#include <core/memory/slab.h>
+#include <mm/slab.h>
 
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
@@ -35,6 +37,9 @@ static void spfree(void *addr, uint64_t s, uint64_t)
 int init_system_tgroup();
 
 void do_sync_test(void);
+
+void sched_init();
+void sched_cpu_init();
 
 void dufay_entry(void)
 {
@@ -64,19 +69,16 @@ void dufay_entry(void)
 
 	kmem_init();
 
-	init_system_tgroup();
+	//init_system_tgroup();
 
-	int ret = launch_schedulers();
+	int ret = message_init();
 	if (ret == -1) {
 		REPORT_ERROR;
-		panic("");
+		panic("message init failed!");
 	}
 
-	ret = message_init();
-	if (ret == -1) {
-		REPORT_ERROR;
-		panic("");
-	}
+	sched_init();
+	sched_cpu_init();
 
 #if 1
 	do_sync_test();
@@ -88,7 +90,8 @@ void dufay_entry(void)
 	}
 #endif
 
-	arch_enable_interrupts();
+	/* Liftoff! */
+	ipl_lower(IPL_ZERO);
 
 	for (;;) {
 		arch_halt();

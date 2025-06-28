@@ -19,17 +19,17 @@ endchoice
 
 choice
     prompt "Scheduling Algorithm"
-    default SCHED_RR
+    default SCHED_ULE
 
+    config SCHED_ULE
+        bool "ULE"
+        help
+          Enable this option to select the ULE-like scheduler.
+        
     config SCHED_RR
         bool "Round-Robin"
         help
           Enable this option to select the Round-Robin scheduler.
-        
-    config SCHED_CFS
-        bool "Completely Fair Scheduler"
-        help
-          Enable this option to select the Shortest Job First scheduler.
 
 endchoice
 

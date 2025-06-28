@@ -5,7 +5,7 @@
 #include <core/init.h>
 #include <core/debug.h>
 #include <core/elf.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 
 #include <fayt/debug.h>
 #include <fayt/notification.h>
@@ -17,6 +17,7 @@ static volatile struct limine_module_request limine_module_request = {
 	.revision = 0
 };
 
+#if 0
 struct tgroup tgroup_system;
 
 static int launch_server(const char *, struct thread *, void *, int);
@@ -228,6 +229,8 @@ finish:
 
 	return 0;
 }
+
+#endif
 
 struct limine_file *limine_search_module(const char *identifier)
 {

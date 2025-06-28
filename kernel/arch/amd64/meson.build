@@ -1,5 +1,4 @@
 src += files('apic.c', 
-'context.c', 
 'cpu.c', 
 'debug.c', 
 'entry.c',
@@ -9,4 +8,5 @@ src += files('apic.c',
 'smp.c',
 'hpet.c',
 'isr.asm', 
-'syscall.asm')
+'syscall.asm',
+'thread.asm')

@@ -15,7 +15,8 @@ void print_unlocked(const char *str, ...);
 	({                                                          \
 		if (!(EXPR)) {                                          \
 			panic("Assertion \"" #EXPR "\" failed at " __FILE__ \
-				  ":" STRINGIFY(__LINE__));                     \
+				  ":" STRINGIFY(__LINE__) " in %s",             \
+				  __func__);                                    \
 		}                                                       \
 	})
 
