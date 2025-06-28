@@ -2,9 +2,10 @@
 #include <arch/amd64/hpet.h>
 #include <arch/amd64/apic.h>
 #include <arch/amd64/cpu.h>
+#include <core/cpu.h>
 
-#include <core/memory/virtual.h>
-#include <core/memory/address.h>
+#include <mm/virtual.h>
+#include <mm/address.h>
 
 #include <core/debug.h>
 #include <fayt/string.h>
@@ -214,4 +215,14 @@ void apic_init()
 	xapic_write(XAPIC_SINT_OFF, xapic_read(XAPIC_SINT_OFF) | 0x1ff);
 
 	__asm__ volatile("mov %0, %%cr8" ::"r"(0ull));
+}
+
+void arch_send_ipi(struct cpu_local *cpu, uint8_t ipi)
+{
+	xapic_write(XAPIC_ICR_1, cpu->core_id << 24);
+	xapic_write(XAPIC_ICR_OFF, ipi);
+
+	while (xapic_read(XAPIC_ICR_OFF) & 1 << 12) {
+		asm("");
+	}
 }

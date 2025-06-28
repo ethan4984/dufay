@@ -1,7 +1,7 @@
 #ifndef CORE_MEMORY_ADDRESS_H_
 #define CORE_MEMORY_ADDRESS_H_
 
-#include <core/memory/virtual.h>
+#include <mm/virtual.h>
 
 #include <fayt/aslr.h>
 

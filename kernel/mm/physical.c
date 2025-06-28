@@ -1,5 +1,5 @@
 #include <arch/port.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>

@@ -4,8 +4,7 @@
 #include <arch/amd64/apic.h>
 #include <core/scheduler/processor.h>
 
-#include <core/scheduler/context.h>
-#include <core/memory/portal.h>
+#include <mm/portal.h>
 #include <core/debug.h>
 #include <core/irq.h>
 #include <core/syscall.h>

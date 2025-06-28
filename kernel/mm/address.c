@@ -1,6 +1,6 @@
 #include <arch/amd64/smp.h>
 
-#include <core/memory/address.h>
+#include <mm/address.h>
 #include <core/syscall.h>
 #include <core/capability.h>
 
@@ -147,7 +147,7 @@ SYSCALL_DEFINE4(
 		if (ops != AS_ACTION_CONSTRUCT) {
 			as_capability = ({
 				struct capability_binding *binding = capability_lookup(
-					current_thread->capability_table, capability);
+					current_thread->process->capability_table, capability);
 				if (binding == NULL)
 					RETURN_ERROR;
 				binding->obj;
@@ -171,7 +171,7 @@ SYSCALL_DEFINE4(
 
 			capability_t capability;
 			ret = capability_create(
-				current_thread->capability_table, as_capability,
+				current_thread->process->capability_table, as_capability,
 				CAPABILITY_ACCESS_READ | CAPABILITY_ACCESS_WRITE, &capability);
 			if (ret == -1)
 				RETURN_ERROR;

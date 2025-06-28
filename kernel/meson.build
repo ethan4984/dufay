@@ -33,5 +33,6 @@ subdir('core')
 subdir('arch')
 subdir('fayt')
 subdir('acpi')
+subdir('mm')
 
 executable('dufay', src, include_directories: inc, c_args: c_args)

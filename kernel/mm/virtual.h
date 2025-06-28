@@ -1,7 +1,7 @@
 #ifndef CORE_MEMORY_VIRTUAL_H_
 #define CORE_MEMORY_VIRTUAL_H_
 
-#include <core/memory/portal.h>
+#include <mm/portal.h>
 
 #include <fayt/vector.h>
 #include <fayt/lock.h>

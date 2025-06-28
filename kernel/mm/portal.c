@@ -1,12 +1,12 @@
 #include <arch/amd64/smp.h>
 #include <arch/amd64/paging.h>
 
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 #include <core/syscall.h>
-#include <core/memory/portal.h>
+#include <mm/portal.h>
 #include <core/debug.h>
-#include <core/memory/virtual.h>
-#include <core/memory/address.h>
+#include <mm/virtual.h>
+#include <mm/address.h>
 
 #include <fayt/compiler.h>
 #include <fayt/circular_queue.h>
@@ -65,7 +65,7 @@ int portal_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = thread->address_space->page_table;
+	struct page_table *page_table = thread->process->as->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
@@ -499,14 +499,16 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 		panic("DUFAY: core local corrupt");
 
 	struct address_space *source_address_space = ({
-		struct capability_binding *capability_binding = capability_lookup(
-			current_thread->capability_table, req->cow.source.capability);
+		struct capability_binding *capability_binding =
+			capability_lookup(current_thread->process->capability_table,
+							  req->cow.source.capability);
 		capability_binding->obj;
 	});
 
 	struct address_space *destination_address_space = ({
-		struct capability_binding *capability_binding = capability_lookup(
-			current_thread->capability_table, req->cow.source.capability);
+		struct capability_binding *capability_binding =
+			capability_lookup(current_thread->process->capability_table,
+							  req->cow.source.capability);
 		capability_binding->obj;
 	});
 
@@ -635,7 +637,7 @@ int portal(struct portal_req *req, struct portal_resp *resp)
 	struct page_table *page_table = NULL;
 
 	if (likely(thread))
-		page_table = thread->address_space->page_table;
+		page_table = thread->process->as->page_table;
 	if (unlikely(thread == NULL))
 		page_table = kernel_mappings.page_table;
 	if (unlikely(page_table == NULL))

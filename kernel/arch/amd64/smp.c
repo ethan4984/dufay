@@ -1,3 +1,4 @@
+#include <mm/address.h>
 #include <arch/amd64/paging.h>
 #include <arch/amd64/smp.h>
 #include <arch/amd64/apic.h>

@@ -1,7 +1,7 @@
 #include <arch/port.h>
 #include <arch/amd64/cpu.h>
 
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 
 #include <fayt/slab.h>
 #include <fayt/debug.h>

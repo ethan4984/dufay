@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 #include "physical.h"
-#include <core/scheduler/processor.h>
+#include <core/cpu.h>
 
 #define SLAB_ALIGN 8
 #define CACHES_NUM 32
@@ -69,7 +69,7 @@ static struct kmem_slab *slab_create_small(struct kmem_cache *cp)
 	size_t capacity = 0;
 	uint8_t *buf = (uint8_t *)alloc_pages(1);
 
-	// We employ a simple coloring scheme,
+	// We employ a simple coloring scheme;
 	// Everytime a slab is created, the color is shifted by the alignment,
 	// This is done until we reach the max color (which is when there is no space
 	// left in the slab buffer). This ensures uniform buffer address distribution

@@ -1,7 +1,7 @@
 #include <arch/port.h>
 
-#include <core/memory/virtual.h>
-#include <core/memory/physical.h>
+#include <mm/virtual.h>
+#include <mm/physical.h>
 #include <core/elf.h>
 #include <core/debug.h>
 

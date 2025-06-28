@@ -1,9 +1,9 @@
 #include <arch/port.h>
 #include <fayt/lock.h>
 
-#include <core/memory/virtual.h>
-#include <core/memory/physical.h>
-#include <core/memory/address.h>
+#include <mm/virtual.h>
+#include <mm/physical.h>
+#include <mm/address.h>
 #include <core/debug.h>
 
 #include <fayt/string.h>
