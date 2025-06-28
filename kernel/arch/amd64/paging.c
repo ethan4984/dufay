@@ -1,12 +1,12 @@
 #include <arch/amd64/port.h>
-#include <core/memory/address.h>
+#include <mm/address.h>
 #include <arch/port.h>
 
 #include <arch/amd64/paging.h>
 #include <arch/amd64/cpu.h>
 
-#include <core/memory/physical.h>
-#include <core/memory/virtual.h>
+#include <mm/physical.h>
+#include <mm/virtual.h>
 
 #include <fayt/lock.h>
 #include <fayt/debug.h>
