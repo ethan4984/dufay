@@ -3,7 +3,7 @@
 #include <fayt/debug.h>
 #include <fayt/slab.h>
 #include <fayt/string.h>
-#include <core/memory/slab.h>
+#include <mm/slab.h>
 
 static struct object_class classes[256];
 

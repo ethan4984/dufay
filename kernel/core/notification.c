@@ -1,9 +1,9 @@
-#include <core/memory/virtual.h>
+#include <mm/virtual.h>
 #include <arch/amd64/smp.h>
 
 #include <core/notification.h>
 #include <core/syscall.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 #include <core/lock.h>
 #include <core/debug.h>
 #include <core/capability.h>
