@@ -1,9 +1,9 @@
 #include "core/scheduler/processor.h"
 #include <core/scheduler/rr.h>
-#include <fayt/slab.h>
-#include <fayt/debug.h>
+#include <aria/slab.h>
+#include <aria/debug.h>
 #include <arch/x86/smp.h>
-#include <fayt/compiler.h>
+#include <aria/compiler.h>
 #include <core/lock.h>
 
 static struct spinlock rr_lock;

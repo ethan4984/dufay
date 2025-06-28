@@ -3,8 +3,8 @@
 #include <core/scheduler/processor.h>
 #include <core/lock.h>
 
-#include <fayt/compiler.h>
-#include <fayt/debug.h>
+#include <aria/compiler.h>
+#include <aria/debug.h>
 
 static int cfs_internal_enqueue(struct scheduler *, struct thread *, int);
 

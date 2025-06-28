@@ -1,12 +1,12 @@
-#include <fayt/address.h>
-#include <fayt/debug.h>
-#include <fayt/portal.h>
-#include <fayt/notification.h>
-#include <fayt/rb_tree.h>
-#include <fayt/slab.h>
-#include <fayt/stream.h>
-#include <fayt/syscall.h>
-#include <fayt/message.h>
+#include <aria/address.h>
+#include <aria/debug.h>
+#include <aria/portal.h>
+#include <aria/notification.h>
+#include <aria/rb_tree.h>
+#include <aria/slab.h>
+#include <aria/stream.h>
+#include <aria/syscall.h>
+#include <aria/message.h>
 
 static void *spalloc(void *, uint64_t);
 static void spfree(void *, uint64_t, uint64_t);

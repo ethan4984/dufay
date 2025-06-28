@@ -1,21 +1,21 @@
-[submodule "servers/io/nvme/fayt"]
-	path = servers/io/nvme/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/pci/fayt"]
-	path = servers/io/pci/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/fs/fayt"]
-	path = servers/fs/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "kernel/fayt"]
-	path = kernel/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/nvme/controller/fayt"]
-	path = servers/io/nvme/controller/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/io/nvme/irq/fayt"]
-	path = servers/io/nvme/irq/fayt
-	url = https://github.com/ethan4984/fayt
-[submodule "servers/sys/init/fayt"]
-	path = servers/sys/init/fayt
-	url = https://github.com/ethan4984/fayt
+[submodule "servers/io/nvme/aria"]
+	path = servers/io/nvme/aria
+	url = https://github.com/bach-os/aria
+[submodule "servers/io/pci/aria"]
+	path = servers/io/pci/aria
+	url = https://github.com/bach-os/aria
+[submodule "servers/fs/aria"]
+	path = servers/fs/aria
+	url = https://github.com/bach-os/aria
+[submodule "kernel/aria"]
+	path = kernel/aria
+	url = https://github.com/bach-os/aria
+[submodule "servers/io/nvme/controller/aria"]
+	path = servers/io/nvme/controller/aria
+	url = https://github.com/bach-os/aria
+[submodule "servers/io/nvme/irq/aria"]
+	path = servers/io/nvme/irq/aria
+	url = https://github.com/bach-os/aria
+[submodule "servers/sys/init/aria"]
+	path = servers/sys/init/aria
+	url = https://github.com/bach-os/aria

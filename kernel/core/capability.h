@@ -1,9 +1,9 @@
 #ifndef HANDLE_H_
 #define HANDLE_H_
 
-#include <fayt/bitmap.h>
-#include <fayt/vector.h>
-#include <fayt/capability.h>
+#include <aria/bitmap.h>
+#include <aria/vector.h>
+#include <aria/capability.h>
 
 struct capability_binding {
 	uint8_t access;

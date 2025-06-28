@@ -2,7 +2,7 @@
 #include <core/semaphore.h>
 #include <core/debug.h>
 #include <core/scheduler/thread.h>
-#include <fayt/debug.h>
+#include <aria/debug.h>
 
 /*
  * ------------ Mutex Test ------------

@@ -2,8 +2,8 @@
 
 #include <core/memory/physical.h>
 
-#include <fayt/slab.h>
-#include <fayt/debug.h>
+#include <aria/slab.h>
+#include <aria/debug.h>
 
 struct segment_descriptor {
 	uint16_t limit;

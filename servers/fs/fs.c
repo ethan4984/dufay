@@ -1,5 +1,5 @@
-#include <fayt/pci.h>
-#include <fayt/debug.h>
+#include <aria/pci.h>
+#include <aria/debug.h>
 
 int fs(struct pci_info *pci_info)
 {

@@ -6,9 +6,9 @@
 #include <core/memory/address.h>
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/dictionary.h>
-#include <fayt/debug.h>
+#include <aria/string.h>
+#include <aria/dictionary.h>
+#include <aria/debug.h>
 
 #include <limine.h>
 

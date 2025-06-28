@@ -4,7 +4,7 @@
 #include <core/scheduler/thread.h>
 #include <core/memory/portal.h>
 
-#include <fayt/circular_queue.h>
+#include <aria/circular_queue.h>
 
 #include <stddef.h>
 #include <stdint.h>

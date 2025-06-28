@@ -7,7 +7,7 @@
 #include <core/memory/address.h>
 
 #include <core/debug.h>
-#include <fayt/string.h>
+#include <aria/string.h>
 
 typeof(madt_ent0_list) madt_ent0_list;
 typeof(madt_ent1_list) madt_ent1_list;

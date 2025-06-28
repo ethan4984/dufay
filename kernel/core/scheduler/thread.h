@@ -3,7 +3,7 @@
 
 #include <core/scheduler/context.h>
 #include <core/wait.h>
-#include <fayt/rb_tree.h>
+#include <aria/rb_tree.h>
 
 struct thread_capability {
 	int tid;

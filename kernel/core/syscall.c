@@ -4,8 +4,8 @@
 
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/compiler.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
 
 #define SYSRET(RET, ERROR)         \
 	({                             \

@@ -3,7 +3,7 @@
 
 #include <core/memory/virtual.h>
 
-#include <fayt/aslr.h>
+#include <aria/aslr.h>
 
 struct address_space_capability {
 	int asid;

@@ -3,9 +3,9 @@
 #include <core/memory/physical.h>
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/lock.h>
-#include <fayt/debug.h>
+#include <aria/string.h>
+#include <aria/lock.h>
+#include <aria/debug.h>
 
 struct pmm_module {
 	struct limine_memmap_entry *mmap_entry;

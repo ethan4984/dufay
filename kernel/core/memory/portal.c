@@ -8,11 +8,11 @@
 #include <core/memory/virtual.h>
 #include <core/memory/address.h>
 
-#include <fayt/compiler.h>
-#include <fayt/circular_queue.h>
-#include <fayt/string.h>
-#include <fayt/bst.h>
-#include <fayt/debug.h>
+#include <aria/compiler.h>
+#include <aria/circular_queue.h>
+#include <aria/string.h>
+#include <aria/bst.h>
+#include <aria/debug.h>
 
 #define PORTAL_MAP_COW (1 << 9)
 #define PORTAL_MAP_SHARE (1 << 10)

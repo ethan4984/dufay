@@ -8,10 +8,10 @@
 #include <core/elf.h>
 #include <core/init.h>
 
-#include <fayt/debug.h>
-#include <fayt/compiler.h>
-#include <fayt/string.h>
-#include <fayt/dictionary.h>
+#include <aria/debug.h>
+#include <aria/compiler.h>
+#include <aria/string.h>
+#include <aria/dictionary.h>
 
 static struct aslr aslr_irq = { .layout = NULL,
 								.minimum_vaddr = 0xffffe00000000000,

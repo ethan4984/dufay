@@ -4,9 +4,9 @@
 #include <core/syscall.h>
 #include <core/capability.h>
 
-#include <fayt/compiler.h>
-#include <fayt/debug.h>
-#include <fayt/address.h>
+#include <aria/compiler.h>
+#include <aria/debug.h>
+#include <aria/address.h>
 
 static struct dictionary as_table;
 static int asid_bump;

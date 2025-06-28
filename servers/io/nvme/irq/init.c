@@ -1,8 +1,8 @@
-#include <fayt/syscall.h>
-#include <fayt/debug.h>
-#include <fayt/address.h>
-#include <fayt/stream.h>
-#include <fayt/string.h>
+#include <aria/syscall.h>
+#include <aria/debug.h>
+#include <aria/address.h>
+#include <aria/stream.h>
+#include <aria/string.h>
 
 #include <stdarg.h>
 

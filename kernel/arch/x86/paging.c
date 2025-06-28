@@ -4,8 +4,8 @@
 #include <core/memory/physical.h>
 #include <core/memory/virtual.h>
 
-#include <fayt/lock.h>
-#include <fayt/debug.h>
+#include <aria/lock.h>
+#include <aria/debug.h>
 
 #define PML5_FLAGS_MASK ~(X86_FLAGS_PS | X86_FLAGS_G | X86_FLAGS_NX)
 #define PML4_FLAGS_MASK ~(X86_FLAGS_PS | X86_FLAGS_G | X86_FLAGS_NX)

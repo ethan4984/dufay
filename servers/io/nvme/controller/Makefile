@@ -16,7 +16,7 @@ INTERNALLDFLAGS := \
 
 INTERNALCFLAGS := \
 	-I.	\
-	-Ifayt \
+	-Iaria \
 	-std=c23 \
 	-ffreestanding \
 	-mno-80387 \

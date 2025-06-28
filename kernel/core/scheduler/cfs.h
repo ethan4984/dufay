@@ -3,8 +3,8 @@
 
 #include <core/scheduler/thread.h>
 
-#include <fayt/dictionary.h>
-#include <fayt/time.h>
+#include <aria/dictionary.h>
+#include <aria/time.h>
 
 struct cfs_unit {
 	struct time epoch;

@@ -11,12 +11,12 @@
 #include <core/notification.h>
 #include <core/debug.h>
 
-#include <fayt/lock.h>
-#include <fayt/string.h>
-#include <fayt/compiler.h>
-#include <fayt/portal.h>
-#include <fayt/debug.h>
-#include <fayt/dictionary.h>
+#include <aria/lock.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
+#include <aria/portal.h>
+#include <aria/debug.h>
+#include <aria/dictionary.h>
 
 int destroy_context(struct thread *thread, struct context *context)
 {

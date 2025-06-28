@@ -4,9 +4,9 @@
 #include <core/memory/address.h>
 #include <core/scheduler/cfs.h>
 
-#include <fayt/compiler.h>
-#include <fayt/capability.h>
-#include <fayt/debug.h>
+#include <aria/compiler.h>
+#include <aria/capability.h>
+#include <aria/debug.h>
 
 int create_thread(int tgid, struct thread **thread)
 {

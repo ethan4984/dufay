@@ -7,9 +7,9 @@
 #include <core/events.h>
 #include <core/memory/address.h>
 
-#include <fayt/lock.h>
-#include <fayt/sched.h>
-#include <fayt/vector.h>
+#include <aria/lock.h>
+#include <aria/sched.h>
+#include <aria/vector.h>
 
 constexpr int CONTEXT_DEFAULT_STACK_SIZE = 0x200000;
 constexpr int SCHED_TICK_RATE_MS = 20;

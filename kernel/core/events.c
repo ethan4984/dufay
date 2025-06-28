@@ -7,9 +7,9 @@
 #include <core/lock.h>
 #include <core/memory/physical.h>
 
-#include <fayt/debug.h>
-#include <fayt/sched.h>
-#include <fayt/compiler.h>
+#include <aria/debug.h>
+#include <aria/sched.h>
+#include <aria/compiler.h>
 #include <core/wait.h>
 
 void event_init(struct event *event, const char *name, bool notification)

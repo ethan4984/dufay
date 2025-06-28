@@ -3,9 +3,9 @@
 
 #include <core/memory/portal.h>
 
-#include <fayt/vector.h>
-#include <fayt/lock.h>
-#include <fayt/dictionary.h>
+#include <aria/vector.h>
+#include <aria/lock.h>
+#include <aria/dictionary.h>
 
 #include <stdint.h>
 #include <stddef.h>

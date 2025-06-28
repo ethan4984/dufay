@@ -8,7 +8,7 @@
 
 #include <core/debug.h>
 
-#include <fayt/sched.h>
+#include <aria/sched.h>
 
 uint64_t HIGH_VMA = 0xffff800000000000;
 

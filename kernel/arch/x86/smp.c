@@ -10,9 +10,9 @@
 #include <core/memory/virtual.h>
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/lock.h>
-#include <fayt/debug.h>
+#include <aria/string.h>
+#include <aria/lock.h>
+#include <aria/debug.h>
 
 #include <acpi/madt.h>
 

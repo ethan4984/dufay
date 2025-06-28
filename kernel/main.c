@@ -1,4 +1,4 @@
-#include "fayt/lock.h"
+#include "aria/lock.h"
 #include <arch/x86/cpu.h>
 
 #include <core/scheduler/thread.h>
@@ -12,9 +12,9 @@
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
 
-#include <fayt/slab.h>
-#include <fayt/debug.h>
-#include <fayt/string.h>
+#include <aria/slab.h>
+#include <aria/debug.h>
+#include <aria/string.h>
 
 #include <limine.h>
 #include <core/mutex.h>
@@ -37,7 +37,7 @@ static void spfree(void *addr, uint64_t s, uint64_t)
 }
 
 #include <arch/x86/hpet.h>
-#include <fayt/time.h>
+#include <aria/time.h>
 
 int init_system_tgroup();
 

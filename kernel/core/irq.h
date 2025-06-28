@@ -4,9 +4,9 @@
 #include <core/memory/virtual.h>
 #include <core/lock.h>
 
-#include <fayt/pci.h>
-#include <fayt/irq.h>
-#include <fayt/aslr.h>
+#include <aria/pci.h>
+#include <aria/irq.h>
+#include <aria/aslr.h>
 
 struct irq_family {};
 

@@ -4,7 +4,7 @@
 #include <sys/queue.h>
 #include <arch/x86/smp.h>
 #include <core/lock.h>
-#include <fayt/debug.h>
+#include <aria/debug.h>
 
 void dispatch_object_init(struct dispatch_header *hdr,
 						  enum dispatch_object_type type, const char *name)

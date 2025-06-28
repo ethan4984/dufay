@@ -1,7 +1,7 @@
 #ifndef LOCK_H_
 #define LOCK_H_
 
-#include <fayt/lock.h>
+#include <aria/lock.h>
 
 static inline void spinlock_irqsave(struct spinlock *spinlock)
 {

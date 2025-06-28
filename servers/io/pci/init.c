@@ -1,10 +1,10 @@
-#include <fayt/address.h>
-#include <fayt/syscall.h>
-#include <fayt/debug.h>
-#include <fayt/portal.h>
-#include <fayt/stream.h>
-#include <fayt/slab.h>
-#include <fayt/rb_tree.h>
+#include <aria/address.h>
+#include <aria/syscall.h>
+#include <aria/debug.h>
+#include <aria/portal.h>
+#include <aria/stream.h>
+#include <aria/slab.h>
+#include <aria/rb_tree.h>
 
 #include <pci.h>
 

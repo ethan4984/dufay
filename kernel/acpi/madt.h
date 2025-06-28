@@ -1,7 +1,7 @@
 #pragma once
 
 #include <acpi/rsdp.h>
-#include <fayt/vector.h>
+#include <aria/vector.h>
 
 struct madt_hdr {
 	struct acpi_hdr acpi_hdr;

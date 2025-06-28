@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#include <fayt/time.h>
+#include <aria/time.h>
 
 #define PAGE_SIZE 0x1000ull
 #define KERNEL_HIGH_VMA 0xffffffff80000000

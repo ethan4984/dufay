@@ -7,10 +7,10 @@
 #include <core/elf.h>
 #include <core/memory/physical.h>
 
-#include <fayt/debug.h>
-#include <fayt/notification.h>
-#include <fayt/string.h>
-#include <fayt/compiler.h>
+#include <aria/debug.h>
+#include <aria/notification.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
 
 static volatile struct limine_module_request limine_module_request = {
 	.id = LIMINE_MODULE_REQUEST,

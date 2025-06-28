@@ -8,10 +8,10 @@
 #include <core/debug.h>
 #include <core/capability.h>
 
-#include <fayt/lock.h>
-#include <fayt/string.h>
-#include <fayt/compiler.h>
-#include <fayt/debug.h>
+#include <aria/lock.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
+#include <aria/debug.h>
 
 static inline int notification_is_valid(int not)
 {

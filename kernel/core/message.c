@@ -7,9 +7,9 @@
 #include <core/message.h>
 #include <core/object.h>
 
-#include <fayt/debug.h>
-#include <fayt/slab.h>
-#include <fayt/string.h>
+#include <aria/debug.h>
+#include <aria/slab.h>
+#include <aria/string.h>
 
 #include <sys/queue.h>
 #include <core/memory/slab.h>

@@ -1,8 +1,8 @@
 #ifndef PCI_H_
 #define PCI_H_
 
-#include <fayt/pci.h>
-#include <fayt/bitmap.h>
+#include <aria/pci.h>
+#include <aria/bitmap.h>
 
 #include <stdint.h>
 #include <stddef.h>
