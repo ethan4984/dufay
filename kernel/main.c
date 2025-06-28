@@ -43,7 +43,7 @@ int init_system_tgroup();
 
 void do_sync_test(void);
 
-void dufay_entry(void)
+void fuga_entry(void)
 {
 	if (limine_hhdm_request.response)
 		HIGH_VMA = limine_hhdm_request.response->offset;

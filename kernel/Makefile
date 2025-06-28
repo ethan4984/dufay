@@ -1,7 +1,7 @@
 -include .config
 
 BUILD = build
-KERNEL := $(BUILD)/dufay.elf
+KERNEL := $(BUILD)/fuga.elf
 
 CC ?= gcc
 LD ?= ld

@@ -1,5 +1,5 @@
-DISK_IMAGE = dufay.img
-ISO_IMAGE = dufay.iso
+DISK_IMAGE = fuga.img
+ISO_IMAGE = fuga.iso
 INITRAMFS = initramfs.tar
 BUILD = build
 
@@ -66,38 +66,38 @@ $(INITRAMFS):
 	cd build/system-root/ && tar -c --format=posix -f ../../initramfs.tar .
 
 $(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel build_servers 
-	rm -rf dufay.iso
+	rm -rf fuga.iso
 	rm -rf disk_image
 	mkdir disk_image
 	mkdir disk_image/boot
 	mkdir disk_image/servers/
 	$(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-	cp kernel/build/dufay.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
-	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o dufay.iso
-	./limine/limine bios-install dufay.iso
+	cp kernel/build/fuga.elf initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
+	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o fuga.iso
+	./limine/limine bios-install fuga.iso
 	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
 	parted -s disk.img mklabel msdos
 	parted -s disk.img mkpart primary 1 100%
 
 $(DISK_IMAGE): $(BUILD) limine kernel build_servers
-	rm -f dufay.img 
-	dd if=/dev/zero bs=1M count=0 seek=1024 of=dufay.img
-	parted -s dufay.img mklabel msdos
-	parted -s dufay.img mkpart primary 1 100%
+	rm -f fuga.img 
+	dd if=/dev/zero bs=1M count=0 seek=1024 of=fuga.img
+	parted -s fuga.img mklabel msdos
+	parted -s fuga.img mkpart primary 1 100%
 	rm -rf disk_image
 	mkdir disk_image
-	sudo losetup -Pf --show dufay.img > loopback_dev
+	sudo losetup -Pf --show fuga.img > loopback_dev
 	sudo mkfs.ext2 `cat loopback_dev`p1
 	sudo mount `cat loopback_dev`p1 disk_image
 	sudo mkdir disk_image/boot
 	sudo mkdir disk_image/servers/
 	sudo $(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-	sudo cp kernel/build/dufay.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
+	sudo cp kernel/build/fuga.elf limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
 	sync
 	sudo umount disk_image/
 	sudo losetup -d `cat loopback_dev`
 	rm -rf disk_image loopback_dev
-	./limine/limine bios-install dufay.img
+	./limine/limine bios-install fuga.img
 
 rebuild_mlibc:
 	cd build && xbstrap install mlibc --rebuild

@@ -41,11 +41,11 @@ void x86_tsc_calibrate(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
 	if ((cpuid_state.rdx & (1 << 4)) == 0)
-		panic("dufay: cpuid: tsc/rdtsc unsupported");
+		panic("fuga: cpuid: tsc/rdtsc unsupported");
 
 	cpuid_state = cpuid(0x80000007, 0);
 	if ((cpuid_state.rdx & (1 << 8)) == 0)
-		panic("dufay: cpuid: tsc-invariant unsupported\n");
+		panic("fuga: cpuid: tsc-invariant unsupported\n");
 
 	uint64_t a = rdtsc();
 	hpet_msleep(50);
@@ -62,11 +62,11 @@ void x86_system_init(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
 	if ((cpuid_state.rdx & (1 << 25)) == 0)
-		panic("dufay: cpuid: sse unsupported");
+		panic("fuga: cpuid: sse unsupported");
 
 	cpuid_state = cpuid(0x80000001, 0);
 	if ((cpuid_state.rdx & (1 << 24)) == 0)
-		panic("dufay: cpuid: fxsave/fxrstor unsupported\n");
+		panic("fuga: cpuid: fxsave/fxrstor unsupported\n");
 
 	wrmsr(MSR_EFER, rdmsr(MSR_EFER) | (1 << 0) | (1 << 11)); // set SCE and NX
 	wrmsr(MSR_STAR, 0x33ull << 48 | 0x28ull << 32);
