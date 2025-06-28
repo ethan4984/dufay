@@ -1,14 +1,14 @@
 #include <arch/port.h>
-#include <fayt/lock.h>
+#include <arialock.h>
 
 #include <mm/virtual.h>
 #include <mm/physical.h>
 #include <mm/address.h>
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/dictionary.h>
-#include <fayt/debug.h>
+#include <aria/string.h>
+#include <aria/dictionary.h>
+#include <aria/debug.h>
 
 #include <limine.h>
 

@@ -3,6 +3,7 @@ OUTPUT_ARCH(i386:x86-64)
 
 ENTRY(amd64_entry)
 
+
 PHDRS {
 	null PT_NULL FLAGS(0);
 	text PT_LOAD FLAGS((1 << 0) | (1 << 2));

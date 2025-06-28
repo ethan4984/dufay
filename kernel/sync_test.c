@@ -1,10 +1,10 @@
-#include "core/ipl.h"
+#include <core/ipl.h>
 #include <core/mutex.h>
 #include <core/semaphore.h>
 #include <core/debug.h>
 #include <core/sched.h>
-#include <fayt/string.h>
-#include <fayt/debug.h>
+#include <aria/string.h>
+#include <aria/debug.h>
 #include <core/timer.h>
 #include <core/cpu.h>
 

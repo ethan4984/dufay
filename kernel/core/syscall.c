@@ -3,8 +3,8 @@
 
 #include <core/debug.h>
 
-#include <fayt/string.h>
-#include <fayt/compiler.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
 
 #define SYSRET(RET, ERROR)                 \
 	({                                     \
@@ -74,7 +74,7 @@ void syscall_handler(struct registers *regs, void *)
 	}
 
 	if (unlikely(CORE_LOCAL->current_thread == NULL))
-		panic("dufay: critical error\n");
+		panic("fuga: critical error\n");
 	//	else if (CORE_LOCAL->current_thread->comms.sysperm &
 	//			 (1 << syscall_index)) {
 	//		SYSRET(-1, 0);

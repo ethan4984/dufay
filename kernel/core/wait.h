@@ -1,7 +1,7 @@
 #ifndef CORE_WAIT_H_
 #define CORE_WAIT_H_
 #include <sys/queue.h>
-#include <fayt/lock.h>
+#include <aria/lock.h>
 #include <core/clock.h>
 #include <stdatomic.h>
 

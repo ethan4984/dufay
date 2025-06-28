@@ -4,10 +4,10 @@
 #include <core/capability.h>
 #include <core/syscall.h>
 
-#include <fayt/debug.h>
-#include <fayt/string.h>
-#include <fayt/compiler.h>
-#include <fayt/dictionary.h>
+#include <aria/debug.h>
+#include <aria/string.h>
+#include <aria/compiler.h>
+#include <aria/dictionary.h>
 
 static struct dictionary bcache_table;
 

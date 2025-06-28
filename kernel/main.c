@@ -1,7 +1,7 @@
 #include "arch/amd64/cpu.h"
 #include "core/sched.h"
 #include "mm/address.h"
-#include <fayt/lock.h>
+#include <aria/lock.h>
 #include <arch/port.h>
 
 #include <core/cpu.h>
@@ -16,12 +16,14 @@
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
 
-#include <fayt/slab.h>
-#include <fayt/debug.h>
-#include <fayt/string.h>
+#include <aria/slab.h>
+#include <aria/debug.h>
+#include <aria/string.h>
 
 #include <limine.h>
 #include <core/mutex.h>
+
+#include <aria/time.h>
 
 static void *spalloc(void *, uint64_t s)
 {
@@ -32,8 +34,6 @@ static void spfree(void *addr, uint64_t s, uint64_t)
 	pmm_free(V2P(addr), s);
 }
 
-#include <fayt/time.h>
-
 int init_system_tgroup();
 
 void do_sync_test(void);
@@ -41,7 +41,7 @@ void do_sync_test(void);
 void sched_init();
 void sched_cpu_init();
 
-void dufay_entry(void)
+void fuga_entry(void)
 {
 	pmm_init();
 

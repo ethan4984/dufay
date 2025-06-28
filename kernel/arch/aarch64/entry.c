@@ -1,4 +1,4 @@
-#include <fayt/debug.h>
+#include <ariadebug.h>
 #include <stdint.h>
 
 struct cpu_local *CORE_LOCAL;

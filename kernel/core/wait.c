@@ -5,7 +5,7 @@
 #include <sys/queue.h>
 #include <arch/amd64/smp.h>
 #include <core/lock.h>
-#include <fayt/debug.h>
+#include <aria/debug.h>
 #include <core/ipl.h>
 #include <core/timer.h>
 

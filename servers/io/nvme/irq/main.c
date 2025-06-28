@@ -1,9 +1,9 @@
-#include <fayt/syscall.h>
-#include <fayt/debug.h>
-#include <fayt/irq.h>
-#include <fayt/address.h>
-#include <fayt/sched.h>
-#include <fayt/syscall.h>
+#include <aria/syscall.h>
+#include <aria/debug.h>
+#include <aria/irq.h>
+#include <aria/address.h>
+#include <aria/sched.h>
+#include <aria/syscall.h>
 
 #include <nvme.h>
 

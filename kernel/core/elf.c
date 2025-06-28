@@ -5,10 +5,10 @@
 #include <core/elf.h>
 #include <core/debug.h>
 
-#include <fayt/slab.h>
-#include <fayt/compiler.h>
-#include <fayt/string.h>
-#include <fayt/debug.h>
+#include <aria/slab.h>
+#include <aria/compiler.h>
+#include <aria/string.h>
+#include <aria/debug.h>
 
 int elf64_read(struct elf64_file *file, void *buffer, int offset, size_t cnt)
 {

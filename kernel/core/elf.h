@@ -3,7 +3,7 @@
 
 #include <mm/address.h>
 
-#include <fayt/elf.h>
+#include <aria/elf.h>
 
 struct elf64_file_buffer {
 	void *data;

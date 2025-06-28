@@ -16,7 +16,7 @@ INTERNALLDFLAGS := \
 
 INTERNALCFLAGS := \
 	-I.	\
-	-Ifayt \
+	-Iaria \
 	-I../controller \
 	-std=c23 \
 	-ffreestanding \

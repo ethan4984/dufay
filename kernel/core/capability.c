@@ -5,9 +5,9 @@
 #include <core/syscall.h>
 #include <core/capability.h>
 
-#include <fayt/debug.h>
-#include <fayt/string.h>
-#include <fayt/vector.h>
+#include <aria/debug.h>
+#include <aria/string.h>
+#include <aria/vector.h>
 
 void capability_table_init(struct capability_table *table)
 {

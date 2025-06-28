@@ -1,10 +1,10 @@
 #ifndef NVME_H_
 #define NVME_H_
 
-#include <fayt/pci.h>
-#include <fayt/bitmap.h>
-#include <fayt/vector.h>
-#include <fayt/portal.h>
+#include <aria/pci.h>
+#include <aria/bitmap.h>
+#include <aria/vector.h>
+#include <aria/portal.h>
 
 #include <stdint.h>
 #include <stddef.h>

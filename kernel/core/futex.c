@@ -8,9 +8,9 @@
 #include <core/syscall.h>
 #include <core/lock.h>
 
-#include <fayt/debug.h>
-#include <fayt/compiler.h>
-#include <fayt/sched.h>
+#include <aria/debug.h>
+#include <aria/compiler.h>
+#include <aria/sched.h>
 
 static struct dictionary futex_table;
 

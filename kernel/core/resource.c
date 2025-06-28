@@ -1,8 +1,8 @@
 #include <core/resource.h>
 
-#include <fayt/compiler.h>
-#include <fayt/slab.h>
-#include <fayt/debug.h>
+#include <aria/compiler.h>
+#include <aria/slab.h>
+#include <aria/debug.h>
 
 static int rpool_boundary_index(struct rpool *, size_t);
 static int rpool_boundary_move(struct rboundary **, struct rboundary **,

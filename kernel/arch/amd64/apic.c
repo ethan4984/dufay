@@ -8,7 +8,7 @@
 #include <mm/address.h>
 
 #include <core/debug.h>
-#include <fayt/string.h>
+#include <aria/string.h>
 #include <arch/port.h>
 
 typeof(madt_ent0_list) madt_ent0_list;

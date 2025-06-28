@@ -3,7 +3,7 @@
 
 #include <core/capability.h>
 
-#include <fayt/rb_tree.h>
+#include <aria/rb_tree.h>
 
 struct blk;
 struct bcache {

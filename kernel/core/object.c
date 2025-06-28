@@ -1,8 +1,8 @@
 #include <core/object.h>
 
-#include <fayt/debug.h>
-#include <fayt/slab.h>
-#include <fayt/string.h>
+#include <aria/debug.h>
+#include <aria/slab.h>
+#include <aria/string.h>
 #include <mm/slab.h>
 
 static struct object_class classes[256];

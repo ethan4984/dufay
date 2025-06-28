@@ -1,10 +1,10 @@
 #define CPU_COUNT 16
 #include "slab.h"
 
-#include <fayt/debug.h>
-#include <fayt/string.h>
+#include <aria/debug.h>
+#include <aria/string.h>
 #include <sys/mman.h>
-#include <fayt/dictionary.h>
+#include <aria/dictionary.h>
 
 #include <stdint.h>
 #include "physical.h"

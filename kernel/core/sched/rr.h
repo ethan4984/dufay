@@ -1,7 +1,7 @@
 #ifndef CORE_SCHED_RR_H_
 #define CORE_SCHED_RR_H_
 #include <sys/queue.h>
-#include <fayt/lock.h>
+#include <arialock.h>
 
 /* 
  * Trivial scheduler using a round-robin algorithm, where all threads are scheduled successively without care for priorities.

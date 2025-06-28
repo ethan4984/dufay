@@ -1,9 +1,9 @@
 #ifndef CORE_MEMORY_PORTAL_H_
 #define CORE_MEMORY_PORTAL_H_
 
-#include <fayt/dictionary.h>
-#include <fayt/bst.h>
-#include <fayt/portal.h>
+#include <aria/dictionary.h>
+#include <aria/bst.h>
+#include <aria/portal.h>
 
 #include <stdint.h>
 #include <stddef.h>

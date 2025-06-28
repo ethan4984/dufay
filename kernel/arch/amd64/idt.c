@@ -11,8 +11,8 @@
 #include <core/ipl.h>
 #include <core/clock.h>
 
-#include <fayt/lock.h>
-#include <fayt/debug.h>
+#include <aria/lock.h>
+#include <aria/debug.h>
 
 struct idt_descriptor {
 	uint16_t offset_low;

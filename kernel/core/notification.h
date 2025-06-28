@@ -4,9 +4,9 @@
 #include <core/sched.h>
 #include <core/events.h>
 
-#include <fayt/lock.h>
-#include <fayt/notification.h>
-#include <fayt/vector.h>
+#include <aria/lock.h>
+#include <aria/notification.h>
+#include <aria/vector.h>
 
 #define NOTIFICATION_MAX 32
 #define NOTIFICATION_MASK(NOT) (1ull << ((NOT) - 1))

@@ -1,8 +1,8 @@
 #ifndef CORE_RESOURCE_H_
 #define CORE_RESOURCE_H_
 
-#include <fayt/rb_tree.h>
-#include <fayt/dictionary.h>
+#include <aria/rb_tree.h>
+#include <aria/dictionary.h>
 
 #include <stdint.h>
 #include <stddef.h>

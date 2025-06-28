@@ -8,8 +8,8 @@
 #include <mm/physical.h>
 #include <mm/virtual.h>
 
-#include <fayt/lock.h>
-#include <fayt/debug.h>
+#include <aria/lock.h>
+#include <aria/debug.h>
 
 #define PTE_ADDR_MASK 0x000ffffffffff000
 #define PTE_GET_ADDR(VALUE) ((VALUE) & PTE_ADDR_MASK)

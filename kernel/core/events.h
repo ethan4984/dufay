@@ -1,8 +1,8 @@
 #ifndef CORE_EVENTS_H_
 #define CORE_EVENTS_H_
 
-#include <fayt/lock.h>
-#include <fayt/vector.h>
+#include <aria/lock.h>
+#include <aria/vector.h>
 #include <sys/queue.h>
 #include <core/wait.h>
 

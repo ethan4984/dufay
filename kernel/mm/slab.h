@@ -6,8 +6,8 @@
 
 #ifndef SLAB_H
 #define SLAB_H
-#include <fayt/dictionary.h>
-#include <fayt/lock.h>
+#include <aria/dictionary.h>
+#include <aria/lock.h>
 #include <stddef.h>
 #include <sys/queue.h>
 

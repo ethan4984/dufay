@@ -1,14 +1,14 @@
-#include <fayt/debug.h>
-#include <fayt/slab.h>
-#include <fayt/string.h>
-#include <fayt/portal.h>
-#include <fayt/address.h>
-#include <fayt/syscall.h>
-#include <fayt/notification.h>
-#include <fayt/pci.h>
-#include <fayt/bitmap.h>
-#include <fayt/irq.h>
-#include <fayt/compiler.h>
+#include <aria/debug.h>
+#include <aria/slab.h>
+#include <aria/string.h>
+#include <aria/portal.h>
+#include <aria/address.h>
+#include <aria/syscall.h>
+#include <aria/notification.h>
+#include <aria/pci.h>
+#include <aria/bitmap.h>
+#include <aria/irq.h>
+#include <aria/compiler.h>
 
 #include <nvme.h>
 

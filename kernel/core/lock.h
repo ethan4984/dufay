@@ -2,7 +2,7 @@
 #define LOCK_H_
 
 #include <arch/port.h>
-#include <fayt/lock.h>
+#include <aria/lock.h>
 #include <core/ipl.h>
 
 static inline ipl_t spinlock_acquire(struct spinlock *spinlock)

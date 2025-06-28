@@ -4,12 +4,12 @@
 #include <core/sched.h>
 #include <mm/portal.h>
 
-#include <fayt/circular_queue.h>
+#include <ariacircular_queue.h>
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include <fayt/pairing_heap.h>
+#include <ariapairing_heap.h>
 #include <arch/port.h>
 #include <core/ipl.h>
 #include <core/dpc.h>

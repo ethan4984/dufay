@@ -2,9 +2,9 @@
 #include <core/debug.h>
 #include <arch/port.h>
 
-#include <fayt/lock.h>
-#include <fayt/string.h>
-#include <fayt/stream.h>
+#include <aria/lock.h>
+#include <aria/string.h>
+#include <aria/stream.h>
 
 #include <stdint.h>
 #include <stddef.h>

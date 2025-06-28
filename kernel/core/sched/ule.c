@@ -4,7 +4,7 @@
 #include <arch/port.h>
 #include <core/cpu.h>
 #include <core/sched.h>
-#include <fayt/string.h>
+#include <ariastring.h>
 #include <mm/address.h>
 #include <core/timer.h>
 #include <mm/physical.h>

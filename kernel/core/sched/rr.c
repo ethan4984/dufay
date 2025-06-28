@@ -1,7 +1,7 @@
 #include "arch/amd64/port.h"
 #include "core/ipl.h"
 #include "core/sched.h"
-#include "fayt/lock.h"
+#include "arialock.h"
 #include <mm/physical.h>
 #include <arch/port.h>
 #include <mm/virtual.h>
@@ -14,7 +14,7 @@
 #include <core/lock.h>
 #include <core/thread.h>
 #include <mm/slab.h>
-#include <fayt/string.h>
+#include <ariastring.h>
 
 static size_t last_cpu = 0;
 

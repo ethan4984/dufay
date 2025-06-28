@@ -1,7 +1,7 @@
-#include <fayt/pairing_heap.h>
+#include <aria/pairing_heap.h>
 #include <core/timer.h>
 #include <core/lock.h>
-#include <fayt/container_of.h>
+#include <aria/container_of.h>
 #include <core/cpu.h>
 #include <stdatomic.h>
 
