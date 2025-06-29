@@ -189,7 +189,7 @@ extern void isr_handler_main(struct registers *regs)
 	}
 
 	xapic_write(XAPIC_EOI_OFF, 0);
-done:
+
 	arch_set_hardware_ipl(oldipl);
 	CORE_LOCAL->ipl = oldipl;
 

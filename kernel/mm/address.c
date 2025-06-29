@@ -6,7 +6,6 @@
 
 #include <aria/compiler.h>
 #include <aria/debug.h>
-#include <aria/address.h>
 
 static struct dictionary as_table;
 static int asid_bump;

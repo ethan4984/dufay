@@ -9,7 +9,7 @@
 
 #include <aria/debug.h>
 #include <aria/slab.h>
-#include <aria/string.h>
+#include <aria/base.h>
 
 #include <sys/queue.h>
 #include <mm/slab.h>

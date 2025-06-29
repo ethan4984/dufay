@@ -2,7 +2,7 @@
 #include <mm/physical.h>
 #include <core/debug.h>
 
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/lock.h>
 #include <aria/debug.h>
 

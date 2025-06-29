@@ -3,7 +3,7 @@
 
 #include <core/debug.h>
 
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/compiler.h>
 
 #define SYSRET(RET, ERROR)                 \

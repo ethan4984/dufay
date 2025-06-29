@@ -10,7 +10,6 @@
 
 #include <aria/debug.h>
 #include <aria/compiler.h>
-#include <aria/sched.h>
 
 static struct dictionary futex_table;
 

@@ -8,10 +8,8 @@
 #include <arch/amd64/smp.h>
 #include <arch/amd64/debug.h>
 #include <core/cpu.h>
-#include <aria/sched.h>
-#include <aria/time.h>
 #include <core/debug.h>
-#include <aria/string.h>
+#include <aria/base.h>
 
 uint64_t HIGH_VMA = 0xffff800000000000;
 
@@ -38,8 +36,6 @@ struct cpuid_state cpuid(size_t leaf, size_t subleaf)
 	return ret;
 }
 
-struct timer invariant_tsc;
-
 void amd64_tsc_calibrate(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
@@ -55,10 +51,11 @@ void amd64_tsc_calibrate(void)
 	uint64_t b = rdtsc();
 
 	uint64_t freq = ((b - a) * 1000000000) / 50000000;
+	(void)freq;
+}
 
-	invariant_tsc = (struct timer){ .source = TIME_SOURCE_INVARIANT_TSC,
-									.freq = freq,
-									.read = invariant_tsc_read };
+uint64_t arch_read_timestamp_ns()
+{
 }
 
 void amd64_system_init(void)

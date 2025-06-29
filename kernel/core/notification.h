@@ -5,7 +5,6 @@
 #include <core/events.h>
 
 #include <aria/lock.h>
-#include <aria/notification.h>
 #include <aria/vector.h>
 
 #define NOTIFICATION_MAX 32

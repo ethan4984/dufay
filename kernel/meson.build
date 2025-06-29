@@ -15,6 +15,8 @@ inc = [include_directories('.', 'external')]
 
 src = files('main.c', 'sync_test.c')
 
+dep = dependency('aria', fallback: ['aria', 'aria_dep'])
+
 keyval = import('keyval')
 kconfig = configuration_data(keyval.load('.config'))
 
@@ -31,8 +33,7 @@ endif
 
 subdir('core')
 subdir('arch')
-subdir('aria')
 subdir('acpi')
 subdir('mm')
 
-executable('fuga', src, include_directories: inc, c_args: c_args)
+executable('fuga', src, include_directories: inc, c_args: c_args, dependencies: dep)

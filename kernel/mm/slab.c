@@ -2,7 +2,7 @@
 #include "slab.h"
 
 #include <aria/debug.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <sys/mman.h>
 #include <aria/dictionary.h>
 

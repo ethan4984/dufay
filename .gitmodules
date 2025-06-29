@@ -7,9 +7,6 @@
 [submodule "servers/fs/aria"]
 	path = servers/fs/aria
 	url = https://github.com/bach-os/aria
-[submodule "kernel/aria"]
-	path = kernel/aria
-	url = https://github.com/bach-os/aria
 [submodule "servers/io/nvme/controller/aria"]
 	path = servers/io/nvme/controller/aria
 	url = https://github.com/bach-os/aria
@@ -19,3 +16,7 @@
 [submodule "servers/sys/init/aria"]
 	path = servers/sys/init/aria
 	url = https://github.com/bach-os/aria
+[submodule "kernel/subprojects/aria"]
+	path = kernel/subprojects/aria
+	url = https://github.com/bach-os/aria
+	branch = refactor

@@ -10,7 +10,7 @@
 
 #include <aria/compiler.h>
 #include <aria/circular_queue.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/bst.h>
 #include <aria/debug.h>
 

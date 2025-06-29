@@ -1,6 +1,3 @@
-#include "arch/amd64/cpu.h"
-#include "core/sched.h"
-#include "mm/address.h"
 #include <aria/lock.h>
 #include <arch/port.h>
 
@@ -18,12 +15,10 @@
 
 #include <aria/slab.h>
 #include <aria/debug.h>
-#include <aria/string.h>
+#include <aria/base.h>
 
 #include <limine.h>
 #include <core/mutex.h>
-
-#include <aria/time.h>
 
 static void *spalloc(void *, uint64_t s)
 {

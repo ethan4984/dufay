@@ -5,6 +5,8 @@
 
 #include <aria/aslr.h>
 
+enum { AS_ACTION_CONSTRUCT, AS_ACTION_ALLOCATE, AS_ACTION_FREE };
+
 struct address_space_capability {
 	int asid;
 };

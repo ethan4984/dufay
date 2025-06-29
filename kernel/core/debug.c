@@ -3,23 +3,24 @@
 #include <arch/port.h>
 
 #include <aria/lock.h>
-#include <aria/string.h>
-#include <aria/stream.h>
+#include <aria/base.h>
+#include <aria/external/nanoprintf.h>
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <core/lock.h>
 
-static void print_write(struct stream_info *, char);
-
-struct stream_info print_stream = { .write = print_write };
-
 static struct spinlock print_lock;
+
+static void putc(int c, void *)
+{
+	arch_debug_write(c);
+}
 
 SYSCALL_DEFINE1(log, char, character, ({
 					spinlock_irqsave(&print_lock);
-					print_stream.write(&print_stream, character);
+					putc(character, NULL);
 					spinrelease_irqsave(&print_lock);
 				}))
 
@@ -28,7 +29,7 @@ void print_unlocked(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
-	stream_print(&print_stream, str, arg);
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 }
@@ -39,13 +40,9 @@ void print(const char *str, ...)
 	va_start(arg, str);
 
 	spinlock_irqsave(&print_lock);
-	const char *prefix = "DUFAY: [KERNEL] ";
-	for (; *prefix;) {
-		print_stream.write(&print_stream, *prefix);
-		prefix++;
-	}
 
-	stream_print(&print_stream, str, arg);
+	npf_pprintf(&putc, NULL, "FUGA: [KERNEL] ");
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 
@@ -59,7 +56,7 @@ void panic(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
-	stream_print(&print_stream, str, arg);
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 
@@ -94,9 +91,4 @@ void stacktrace(uint64_t *rbp)
 
 		rbp = (void *)previous_rbp;
 	}
-}
-
-static void print_write(struct stream_info *, char c)
-{
-	arch_debug_write(c);
 }

@@ -2,7 +2,7 @@
 #include <core/dpc.h>
 #include <core/cpu.h>
 #include <core/lock.h>
-#include <core/debug.h>
+#include <aria/debug.h>
 #include <sys/queue.h>
 
 void dpc_init(struct dpc *dpc, dpc_routine_t routine)

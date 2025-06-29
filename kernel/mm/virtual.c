@@ -6,7 +6,7 @@
 #include <mm/address.h>
 #include <core/debug.h>
 
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/dictionary.h>
 #include <aria/debug.h>
 

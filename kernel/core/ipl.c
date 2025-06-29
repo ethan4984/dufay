@@ -1,6 +1,5 @@
-#include "arch/amd64/port.h"
-#include "core/sched.h"
-#include <core/debug.h>
+#include <core/sched.h>
+#include <aria/debug.h>
 #include <core/ipl.h>
 #include <arch/port.h>
 #include <core/cpu.h>

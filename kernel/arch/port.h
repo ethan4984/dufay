@@ -29,4 +29,6 @@ void arch_load_context(struct thread *td);
 
 void arch_send_ipi(struct cpu_local *cpu, uint8_t ipi);
 
+uint64_t arch_read_timestamp_ns();
+
 #endif

@@ -14,7 +14,7 @@
 #include <core/lock.h>
 #include <core/thread.h>
 #include <mm/slab.h>
-#include <aria/string.h>
+#include <aria/base.h>
 
 static size_t last_cpu = 0;
 

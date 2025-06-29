@@ -3,7 +3,7 @@
 #include <acpi/rsdp.h>
 
 #include <core/debug.h>
-#include <aria/string.h>
+#include <aria/base.h>
 
 struct rsdp *rsdp;
 struct rsdt *rsdt;

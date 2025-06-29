@@ -6,7 +6,7 @@
 #include <core/capability.h>
 
 #include <aria/debug.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/vector.h>
 
 void capability_table_init(struct capability_table *table)

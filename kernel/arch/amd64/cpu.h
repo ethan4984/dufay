@@ -1,11 +1,9 @@
-#ifndef X86_CPU_H_
-#define X86_CPU_H_
+#ifndef AMD64_CPU_H_
+#define AMD64_CPU_H_
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-
-#include <aria/time.h>
 
 #define MSR_LAPIC_BASE 0x1b
 #define MSR_EFER 0xc0000080

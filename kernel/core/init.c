@@ -1,15 +1,10 @@
-#include "arch/port.h"
-#include <arch/amd64/smp.h>
-#include <arch/amd64/paging.h>
-
 #include <core/init.h>
 #include <core/debug.h>
 #include <core/elf.h>
 #include <mm/physical.h>
 
 #include <aria/debug.h>
-#include <aria/notification.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/compiler.h>
 
 static volatile struct limine_module_request limine_module_request = {

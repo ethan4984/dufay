@@ -11,7 +11,7 @@
 
 #include <aria/debug.h>
 #include <aria/compiler.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/dictionary.h>
 
 static struct aslr aslr_irq = { .layout = NULL,

@@ -3,7 +3,7 @@
 #include <core/semaphore.h>
 #include <core/debug.h>
 #include <core/sched.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/debug.h>
 #include <core/timer.h>
 #include <core/cpu.h>

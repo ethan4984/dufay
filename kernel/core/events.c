@@ -7,7 +7,6 @@
 #include <mm/physical.h>
 
 #include <aria/debug.h>
-#include <aria/sched.h>
 #include <aria/compiler.h>
 #include <core/wait.h>
 
