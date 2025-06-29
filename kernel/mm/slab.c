@@ -1,10 +1,10 @@
-#define CPU_COUNT 16
 #include "slab.h"
 
 #include <aria/debug.h>
 #include <aria/base.h>
 #include <sys/mman.h>
 #include <aria/dictionary.h>
+#include <aria/compiler.h>
 
 #include <stdint.h>
 #include "physical.h"
@@ -232,43 +232,46 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 	void *buf = NULL;
 	struct kmem_cpu *cpu = NULL;
 
-	cpu = &cp->cpu[get_curr_cpu()];
+	if (likely(cp->magazines_enabled)) {
+		cpu = &cp->cpu[get_curr_cpu()];
 
-	spinlock(&cpu->lock);
+		spinlock(&cpu->lock);
 
-	for (;;) {
-		// Try getting a round from the per-cpu cache
-		if (cpu->rounds > 0) {
-			buf = cpu->loaded->rounds[--cpu->rounds];
-			spinrelease(&cpu->lock);
-			return buf;
-		}
-
-		// Loaded magazine is empty, if the previous magazine is not empty, exchange
-		// them
-		if (cpu->rounds_previous > 0) {
-			cpu_reload(cpu, cpu->previous, cpu->rounds_previous);
-			continue;
-		}
-
-		// Try to get a full magazine from the depot
-		struct kmem_magazine *mag = alloc_from_depot(cp, &cp->full_magazines);
-
-		if (mag) {
-			// Put previous magazine on empty list because it will get emptied on
-			// reload()
-			if (cpu->previous) {
-				free_to_depot(cp, cpu->previous, &cp->empty_magazines);
+		for (;;) {
+			// Try getting a round from the per-cpu cache
+			if (cpu->rounds > 0) {
+				buf = cpu->loaded->rounds[--cpu->rounds];
+				spinrelease(&cpu->lock);
+				return buf;
 			}
 
-			cpu_reload(cpu, mag, cpu->magazine_size);
-			continue;
+			// Loaded magazine is empty, if the previous magazine is not empty, exchange
+			// them
+			if (cpu->rounds_previous > 0) {
+				cpu_reload(cpu, cpu->previous, cpu->rounds_previous);
+				continue;
+			}
+
+			// Try to get a full magazine from the depot
+			struct kmem_magazine *mag =
+				alloc_from_depot(cp, &cp->full_magazines);
+
+			if (mag) {
+				// Put previous magazine on empty list because it will get emptied on
+				// reload()
+				if (cpu->previous) {
+					free_to_depot(cp, cpu->previous, &cp->empty_magazines);
+				}
+
+				cpu_reload(cpu, mag, cpu->magazine_size);
+				continue;
+			}
+
+			break;
 		}
 
-		break;
+		spinrelease(&cpu->lock);
 	}
-
-	spinrelease(&cpu->lock);
 
 	// Fall back to slab layer
 	spinlock(&cp->lock);
@@ -313,57 +316,61 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 
 void kmem_cache_free(struct kmem_cache *cp, void *ptr)
 {
-	struct kmem_cpu *cpu = &cp->cpu[get_curr_cpu()];
-
-	spinlock(&cpu->lock);
-
-	for (;;) {
-		// There's space in the magazine, put the object there
-		if ((size_t)cpu->rounds < cpu->magazine_size) {
-			cpu->loaded->rounds[cpu->rounds++] = ptr;
-			spinrelease(&cpu->lock);
-			return;
-		}
-
-		// Loaded magazine is full, try to exchange it with the previous one if it
-		// was empty
-		if (cpu->rounds_previous == 0) {
-			cpu_reload(cpu, cpu->previous, 0);
-			continue;
-		}
-
-		// Try to get an empty magazine from the depot
-		struct kmem_magazine *mag = alloc_from_depot(cp, &cp->empty_magazines);
-
-		if (mag) {
-			// Put the previous magazine on the full list
-			if (cpu->previous) {
-				free_to_depot(cp, cpu->previous, &cp->full_magazines);
-			}
-
-			cpu_reload(cpu, mag, 0);
-			continue;
-		}
-
-		// No empty magazines in the depot, try to allocate a new one
-		struct kmem_magazine *new_mag;
-
-		spinrelease(&cpu->lock);
-
-		new_mag = (struct kmem_magazine *)kmem_cache_alloc(cp->magtype->cache);
+	if (likely(cp->magazines_enabled)) {
+		struct kmem_cpu *cpu = &cp->cpu[get_curr_cpu()];
 
 		spinlock(&cpu->lock);
 
-		// We got a new empty magazine, add it to the empty depot and retry
-		if (new_mag) {
-			free_to_depot(cp, new_mag, &cp->empty_magazines);
-			continue;
+		for (;;) {
+			// There's space in the magazine, put the object there
+			if ((size_t)cpu->rounds < cpu->magazine_size) {
+				cpu->loaded->rounds[cpu->rounds++] = ptr;
+				spinrelease(&cpu->lock);
+				return;
+			}
+
+			// Loaded magazine is full, try to exchange it with the previous one if it
+			// was empty
+			if (cpu->rounds_previous == 0) {
+				cpu_reload(cpu, cpu->previous, 0);
+				continue;
+			}
+
+			// Try to get an empty magazine from the depot
+			struct kmem_magazine *mag =
+				alloc_from_depot(cp, &cp->empty_magazines);
+
+			if (mag) {
+				// Put the previous magazine on the full list
+				if (cpu->previous) {
+					free_to_depot(cp, cpu->previous, &cp->full_magazines);
+				}
+
+				cpu_reload(cpu, mag, 0);
+				continue;
+			}
+
+			// No empty magazines in the depot, try to allocate a new one
+			struct kmem_magazine *new_mag;
+
+			spinrelease(&cpu->lock);
+
+			new_mag =
+				(struct kmem_magazine *)kmem_cache_alloc(cp->magtype->cache);
+
+			spinlock(&cpu->lock);
+
+			// We got a new empty magazine, add it to the empty depot and retry
+			if (new_mag) {
+				free_to_depot(cp, new_mag, &cp->empty_magazines);
+				continue;
+			}
+
+			break;
 		}
 
-		break;
+		spinrelease(&cpu->lock);
 	}
-
-	spinrelease(&cpu->lock);
 
 	// First destroy the object
 	if (cp->destructor) {
@@ -443,13 +450,14 @@ void kmem_cache_dump(struct kmem_cache *cp)
 	}
 }
 
-void kmem_init()
+void kmem_early_init()
 {
 	cache_freelist = NULL;
 
 	for (size_t i = 0; i < CACHES_NUM; i++) {
 		caches[i].next = cache_freelist;
-		caches[i].cpu = alloc(logical_processor_cnt * sizeof(struct kmem_cpu));
+		caches[i].cpu = NULL;
+		caches[i].magazines_enabled = false;
 		cache_freelist = &caches[i];
 	}
 
@@ -470,6 +478,28 @@ void kmem_init()
 		mtp->cache = kmem_cache_create("magazine",
 									   (mtp->rounds + 1) * sizeof(void *),
 									   mtp->align, NULL, NULL);
+	}
+}
+
+void kmem_init()
+{
+	for (size_t i = 0; i < CACHES_NUM; i++) {
+		struct kmem_cache *cache = &caches[i];
+
+		cache->cpu =
+			kmem_malloc(logical_processor_cnt * sizeof(struct kmem_cpu));
+
+		cache->magazines_enabled = true;
+
+		if (cache->magtype) {
+			for (size_t i = 0; i < logical_processor_cnt; i++) {
+				cache->cpu[i].magazine_size = cache->magtype->rounds;
+				cache->cpu[i].rounds = -1;
+				cache->cpu[i].rounds_previous = -1;
+				cache->cpu[i].loaded = NULL;
+				cache->cpu[i].previous = NULL;
+			}
+		}
 	}
 }
 
@@ -620,7 +650,8 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t size,
 
 	cache->magtype = magtype;
 
-	// KERNEL: do per-cpu init
+	if (!cache->magazines_enabled)
+		return cache;
 
 	for (size_t i = 0; i < logical_processor_cnt; i++) {
 		cache->cpu[i].magazine_size = magtype->rounds;

@@ -196,7 +196,7 @@ uint64_t pmm_alloc(uint64_t cnt, uint64_t align)
 			continue;
 		}
 
-		memset64((void *)(alloc + HIGH_VMA), 0, (cnt * PAGE_SIZE) / 8);
+		memset64((void *)P2V(alloc), 0, (cnt * PAGE_SIZE) / 8);
 
 		return alloc;
 	} while (module);

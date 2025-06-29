@@ -58,6 +58,8 @@ void fuga_entry(void)
 	slab_cache_create(&pool, "CACHE65536", 65536);
 	slab_cache_create(&pool, "CACHE131072", 131072);
 
+	kmem_early_init();
+
 	vmm_init();
 
 	arch_devices_init();

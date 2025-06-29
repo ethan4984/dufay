@@ -135,10 +135,13 @@ struct kmem_cache {
 	/// Per-CPU data
 	struct kmem_cpu *cpu;
 
+	bool magazines_enabled;
+
 	void (*constructor)(void *);
 	void (*destructor)(void *);
 };
 
+void kmem_early_init();
 void kmem_init();
 
 struct kmem_cache *kmem_cache_create(const char *name, size_t size,

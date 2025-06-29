@@ -4,6 +4,7 @@
 #include <mm/virtual.h>
 #include <mm/physical.h>
 #include <mm/address.h>
+#include <mm/slab.h>
 #include <core/debug.h>
 
 #include <aria/base.h>
@@ -121,7 +122,7 @@ int vmm_init(void)
 
 	size_t identity_map_size = (highest_page > gib4) ? highest_page : gib4;
 
-	print("Identity mapping %d bytes of memory using %d bytes pages\n",
+	print("Identity mapping %ld bytes of memory using %ld bytes pages\n",
 		  identity_map_size, max_page_size);
 
 	for (size_t i = 0; i < identity_map_size / max_page_size; i++) {
