@@ -37,6 +37,9 @@ struct cpu_local {
 	struct thread
 		*current_thread; /* Thread that's currently running on this CPU */
 
+	uint8_t
+		current_thread_status; /* 1 bit for thread interactivity and 7 for priority */
+
 	struct thread *next_thread; /* Thread that will run next on this CPU */
 
 	struct spinlock timers_lock;

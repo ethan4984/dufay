@@ -357,15 +357,18 @@ static void sched_recompute_priority(struct cpu_local *cpu, struct thread *td)
 	}
 }
 
-/* Returns whether or not td should preempt curtd */
-static inline bool should_preempt(struct thread *td, struct thread *curtd)
+/* Returns whether or not `td` should preempt the thread running on `cpu` */
+static inline bool should_preempt(struct thread *td, struct cpu_local *cpu)
 {
+	uint8_t status = cpu->current_thread_status;
+	uint8_t prio = (status >> 1) & 0x7F;
+	bool interact = status & 1;
+
 	/* Always preempt idle threads */
-	if (curtd->priority == PRIO_IDLE)
+	if (prio == PRIO_IDLE)
 		return true;
 
-	if (curtd->priority_class == PRIO_LOW_BATCH && !curtd->interactive &&
-		td->interactive) {
+	if (PRIO_IS_BATCH(prio) && !interact && td->interactive) {
 		/* Interactive threads always preempt timeshared ones */
 		return true;
 	}
@@ -374,7 +377,7 @@ static inline bool should_preempt(struct thread *td, struct thread *curtd)
 	 * Preempt if the priority exceeds the preemption threshold.
 	 * The default value forbids timeshared (batch) threads to preempt each other.
 	 */
-	if (td->priority >= PREEMPT_THRESHOLD && td->priority > curtd->priority)
+	if (td->priority >= PREEMPT_THRESHOLD && td->priority > prio)
 		return true;
 
 	return false;
@@ -383,9 +386,8 @@ static inline bool should_preempt(struct thread *td, struct thread *curtd)
 static void sched_try_preempt(struct cpu_local *cpu, struct thread *td)
 {
 	spinlock(&cpu->sched_data.thread_queues_lock);
-	struct thread *curthread = cpu->current_thread;
 
-	if (should_preempt(td, curthread)) {
+	if (should_preempt(td, cpu)) {
 		struct thread *next = cpu->next_thread;
 
 		cpu->next_thread = td;
@@ -424,7 +426,7 @@ static struct cpu_local *pick_cpu(struct thread *td)
 	/* Check the last CPU the thread ran on (or the one it's pinned to) */
 	if (td->last_cpu) {
 		/* We can preempt it or the thread is pinned */
-		if (should_preempt(td, td->last_cpu->current_thread) || td->pinned) {
+		if (should_preempt(td, td->last_cpu) || td->pinned) {
 			return td->last_cpu;
 		}
 	}
@@ -440,7 +442,7 @@ static struct cpu_local *pick_cpu(struct thread *td)
 			least = cpu;
 		}
 
-		if (should_preempt(td, cpu->current_thread)) {
+		if (should_preempt(td, cpu)) {
 			if (!least_preempt ||
 				(least_preempt &&
 				 cpu->sched_data.load < least_preempt->sched_data.load)) {
@@ -465,6 +467,10 @@ void sched_switch(struct thread *cur, struct thread *next)
 	cpu->current_thread = next;
 	cpu->next_thread = NULL;
 	next->last_cpu = cpu;
+
+	/* We stash this to ensure that remote preemption checks can be done locklessly (without loading from cpu->current_thread) */
+	cpu->current_thread_status = ((next->priority & 0x7F) << 1) |
+								 (next->interactive);
 
 	thread_switch(cur, next);
 }
