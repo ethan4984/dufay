@@ -36,26 +36,42 @@ struct cpuid_state cpuid(size_t leaf, size_t subleaf)
 	return ret;
 }
 
+static uint64_t tsc_freq = 0;
+static bool use_tsc = false;
+static bool clock_ready = false;
+
 void amd64_tsc_calibrate(void)
 {
 	struct cpuid_state cpuid_state = cpuid(1, 0);
-	if ((cpuid_state.rdx & (1 << 4)) == 0)
-		panic("fuga: cpuid: tsc/rdtsc unsupported");
+	if ((cpuid_state.rdx & (1 << 4)) == 0) {
+		use_tsc = false;
+		return;
+	}
 
 	cpuid_state = cpuid(0x80000007, 0);
-	if ((cpuid_state.rdx & (1 << 8)) == 0)
-		panic("fuga: cpuid: tsc-invariant unsupported\n");
+	if ((cpuid_state.rdx & (1 << 8)) == 0) {
+		use_tsc = false;
+		return;
+	}
 
 	uint64_t a = rdtsc();
-	hpet_msleep(50);
+	hpet_usleep(50);
 	uint64_t b = rdtsc();
 
-	uint64_t freq = ((b - a) * 1000000000) / 50000000;
-	(void)freq;
+	tsc_freq = ((b - a)) / (50000000);
+	use_tsc = true;
 }
 
 uint64_t arch_read_timestamp_ns()
 {
+	if (!clock_ready)
+		return 0;
+
+	//	if (!use_tsc) {
+	return hpet_get_timestamp_ns();
+	//}
+
+	//return rdtsc() / tsc_freq;
 }
 
 void amd64_system_init(void)
@@ -107,8 +123,9 @@ void amd64_system_tables(void)
 	idt_init();
 	hpet_init();
 	apic_init();
-	apic_timer_init(1000 / HZ);
 	amd64_tsc_calibrate();
+	clock_ready = true;
+	apic_timer_init(1000 / HZ);
 	boot_aps();
 }
 

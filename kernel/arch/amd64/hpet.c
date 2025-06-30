@@ -19,6 +19,13 @@ void hpet_msleep(size_t ms)
 	}
 }
 
+size_t hpet_get_timestamp_ns(void)
+{
+	uint32_t period = hpet_regs->capabilities >> 32;
+
+	return (hpet_regs->counter_value / (1000000000 / period)) * 1000;
+}
+
 void hpet_usleep(size_t us)
 {
 	uint32_t period = hpet_regs->capabilities >> 32;

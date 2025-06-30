@@ -32,3 +32,4 @@ struct hpet_regs {
 void hpet_msleep(size_t ms);
 void hpet_usleep(size_t us);
 void hpet_init(void);
+size_t hpet_get_timestamp_ns(void);

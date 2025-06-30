@@ -65,6 +65,7 @@ void apic_timer_init(uint32_t ms)
 	xapic_write(XAPIC_TIMER_DIVIDE_CONF_OFF, 0x3); // divide by 16
 	xapic_write(XAPIC_TIMER_INITAL_COUNT_OFF, ~0);
 
+	// TODO: try the TSC here if possible
 	hpet_msleep(ms);
 
 	uint32_t ticks = ~0 - xapic_read(XAPIC_TIMER_CURRENT_COUNT_OFF);

@@ -1,4 +1,5 @@
 #include <core/syscall.h>
+#include <core/timer.h>
 #include <core/debug.h>
 #include <arch/port.h>
 
@@ -29,6 +30,9 @@ void print_unlocked(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
+	npf_pprintf(&putc, NULL, "FUGA: [KERNEL] ");
+	npf_vpprintf(&putc, NULL, str, arg);
+
 	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
@@ -41,7 +45,11 @@ void print(const char *str, ...)
 
 	spinlock_irqsave(&print_lock);
 
-	npf_pprintf(&putc, NULL, "FUGA: [KERNEL] ");
+	uint64_t timestamp = arch_read_timestamp_ns();
+
+	npf_pprintf(&putc, NULL, "[%5lu.%06lu] [ BACH ] ",
+				timestamp / NANOSECONDS_PER_SECOND,
+				timestamp / (NANOSECONDS_PER_SECOND / 1000));
 	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
