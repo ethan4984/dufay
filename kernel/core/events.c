@@ -1,14 +1,12 @@
-#include <arch/x86/cpu.h>
-#include <arch/x86/smp.h>
+#include <arch/amd64/smp.h>
 
 #include <core/events.h>
-#include <core/scheduler/thread.h>
+#include <core/sched.h>
 #include <core/notification.h>
 #include <core/lock.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 
 #include <aria/debug.h>
-#include <aria/sched.h>
 #include <aria/compiler.h>
 #include <core/wait.h>
 
@@ -43,9 +41,11 @@ void event_signal(struct event *event)
 
 int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 {
+	panic("not implemented");
+
 	if (etrigger == NULL || waking_context == NULL)
 		RETURN_ERROR;
-
+#if 0
 	etrigger->context = waking_context;
 
 	spinlock_irqsave(&etrigger->lock);
@@ -54,7 +54,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 	if (unlikely(scheduler == NULL || scheduler->enqueue == NULL))
 		RETURN_ERROR;
 
-	for (int i = 0; i < etrigger->equeue.length; i++) {
+	for (size_t i = 0; i < etrigger->equeue.length; i++) {
 		struct equeue *equeue = etrigger->equeue.data[i];
 
 		if (equeue == NULL)
@@ -62,7 +62,7 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 
 		spinlock_irqsave(&equeue->lock);
 
-		for (int j = 0; j < equeue->context.length; j++) {
+		for (size_t j = 0; j < equeue->context.length; j++) {
 			struct context *context = equeue->context.data[j];
 
 			if (context == NULL)
@@ -85,12 +85,15 @@ int equeue_wake(struct etrigger *etrigger, struct context *waking_context)
 	}
 
 	spinrelease_irqsave(&etrigger->lock);
-
+#endif
 	return 0;
 }
 
 int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 {
+	panic("not impl");
+
+#if 0
 	if (equeue == NULL)
 		RETURN_ERROR;
 
@@ -128,7 +131,7 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 
 	if (waking_object)
 		*waking_object = context->last_etrigger;
-
+#endif
 	return 0;
 }
 

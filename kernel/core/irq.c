@@ -1,7 +1,7 @@
-#include <arch/x86/paging.h>
-#include <arch/x86/smp.h>
-#include <arch/x86/idt.h>
+#include "mm/virtual.h"
+#include <arch/amd64/paging.h>
 
+#include <core/cpu.h>
 #include <core/irq.h>
 #include <core/debug.h>
 #include <core/syscall.h>
@@ -10,8 +10,12 @@
 
 #include <aria/debug.h>
 #include <aria/compiler.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/dictionary.h>
+
+#ifdef __x86_64__
+#include <arch/amd64/idt.h>
+#endif
 
 static struct aslr aslr_irq = { .layout = NULL,
 								.minimum_vaddr = 0xffffe00000000000,
@@ -21,6 +25,8 @@ static struct dictionary cortex_table;
 
 int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 {
+	panic("irq resolve, faulting addr = %x\n", faulting_address);
+
 	if ((error_code & X86_FLAGS_P) != 0)
 		RETURN_ERROR;
 	if (faulting_address < aslr_irq.minimum_vaddr ||
@@ -31,7 +37,7 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct page_table *page_table = thread->address_space->page_table;
+	struct page_table *page_table = thread->process->as->page_table;
 	if (unlikely(page_table == NULL))
 		RETURN_ERROR;
 
@@ -60,8 +66,8 @@ found:
 	page->paddr = *pml_entry & ~(0xfff);
 	page->flags = *pml_entry & 0xfff;
 	page->frame = NULL;
-	page->pmle = page_table->map_page(
-		page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
+	//page->pmle = page_table->map_page(
+	//page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
 	page->refcnt = alloc(sizeof(*page->refcnt));
 
 	int ret = dictionary_push(page_table->pages, &page->vaddr, page,
@@ -127,8 +133,10 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (ret == -1)
 		RETURN_ERROR;
 
+#ifdef __x86_64__
 	ret = idt_instantiate_vector(vector, (void *)cortex->elf->aux.at_entry,
 								 &cortex->anchor_root, cortex);
+#endif
 	if (ret == -1)
 		RETURN_ERROR;
 

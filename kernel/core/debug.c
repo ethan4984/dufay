@@ -1,26 +1,27 @@
-#include <arch/x86/debug.h>
-
 #include <core/syscall.h>
+#include <core/timer.h>
 #include <core/debug.h>
+#include <arch/port.h>
 
 #include <aria/lock.h>
-#include <aria/string.h>
-#include <aria/stream.h>
+#include <aria/base.h>
+#include <aria/external/nanoprintf.h>
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <core/lock.h>
 
-static void print_write(struct stream_info *, char);
-
-struct stream_info print_stream = { .write = print_write };
-
 static struct spinlock print_lock;
+
+static void putc(int c, void *)
+{
+	arch_debug_write(c);
+}
 
 SYSCALL_DEFINE1(log, char, character, ({
 					spinlock_irqsave(&print_lock);
-					print_stream.write(&print_stream, character);
+					putc(character, NULL);
 					spinrelease_irqsave(&print_lock);
 				}))
 
@@ -29,7 +30,10 @@ void print_unlocked(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
-	stream_print(&print_stream, str, arg);
+	npf_pprintf(&putc, NULL, "FUGA: [KERNEL] ");
+	npf_vpprintf(&putc, NULL, str, arg);
+
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 }
@@ -40,13 +44,13 @@ void print(const char *str, ...)
 	va_start(arg, str);
 
 	spinlock_irqsave(&print_lock);
-	const char *prefix = "DUFAY: [KERNEL] ";
-	for (; *prefix;) {
-		print_stream.write(&print_stream, *prefix);
-		prefix++;
-	}
 
-	stream_print(&print_stream, str, arg);
+	uint64_t timestamp = arch_read_timestamp_ns();
+
+	npf_pprintf(&putc, NULL, "[%5lu.%06lu] [ BACH ] ",
+				timestamp / NANOSECONDS_PER_SECOND,
+				timestamp / (NANOSECONDS_PER_SECOND / 1000));
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 
@@ -60,7 +64,7 @@ void panic(const char *str, ...)
 	va_list arg;
 	va_start(arg, str);
 
-	stream_print(&print_stream, str, arg);
+	npf_vpprintf(&putc, NULL, str, arg);
 
 	va_end(arg);
 
@@ -70,8 +74,10 @@ void panic(const char *str, ...)
 	//	__asm__ volatile ("mov %%rbp, %0" : "=r"(rbp));
 	//	stacktrace((void*)rbp);
 
-	for (;;)
-		__asm__ volatile("cli\nhlt");
+	for (;;) {
+		arch_disable_interrupts();
+		arch_halt();
+	}
 }
 
 void stacktrace(uint64_t *rbp)
@@ -93,9 +99,4 @@ void stacktrace(uint64_t *rbp)
 
 		rbp = (void *)previous_rbp;
 	}
-}
-
-static void print_write(struct stream_info *, char c)
-{
-	serial_write(c);
 }

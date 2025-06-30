@@ -3,7 +3,11 @@
 
 #include <aria/bitmap.h>
 #include <aria/vector.h>
-#include <aria/capability.h>
+
+#define CAPABILITY_ACCESS_READ (1 << 0)
+#define CAPABILITY_ACCESS_WRITE (1 << 1)
+
+typedef uint32_t capability_t;
 
 struct capability_binding {
 	uint8_t access;

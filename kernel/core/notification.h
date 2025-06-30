@@ -1,11 +1,10 @@
 #ifndef NOTIFICATION_H_
 #define NOTIFICATION_H_
 
-#include <core/scheduler/thread.h>
+#include <core/sched.h>
 #include <core/events.h>
 
 #include <aria/lock.h>
-#include <aria/notification.h>
 #include <aria/vector.h>
 
 #define NOTIFICATION_MAX 32

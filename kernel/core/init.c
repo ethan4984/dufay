@@ -1,15 +1,10 @@
-#include "arch/x86/cpu.h"
-#include <arch/x86/smp.h>
-#include <arch/x86/paging.h>
-
 #include <core/init.h>
 #include <core/debug.h>
 #include <core/elf.h>
-#include <core/memory/physical.h>
+#include <mm/physical.h>
 
 #include <aria/debug.h>
-#include <aria/notification.h>
-#include <aria/string.h>
+#include <aria/base.h>
 #include <aria/compiler.h>
 
 static volatile struct limine_module_request limine_module_request = {
@@ -17,6 +12,7 @@ static volatile struct limine_module_request limine_module_request = {
 	.revision = 0
 };
 
+#if 0
 struct tgroup tgroup_system;
 
 static int launch_server(const char *, struct thread *, void *, int);
@@ -38,9 +34,6 @@ int launch_init(void)
 {
 	if (limine_module_request.response == NULL)
 		RETURN_ERROR;
-
-	struct limine_file **modules = limine_module_request.response->modules;
-	int module_count = limine_module_request.response->module_count;
 
 	struct thread *thread_init;
 	int ret = create_thread(TGID_SYSTEM, &thread_init);
@@ -80,7 +73,6 @@ struct thread *new_kernel_thread(uintptr_t entry)
 
 	struct context *context = alloc(sizeof(struct context));
 
-	context->fpu_thread = alloc(CORE_LOCAL->fpu_thread_size);
 	context->stack = ustack;
 	context->thread = thread;
 	context->etrigger = alloc(sizeof(struct etrigger));
@@ -90,14 +82,13 @@ struct thread *new_kernel_thread(uintptr_t entry)
 
 	thread->context_top = context;
 
-	context->regs.rip = entry;
-	context->regs.cs = 0x28; // kernel code segment
-	context->regs.rflags = 0x202;
-	context->regs.ss = 0x30; // kernel data segment
-	context->regs.rsp = ustack->kernel_stack.sp;
+	arch_context_init(&context->arch_context, entry, ustack->kernel_stack.sp,
+					  false);
 
+#if defined(__amd64__)
 	thread->user_fs_base = rdmsr(MSR_FS_BASE);
 	thread->user_gs_base = rdmsr(MSR_GS_BASE);
+#endif
 
 	thread->address_space = &kernel_mappings;
 
@@ -184,9 +175,6 @@ finish:
 	if (context == NULL)
 		RETURN_ERROR;
 
-	context->fpu_thread = alloc(CORE_LOCAL->fpu_thread_size);
-	if (context->fpu_thread == NULL)
-		RETURN_ERROR;
 	context->stack = ustack;
 	context->thread = thread;
 	context->etrigger = alloc(sizeof(struct etrigger));
@@ -206,11 +194,6 @@ finish:
 	if (ret == -1)
 		RETURN_ERROR;
 
-	context->regs.rip = elf->aux.at_entry;
-	context->regs.cs = 0x43;
-	context->regs.rflags = 0x202;
-	context->regs.ss = 0x3b;
-
 	uintptr_t stack_physical =
 		pmm_alloc(context->stack->user_stack.sp / PAGE_SIZE, 1) +
 		SERVER_DEFAULT_STACK_SIZE;
@@ -219,27 +202,30 @@ finish:
 	uintptr_t stack_virtual = context->stack->user_stack.sp;
 
 	for (size_t i = 0; i < SERVER_DEFAULT_STACK_SIZE / PAGE_SIZE; i++) {
-		thread->address_space->page_table->map_page(
-			thread->address_space->page_table, stack_virtual - PAGE_SIZE * i,
-			stack_physical - PAGE_SIZE * i,
-			X86_FLAGS_P | X86_FLAGS_RW | X86_FLAGS_US);
+		pmap_map(thread->address_space->page_table->pmap,
+				 stack_virtual - PAGE_SIZE * i, stack_physical - PAGE_SIZE * i,
+				 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_USER, 0);
 	}
 
-	char *location = (void *)(stack_physical + HIGH_VMA);
+	char *location = (void *)(P2V(stack_physical));
 
 	if (arg) {
 		location = (void *)(((uintptr_t)location - arg_length) & ~15);
 		memcpy(location, arg, arg_length);
-		context->regs.rdi =
-			stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
+
+		arch_context_set_arg(&context->arch_context,
+							 stack_virtual - (stack_physical - V2P(location)));
 	}
 
 	location = (void *)((uint64_t)location & -16ll);
-	context->regs.rsp =
-		stack_virtual - (stack_physical - ((uint64_t)location - HIGH_VMA));
+
+	arch_context_init(&context->arch_context, elf->aux.at_entry,
+					  stack_virtual - (stack_physical - V2P(location)), true);
 
 	return 0;
 }
+
+#endif
 
 struct limine_file *limine_search_module(const char *identifier)
 {

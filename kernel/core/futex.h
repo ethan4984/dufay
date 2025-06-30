@@ -14,4 +14,7 @@ struct futex {
 	int refcnt;
 };
 
+constexpr int FUTEX_WAIT = 1;
+constexpr int FUTEX_WAKE = 2;
+
 #endif
