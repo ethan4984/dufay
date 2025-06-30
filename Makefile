@@ -120,7 +120,6 @@ endif
 	mformat -i $(DISK_IMAGE)@@1M
 	mmd -i $(DISK_IMAGE)@@1M ::/EFI ::/EFI/BOOT ::/boot ::/boot/limine
 	mcopy -i $(DISK_IMAGE)@@1M kernel/build/fuga ::/boot
-	mcopy -i $(DISK_IMAGE)@@1M kernel/build/fuga ::/boot
 	mcopy -i $(DISK_IMAGE)@@1M limine.cfg ::/boot/limine
 ifeq ($(ARCH),x86_64)
 	mcopy -i $(DISK_IMAGE)@@1M limine/limine-bios.sys ::/boot/limine
