@@ -10,6 +10,7 @@
 #define HUGE_PAGE_SIZE (1 << 30) // 1GB
 
 #define KERNEL_HIGH_VMA 0xffffffff80000000
+#define HZ 100
 
 extern uint64_t HIGH_VMA;
 
@@ -40,5 +41,12 @@ struct arch_thread_context {
 	struct registers regs;
 	void *fpu_thread;
 };
+
+typedef enum : uint8_t {
+	IPL_ZERO = 0, /* All interrupts enabled */
+	IPL_DISPATCH = 1, /* Preemption disabled */
+	IPL_DEVICE = 13, /* Device interrupts disabled */
+	IPL_HIGH = 15, /* All interrupts disabled */
+} ipl_t;
 
 #endif

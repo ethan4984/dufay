@@ -10,3 +10,10 @@ src += files('apic.c',
 'isr.asm', 
 'syscall.asm',
 'thread.asm')
+
+
+c_args += '-mcmodel=kernel'
+
+add_languages('nasm')
+
+linker_script = join_paths(meson.current_source_dir(), 'linker.ld')

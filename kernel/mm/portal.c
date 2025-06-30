@@ -111,7 +111,7 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 			uintptr_t misalignment = addr & (PAGE_SIZE - 1);
 			uintptr_t vaddr = addr - misalignment;
 
-			invlpg(vaddr);
+			pmap_tlb_flush(vaddr);
 
 			struct page *page = NULL;
 			if ((root->type & PORTAL_REQ_SHARE) == PORTAL_REQ_SHARE) {
@@ -228,7 +228,7 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 	(*page->refcnt)--;
 
 	*pmle = original_frame | (*pmle & 0x1ff) | X86_FLAGS_RW;
-	invlpg(addr);
+	pmap_tlb_flush(addr);
 
 	page->frame->paddr = new_frame;
 	page->refcnt = alloc(sizeof(page->refcnt));

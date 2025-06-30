@@ -1,4 +1,4 @@
-project('fuga', ['c', 'nasm'], default_options: ['c_std=gnu23', 'warning_level=2', 'buildtype=debugoptimized'])
+project('fuga', 'c', default_options: ['c_std=gnu23', 'warning_level=2', 'buildtype=debugoptimized'])
 
 c_args = [
     '-D__DUFAY__',
@@ -8,7 +8,6 @@ c_args = [
     '-nostdlib',
     '-ffreestanding',
     '-fsanitize=undefined',
-    '-mcmodel=kernel',
 ]
 
 
@@ -39,4 +38,7 @@ subdir('arch')
 subdir('acpi')
 subdir('mm')
 
-executable('fuga', src, include_directories: inc, c_args: c_args, dependencies: dep)
+
+executable('fuga', src, include_directories: inc, c_args: c_args, dependencies: dep,
+  link_args: '-Wl,-T@0@'.format(linker_script),
+          )

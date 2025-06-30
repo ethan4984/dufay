@@ -1,6 +1,5 @@
-#include "arch/amd64/port.h"
-#include "core/ipl.h"
-#include "core/lock.h"
+#include <core/ipl.h>
+#include <core/lock.h>
 #include <arch/port.h>
 #include <core/cpu.h>
 #include <core/sched.h>

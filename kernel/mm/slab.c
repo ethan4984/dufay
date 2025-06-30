@@ -2,7 +2,6 @@
 
 #include <aria/debug.h>
 #include <aria/base.h>
-#include <sys/mman.h>
 #include <aria/dictionary.h>
 #include <aria/compiler.h>
 

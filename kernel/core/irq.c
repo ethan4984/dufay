@@ -1,8 +1,7 @@
 #include "mm/virtual.h"
 #include <arch/amd64/paging.h>
-#include <arch/amd64/smp.h>
-#include <arch/amd64/idt.h>
 
+#include <core/cpu.h>
 #include <core/irq.h>
 #include <core/debug.h>
 #include <core/syscall.h>
@@ -13,6 +12,10 @@
 #include <aria/compiler.h>
 #include <aria/base.h>
 #include <aria/dictionary.h>
+
+#ifdef __x86_64__
+#include <arch/amd64/idt.h>
+#endif
 
 static struct aslr aslr_irq = { .layout = NULL,
 								.minimum_vaddr = 0xffffe00000000000,
@@ -130,8 +133,10 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (ret == -1)
 		RETURN_ERROR;
 
+#ifdef __x86_64__
 	ret = idt_instantiate_vector(vector, (void *)cortex->elf->aux.at_entry,
 								 &cortex->anchor_root, cortex);
+#endif
 	if (ret == -1)
 		RETURN_ERROR;
 

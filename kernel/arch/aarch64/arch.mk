@@ -1,1 +1,0 @@
-ARCHCFLAGS = -target arm64-unknown-elf -mgeneral-regs-only
