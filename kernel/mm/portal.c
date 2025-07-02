@@ -122,7 +122,7 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 				}
 
 				size_t page_index = (vaddr - root->base) / PAGE_SIZE;
-				if (page_index >= orb->page_cnt) {
+				if (page_index >= (size_t)orb->page_cnt) {
 					print("DUFAY: page index out of bounds\n");
 					RETURN_ERROR;
 				}
@@ -180,18 +180,18 @@ next:
 static int portal_fault_share(struct page_table *page_table, uint64_t *pmle,
 							  uintptr_t addr)
 {
-	page_table;
-	pmle;
-	addr;
+	(void)page_table;
+	(void)pmle;
+	(void)addr;
 	RETURN_ERROR;
 }
 
 static int portal_fault_sp(struct page_table *page_table, uint64_t *pmle,
 						   uintptr_t addr)
 {
-	page_table;
-	pmle;
-	addr;
+	(void)page_table;
+	(void)pmle;
+	(void)addr;
 	RETURN_ERROR;
 }
 
@@ -209,7 +209,7 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 
 	uint64_t original_frame = *pmle & ~(0xfff);
 	uint64_t new_frame = ({
-		uint64_t frame;
+		uint64_t frame = 0;
 		if (*page->refcnt <= 1)
 			frame = original_frame;
 		else {
@@ -249,7 +249,10 @@ static int portal_handle_direct(struct portal *portal, struct portal_req *req,
 	uintptr_t paddr = req->morphology.paddr;
 	uintptr_t vaddr = req->morphology.addr;
 
-	for (size_t i = 0; i < page_cnt; i++) {
+	(void)paddr;
+	(void)vaddr;
+
+	for (int i = 0; i < page_cnt; i++) {
 		struct page *page = alloc(sizeof(struct page));
 		if (page == NULL)
 			RETURN_ERROR;
@@ -282,7 +285,7 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 	if (paddr) {
 		permissions |= X86_FLAGS_P;
 
-		for (size_t i = 0; i < req->morphology.pcnt; i++) {
+		for (int i = 0; i < req->morphology.pcnt; i++) {
 			pmap_map(portal->page_table->pmap, vaddr + i * PAGE_SIZE,
 					 paddr + i * PAGE_SIZE,
 					 (req->prot | VM_PROT_USER) & ~VM_PROT_PRESENT, 0);
@@ -296,7 +299,7 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 		}
 	}
 
-	for (size_t i = 0; i < req->morphology.pcnt; i++) {
+	for (int i = 0; i < req->morphology.pcnt; i++) {
 		struct page *page = alloc(sizeof(struct page));
 		if (page == NULL)
 			RETURN_ERROR;
@@ -333,6 +336,8 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 	int ret = dictionary_search(&portal_gateway_map,
 								(void *)req->share.identifier,
 								strlen(req->share.identifier), (void **)&orb);
+
+	(void)ret;
 
 	if (orb == NULL && !req->share.create)
 		RETURN_ERROR;
@@ -427,11 +432,14 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 		paddr = page->frame->paddr;
 map:
 		uint64_t permissions = portal_translate_protections(req->prot);
+		(void)permissions;
 
 		pmap_map(portal->page_table->pmap, vaddr, paddr, req->prot, 0);
 		vaddr += PAGE_SIZE;
 	}
 	struct portal_link *link = (void *)req->morphology.addr;
+
+	(void)link;
 
 	portal->orb = orb;
 	portal->type |= PORTAL_REQ_SHARE;
@@ -446,7 +454,7 @@ static struct portal *portal_copy_tree(struct page_table *source_table,
 	if (source_table == NULL || root == NULL)
 		return NULL;
 
-	if (base == -1 && limit == -1) {
+	if (base == -1UL && limit == -1UL) {
 		struct portal *region = alloc(sizeof(struct portal));
 		if (unlikely(region == NULL))
 			return NULL;
@@ -458,7 +466,8 @@ static struct portal *portal_copy_tree(struct page_table *source_table,
 			portal_copy_tree(source_table, root->right, base, limit);
 
 		return region;
-	} else if ((base == -1 && limit != -1) || (base != -1 && limit == -1))
+	} else if ((base == -1UL && limit != -1UL) ||
+			   (base != -1UL && limit == -1UL))
 		return NULL;
 
 	struct portal *src_portal = ({
@@ -516,12 +525,12 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 	struct page_table *destination_table =
 		destination_address_space->page_table;
 
-	if ((req->cow.source.base == -1 && req->cow.destination.base != -1) ||
-		(req->cow.source.base != -1 && req->cow.destination.base == -1))
+	if ((req->cow.source.base == -1UL && req->cow.destination.base != -1UL) ||
+		(req->cow.source.base != -1UL && req->cow.destination.base == -1UL))
 		return -1;
 
-	if (req->cow.source.base == -1 && req->cow.destination.base == -1) {
-		for (int i = 0; i < source_table->pages->capacity; i++) {
+	if (req->cow.source.base == -1UL && req->cow.destination.base == -1UL) {
+		for (size_t i = 0; i < source_table->pages->capacity; i++) {
 			__label__ skip;
 			struct page *src_page = source_table->pages->data[i];
 			if (src_page == NULL)
@@ -563,7 +572,7 @@ skip:
 		uintptr_t dest_vaddr = req->cow.destination.base;
 		uintptr_t src_vaddr = req->cow.source.base;
 
-		for (int i = 0; i < DIV_ROUNDUP(req->cow.limit, PAGE_SIZE); i++) {
+		for (size_t i = 0; i < DIV_ROUNDUP(req->cow.limit, PAGE_SIZE); i++) {
 			__label__ skip;
 			struct page *src_page;
 			int ret = dictionary_search(source_table->pages, &src_vaddr,
@@ -697,7 +706,7 @@ void portal_destroy(struct portal *portal)
 	portal_destroy(portal->left);
 	portal_destroy(portal->right);
 
-	for (int i = 0; i < portal->pages->capacity; i++) {
+	for (size_t i = 0; i < portal->pages->capacity; i++) {
 		struct page *page = portal->pages->data[i];
 
 		if (page) {

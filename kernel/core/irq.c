@@ -42,7 +42,7 @@ int irq_cortex_resolve_fault(uintptr_t faulting_address, uint64_t error_code)
 		RETURN_ERROR;
 
 	struct irq_cortex *cortex;
-	for (int i = 0; i < cortex_table.capacity; i++) {
+	for (size_t i = 0; i < cortex_table.capacity; i++) {
 		cortex = cortex_table.data[i];
 		if (cortex == NULL)
 			continue;

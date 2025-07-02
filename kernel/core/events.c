@@ -93,6 +93,8 @@ int equeue_block(struct equeue *equeue, struct etrigger **waking_object)
 {
 	panic("not impl");
 
+	(void)equeue;
+	(void)waking_object;
 #if 0
 	if (equeue == NULL)
 		RETURN_ERROR;

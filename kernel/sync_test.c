@@ -177,6 +177,11 @@ static void thread_test()
 
 void do_sync_test()
 {
+	(void)mutex_test;
+	(void)thread_test;
+	(void)sem_test;
+	(void)timer_test;
+
 	ipl_t ipl = ipldispatch();
 #ifdef DO_MUTEX_TEST
 	mutex_test();

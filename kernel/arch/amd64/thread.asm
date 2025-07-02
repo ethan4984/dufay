@@ -14,7 +14,7 @@ amd64_context_switch:
     mov rax, rdi   ; Save prev thread in rax
 
     xor rbx, rbx            
-    lock xchg [rdi+72], rbx   ; Unlock previous thread
+    xchg [rdi+72], rbx   ; Unlock previous thread
 
     ; Restore next thread's registers
     pop rbp
