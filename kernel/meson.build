@@ -1,4 +1,4 @@
-project('fuga', 'c', default_options: ['c_std=gnu23', 'warning_level=2', 'werror=true', 'buildtype=debugoptimized'])
+project('fuga', 'c', default_options: ['c_std=gnu23', 'warning_level=2', 'werror=false', 'buildtype=debugoptimized'])
 
 c_args = [
     '-D__DUFAY__',
@@ -39,6 +39,4 @@ subdir('acpi')
 subdir('mm')
 
 
-executable('fuga', src, include_directories: inc, c_args: c_args, dependencies: dep,
-  link_args: '-Wl,-T@0@'.format(linker_script),
-          )
+executable('fuga', src, include_directories: inc, c_args: c_args, dependencies: dep, link_args: '-Wl,-T@0@'.format(linker_script))

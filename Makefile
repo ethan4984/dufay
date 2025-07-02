@@ -1,52 +1,32 @@
 DISK_IMAGE = fuga.img
-ISO_IMAGE = fuga.iso
-INITRAMFS = initramfs.tar
 BUILD = build
 
-ARCH = x86_64
+ARCH ?= x86_64
 
 .PHONY: all
-all: kernel
+all: kernel build_servers
 
 #-object memory-backend-ram,id=mem0,size=1024M -numa node,memdev=mem0,nodeid=0,cpus=0\
 #-object memory-backend-ram,id=mem1,size=1024M -numa node,memdev=mem1,nodeid=1,cpus=1\
 #	-numa dist,src=0,dst=1,val=15\
 #	-numa dist,src=1,dst=0,val=15
 
-QEMUFLAGS = \
+QEMUFLAGS_BASE = -drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).fd,readonly=on \
+-no-reboot \
+-no-shutdown 
+
+QEMUFLAGS-x86_64 = \
 	-m 2G \
 	-smp 2\
 	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
 	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
 	-device intel-iommu,aw-bits=48 \
 	-machine type=q35 \
+	-enable-kvm \
+	-serial stdio \
 	-cpu host,migratable=no,+invtsc
 
-QEMUFLAGS_ISO = \
-	-m 2G \
-	-smp 2 \
-	-cdrom $(ISO_IMAGE) \
-	-boot d \
-	-machine type=q35,accel=kvm \
-	-drive file=disk.img,if=none,id=nvme0,format=raw \
-	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
-	-cpu host,migratable=no,+invtsc
-
-.PHONY: run
-run: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
-	qemu-system-$(ARCH) $(QEMUFLAGS) -drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).fd,readonly=on -enable-kvm -serial stdio -no-reboot -no-shutdown
-
-.PHONY: run_initrd
-run_initrd: $(ISO_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS_ISO) -enable-kvm -serial stdio -display none
-
-.PHONY: console
-console: $(DISK_IMAGE)
-	qemu-system-x86_64 $(QEMUFLAGS) -enable-kvm -no-reboot -monitor stdio -d int -D qemu.log -no-shutdown -display none
-
-.PHONY: run-aarch64
-run-aarch64: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
-	qemu-system-$(ARCH) \
+QEMUFLAGS-aarch64 = \
 		-M virt \
 		-cpu cortex-a72 \
 		-device ramfb \
@@ -54,8 +34,15 @@ run-aarch64: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
 		-device usb-kbd \
 		-device usb-mouse \
 		-serial stdio\
-		-drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).fd,readonly=on \
 		-hda $(DISK_IMAGE)
+
+.PHONY: run
+run: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
+	qemu-system-$(ARCH) $(QEMUFLAGS-$(ARCH)) $(QEMUFLAGS_BASE)
+
+.PHONY: console
+console: $(DISK_IMAGE)
+	qemu-system-$(ARCH) $(QEMUFLAGS-$(ARCH)) $(QEMUFLAGS_BASE) -monitor stdio -d int -D qemu.log -no-shutdown -display none
 
 ovmf/ovmf-code-$(ARCH).fd:
 	mkdir -p ovmf
@@ -64,7 +51,6 @@ ovmf/ovmf-code-$(ARCH).fd:
 		aarch64) dd if=/dev/zero of=$@ bs=1 count=0 seek=67108864 2>/dev/null;; \
 		riscv64) dd if=/dev/zero of=$@ bs=1 count=0 seek=33554432 2>/dev/null;; \
 	esac
-
 
 $(BUILD):
 	mkdir -p $@
@@ -91,23 +77,6 @@ limine:
 kernel:
 	$(MAKE) -C kernel
 
-$(INITRAMFS):
-	cd build/system-root/ && tar -c --format=posix -f ../../initramfs.tar .
-
-$(ISO_IMAGE): $(BUILD) $(INITRAMFS) limine kernel build_servers 
-	rm -rf fuga.iso
-	rm -rf disk_image
-	mkdir disk_image
-	mkdir disk_image/boot
-	mkdir disk_image/servers/
-	$(MAKE) -C servers install DEST=$(CURDIR)/disk_image/servers
-	cp kernel/build/fuga initramfs.tar limine/limine-bios-cd.bin limine/limine-uefi-cd.bin limine/limine-bios.sys limine.cfg disk_image/boot
-	xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table --efi-boot boot/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label disk_image -o fuga.iso
-	./limine/limine bios-install fuga.iso
-	dd if=/dev/zero bs=1M count=0 seek=512 of=disk.img
-	parted -s disk.img mklabel msdos
-	parted -s disk.img mkpart primary 1 100%
-
 $(DISK_IMAGE): $(BUILD) limine kernel build_servers
 	rm -f $(DISK_IMAGE)
 	dd if=/dev/zero bs=1M count=0 seek=64 of=$(DISK_IMAGE)
@@ -130,12 +99,10 @@ ifeq ($(ARCH),aarch64)
 	mcopy -i $(DISK_IMAGE)@@1M limine/BOOTAA64.EFI ::/EFI/BOOT
 endif
 
-rebuild_mlibc:
-	cd build && xbstrap install mlibc --rebuild
 
 .PHONY: clean
 clean:
-	rm -rf $(DISK_IMAGE) $(INITRAMFS) $(ISO_IMAGE) disk_image disk.img serial.log qemu.log
+	rm -rf $(DISK_IMAGE) serial.log qemu.log
 	$(MAKE) -C kernel clean
 	$(MAKE) -C servers clean
 
