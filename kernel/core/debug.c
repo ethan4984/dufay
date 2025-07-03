@@ -33,8 +33,6 @@ void print_unlocked(const char *str, ...)
 	npf_pprintf(&putc, NULL, "FUGA: [KERNEL] ");
 	npf_vpprintf(&putc, NULL, str, arg);
 
-	npf_vpprintf(&putc, NULL, str, arg);
-
 	va_end(arg);
 }
 
