@@ -233,8 +233,13 @@ static void rcu_test()
 
 	global_data->value = 69;
 
-	ENQUEUE_FUNCTION(rcu_reader);
-	ENQUEUE_FUNCTION(rcu_writer);
+	for (int i = 0; i < 2; i++) {
+		ENQUEUE_FUNCTION(rcu_writer);
+	}
+
+	for (int i = 0; i < 2; i++) {
+		ENQUEUE_FUNCTION(rcu_reader);
+	}
 }
 
 #define DO_RCU_TEST 1

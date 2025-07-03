@@ -14,7 +14,8 @@ struct rcu_state {
 	size_t cur_generation; /* Current generation number */
 	size_t max_generation; /* Highest requested generation */
 
-	_Atomic uint64_t bitmask; /* FIXME: Find a way to handle more than 64 CPUs? */
+	_Atomic uint64_t
+		bitmask; /* FIXME: Find a way to handle more than 64 CPUs? (Tree RCU) */
 };
 
 struct rcu_head {

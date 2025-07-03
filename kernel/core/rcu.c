@@ -14,7 +14,7 @@
 TAILQ_HEAD(rcu_head_list, rcu_head);
 
 struct rcu_state rcu_global_state = {
-	.lock.lock = 0,
+	.lock = SPINLOCK_INITIALIZER,
 	.cur_generation = 0,
 	.max_generation = 0,
 	.bitmask = 0,
