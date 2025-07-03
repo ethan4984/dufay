@@ -1,3 +1,4 @@
+#include "core/rcu.h"
 #include <core/ipl.h>
 #include <core/mutex.h>
 #include <core/semaphore.h>
@@ -6,6 +7,7 @@
 #include <aria/base.h>
 #include <aria/debug.h>
 #include <core/timer.h>
+#include <mm/slab.h>
 #include <core/cpu.h>
 
 /*
@@ -173,7 +175,69 @@ static void thread_test()
 	ENQUEUE_FUNCTION(td8);
 }
 
-#define DO_TIMER_TEST 1
+struct my_data {
+	int value;
+	struct rcu_head rcu;
+};
+
+static struct my_data *global_data;
+
+static void rcu_reader()
+{
+	struct ktimer timer;
+
+	for (;;) {
+		timer_init(&timer, "a");
+		ipl_t ipl = rcu_read_lock();
+
+		print("Reader: read %d\n", global_data->value);
+
+		rcu_read_unlock(ipl);
+
+		timer_start(&timer, 200000 * 1000);
+
+		wait_one(&timer.hdr, -1);
+	}
+}
+
+static int lol = 0;
+
+static void rcu_writer()
+{
+	struct ktimer timer;
+	for (;;) {
+		timer_init(&timer, "a");
+		struct my_data *new_data = kmem_malloc(sizeof(struct my_data));
+
+		new_data->value = ++lol;
+
+		rcu_assign_pointer(global_data, new_data);
+
+		print("Writer: updated to %d\n", new_data->value);
+
+		synchronize_rcu();
+
+		kmem_free(new_data);
+
+		print("Writer: freed old data\n");
+
+		timer_start(&timer, 200000 * 1000);
+
+		wait_one(&timer.hdr, -1);
+	}
+}
+
+static void rcu_test()
+{
+	global_data = kmem_malloc(sizeof(struct my_data));
+
+	global_data->value = 69;
+
+	ENQUEUE_FUNCTION(rcu_reader);
+	ENQUEUE_FUNCTION(rcu_writer);
+}
+
+#define DO_RCU_TEST 1
 
 void do_sync_test()
 {
@@ -181,6 +245,7 @@ void do_sync_test()
 	(void)thread_test;
 	(void)sem_test;
 	(void)timer_test;
+	(void)rcu_test;
 
 	ipl_t ipl = ipldispatch();
 #ifdef DO_MUTEX_TEST
@@ -191,6 +256,8 @@ void do_sync_test()
 	timer_test();
 #elif defined(DO_THREAD_TEST)
 	thread_test();
+#elif defined(DO_RCU_TEST)
+	rcu_test();
 #endif
 	ipl_lower(ipl);
 }

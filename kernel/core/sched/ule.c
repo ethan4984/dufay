@@ -1,3 +1,4 @@
+#include "core/rcu.h"
 #include <core/ipl.h>
 #include <core/lock.h>
 #include <arch/port.h>
@@ -471,6 +472,8 @@ void sched_switch(struct thread *cur, struct thread *next)
 	cpu->current_thread_status = ((next->priority & 0x7F) << 1) |
 								 (next->interactive);
 
+	rcu_enter_quiescent();
+
 	thread_switch(cur, next);
 }
 
@@ -720,6 +723,8 @@ void sched_cpu_init()
 	if (CORE_LOCAL->core_id == 0) {
 		dpc_init(&CORE_LOCAL->balance_dpc, balance_load);
 	}
+
+	rcu_init();
 }
 
 void sched_ready(struct thread *td)

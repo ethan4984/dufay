@@ -13,6 +13,7 @@
 #include <arch/port.h>
 #include <core/ipl.h>
 #include <core/dpc.h>
+#include <core/rcu.h>
 
 enum preemption_reason : uint8_t {
 	PREEMPT_NONE, /* Dummy value to avoid quantum end to be set when = 0 */
@@ -47,6 +48,7 @@ struct cpu_local {
 
 	struct dpc timer_dpc; /* Timer expiry DPC */
 	struct dpc balance_dpc; /* Load balancing DPC */
+	struct dpc rcu_dpc; /* RCU DPC */
 
 	struct sched_percpu sched_data; /* Per-CPU scheduler data */
 
@@ -57,6 +59,8 @@ struct cpu_local {
 
 	TAILQ_HEAD(, dpc) dpc_queue; /* Queue of DPCs on this CPU */
 	struct spinlock dpc_queue_lock;
+
+	struct rcu_cpu rcu; /* RCU data for this CPU */
 };
 
 extern size_t logical_processor_cnt;

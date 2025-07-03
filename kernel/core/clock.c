@@ -1,3 +1,4 @@
+#include <core/rcu.h>
 #include <core/dpc.h>
 #include <core/clock.h>
 #include <core/cpu.h>
@@ -38,6 +39,8 @@ void hardclock()
 	if (timer_expired) {
 		dpc_enqueue(&CORE_LOCAL->timer_dpc, NULL, NULL);
 	}
+
+	rcu_check();
 
 #if defined(CONFIG_SCHED_ULE)
 	/* Balance work on cpu0 */

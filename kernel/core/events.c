@@ -19,24 +19,20 @@ void event_init(struct event *event, const char *name, bool notification)
 
 void event_signal(struct event *event)
 {
-	spinlock_irqsave(&event->hdr.lock);
+	ipl_t ipl = spinlock_acquire(&event->hdr.lock);
 
 	/* Event was already signaled */
 	if (event->hdr.signaled_count > 0) {
-		spinrelease_irqsave(&event->hdr.lock);
+		spinlock_release(&event->hdr.lock, ipl);
 		return;
 	}
 
-	/* Try to satisfy waits */
-	struct thread *ret = try_satisfy_dispatch_object(&event->hdr);
+	event->hdr.signaled_count = 1;
 
-	if (!ret) {
-		/*
-		 * If this is a synchronization object, no one is waiting for us.
-		 * If this is a notification object, just keep the signaled count high
-		 */
-		event->hdr.signaled_count = 1;
-	}
+	/* Try to satisfy waits */
+	try_satisfy_dispatch_object(&event->hdr);
+
+	spinlock_release(&event->hdr.lock, ipl);
 }
 
 int equeue_wake(struct etrigger *etrigger, struct context *waking_context)

@@ -18,6 +18,7 @@ src += files('bcache.c', 'capability.c',
     'dpc.c',
     'clock.c',
     'thread.c',
+    'rcu.c',
     )
 
 subdir('sched')
