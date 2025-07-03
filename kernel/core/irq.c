@@ -1,4 +1,6 @@
-#include "mm/virtual.h"
+#include <mm/virtual.h>
+#include <mm/slab.h>
+
 #include <arch/amd64/paging.h>
 
 #include <core/cpu.h>
@@ -58,7 +60,7 @@ found:
 	if (pml_entry == NULL)
 		RETURN_ERROR;
 
-	struct page *page = alloc(sizeof(struct page));
+	struct page *page = kmem_zalloc(sizeof(struct page));
 	if (unlikely(page == NULL))
 		RETURN_ERROR;
 
@@ -68,7 +70,7 @@ found:
 	page->frame = NULL;
 	//page->pmle = page_table->map_page(
 	//page_table, faulting_page, *pml_entry & ~(0xfff), *pml_entry & 0xfff);
-	page->refcnt = alloc(sizeof(*page->refcnt));
+	page->refcnt = kmem_zalloc(sizeof(*page->refcnt));
 
 	int ret = dictionary_push(page_table->pages, &page->vaddr, page,
 							  sizeof(page->vaddr));
@@ -86,7 +88,7 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (identifier == NULL)
 		RETURN_ERROR;
 
-	struct irq_cortex *cortex = alloc(sizeof(struct irq_cortex));
+	struct irq_cortex *cortex = kmem_zalloc(sizeof(struct irq_cortex));
 	if (cortex == NULL)
 		RETURN_ERROR;
 
@@ -94,7 +96,7 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	if (module == NULL)
 		RETURN_ERROR;
 
-	cortex->elf = alloc(sizeof(struct elf64_file));
+	cortex->elf = kmem_zalloc(sizeof(struct elf64_file));
 	if (cortex->elf == NULL)
 		RETURN_ERROR;
 
@@ -111,7 +113,7 @@ static int irq_cortex_instantiate(const char *path, const char *identifier,
 	cortex->elf->private = file_buffer;
 
 	cortex->elf->aslr = &aslr_irq;
-	cortex->identifier = alloc(strlen(identifier) + 1);
+	cortex->identifier = kmem_zalloc(strlen(identifier) + 1);
 	strcpy((void *)cortex->identifier, identifier);
 
 	int ret = elf64_file_init(cortex->elf);
@@ -157,7 +159,7 @@ static int irq_cortex_anchor(const char *identifier, struct anchor *anchor)
 	cortex->flush = true;
 	{
 		struct anchor *tmp = anchor;
-		anchor = alloc(sizeof(struct anchor));
+		anchor = kmem_zalloc(sizeof(struct anchor));
 		*anchor = *tmp;
 	}
 

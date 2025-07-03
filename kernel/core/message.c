@@ -7,12 +7,12 @@
 #include <core/message.h>
 #include <core/object.h>
 
+#include <mm/slab.h>
+
 #include <aria/debug.h>
-#include <aria/slab.h>
 #include <aria/base.h>
 
 #include <sys/queue.h>
-#include <mm/slab.h>
 
 static struct port *lookup_port(capability_t port, struct thread *ctx,
 								uint8_t *rights)
@@ -60,7 +60,7 @@ int message_init()
 
 int message_send(struct message_header *message, struct thread *thread)
 {
-	struct kernel_message *msg = kmem_malloc(sizeof(struct kernel_message));
+	struct kernel_message *msg = kmem_alloc(sizeof(struct kernel_message));
 	if (msg == NULL)
 		RETURN_ERROR;
 	uint8_t dest_rights = 0, reply_rights = 0;
@@ -78,7 +78,7 @@ int message_send(struct message_header *message, struct thread *thread)
 		!(dest_rights & PORT_RIGHT_SEND_ONCE))
 		RETURN_ERROR;
 
-	msg->header = kmem_malloc(message->size);
+	msg->header = kmem_alloc(message->size);
 	if (msg->header == NULL)
 		RETURN_ERROR;
 

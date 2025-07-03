@@ -1,10 +1,10 @@
 #include <arch/amd64/port.h>
-#include <mm/address.h>
 #include <arch/port.h>
-
 #include <arch/amd64/paging.h>
 #include <arch/amd64/cpu.h>
 
+#include <mm/address.h>
+#include <mm/slab.h>
 #include <mm/physical.h>
 #include <mm/virtual.h>
 
@@ -348,7 +348,7 @@ void pmap_init_kernel(void)
 
 struct pmap *pmap_new(void)
 {
-	struct pmap *pmap = alloc(sizeof(struct pmap));
+	struct pmap *pmap = kmem_zalloc(sizeof(struct pmap));
 	if (!pmap) {
 		REPORT_ERROR;
 		panic("Failed to allocate page map");

@@ -22,7 +22,7 @@ int vmm_default_table(struct page_table *page_table)
 	if (page_table == NULL)
 		RETURN_ERROR;
 
-	page_table->pages = alloc(sizeof(struct dictionary));
+	page_table->pages = kmem_zalloc(sizeof(struct dictionary));
 	if (page_table->pages == NULL)
 		RETURN_ERROR;
 
@@ -84,7 +84,7 @@ int vmm_unmap_range(struct page_table *page_table, uint64_t vaddr, uint64_t cnt)
 
 int vmm_init(void)
 {
-	kernel_mappings.page_table = alloc(sizeof(struct page_table));
+	kernel_mappings.page_table = kmem_zalloc(sizeof(struct page_table));
 
 	if (kernel_mappings.page_table == NULL)
 		RETURN_ERROR;
@@ -132,7 +132,7 @@ int vmm_init(void)
 		phys += max_page_size;
 	}
 
-	kernel_mappings.page_table->pages = alloc(sizeof(struct dictionary));
+	kernel_mappings.page_table->pages = kmem_zalloc(sizeof(struct dictionary));
 
 	spinrelease(&kernel_mappings.lock);
 

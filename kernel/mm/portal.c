@@ -7,6 +7,7 @@
 #include <core/debug.h>
 #include <mm/virtual.h>
 #include <mm/address.h>
+#include <mm/slab.h>
 
 #include <aria/compiler.h>
 #include <aria/circular_queue.h>
@@ -130,7 +131,7 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 				page = orb->pages + page_index;
 
 				if (page->frame == NULL) {
-					page->frame = alloc(sizeof(struct frame));
+					page->frame = kmem_zalloc(sizeof(struct frame));
 					if (page->frame == NULL)
 						RETURN_ERROR;
 
@@ -142,11 +143,11 @@ static int portal_fault_anon(struct page_table *page_table, uint64_t *,
 				} else
 					page->frame->refcnt++;
 			} else {
-				page = alloc(sizeof(struct page));
+				page = kmem_zalloc(sizeof(struct page));
 				if (page == NULL)
 					RETURN_ERROR;
 
-				page->frame = alloc(sizeof(struct frame));
+				page->frame = kmem_zalloc(sizeof(struct frame));
 				if (page->frame == NULL)
 					RETURN_ERROR;
 				page->frame->paddr = pmm_alloc(1, 1);
@@ -213,7 +214,7 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 		if (*page->refcnt <= 1)
 			frame = original_frame;
 		else {
-			page->frame = alloc(sizeof(struct frame));
+			page->frame = kmem_zalloc(sizeof(struct frame));
 			if (page->frame == NULL)
 				RETURN_ERROR;
 			new_frame = pmm_alloc(1, 1);
@@ -231,7 +232,7 @@ static int portal_fault_cow(struct page_table *page_table, uint64_t *pmle,
 	pmap_tlb_flush(addr);
 
 	page->frame->paddr = new_frame;
-	page->refcnt = alloc(sizeof(page->refcnt));
+	page->refcnt = kmem_zalloc(sizeof(page->refcnt));
 	if (page->refcnt == NULL)
 		RETURN_ERROR;
 	*page->refcnt = 1;
@@ -253,7 +254,7 @@ static int portal_handle_direct(struct portal *portal, struct portal_req *req,
 	(void)vaddr;
 
 	for (int i = 0; i < page_cnt; i++) {
-		struct page *page = alloc(sizeof(struct page));
+		struct page *page = kmem_zalloc(sizeof(struct page));
 		if (page == NULL)
 			RETURN_ERROR;
 
@@ -300,7 +301,7 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 	}
 
 	for (int i = 0; i < req->morphology.pcnt; i++) {
-		struct page *page = alloc(sizeof(struct page));
+		struct page *page = kmem_zalloc(sizeof(struct page));
 		if (page == NULL)
 			RETURN_ERROR;
 
@@ -311,7 +312,7 @@ static int portal_handle_anon(struct portal *portal, struct portal_req *req,
 		page->frame = NULL;
 		page->pmle = portal->page_table->page_entry(portal->page_table,
 													vaddr + i * PAGE_SIZE);
-		page->refcnt = alloc(sizeof(page->refcnt));
+		page->refcnt = kmem_zalloc(sizeof(page->refcnt));
 		if (page->refcnt == NULL)
 			RETURN_ERROR;
 
@@ -342,15 +343,15 @@ static int portal_handle_share(struct portal *portal, struct portal_req *req,
 	if (orb == NULL && !req->share.create)
 		RETURN_ERROR;
 	if (orb == NULL && req->share.create) {
-		orb = alloc(sizeof(struct gateway_orb));
+		orb = kmem_zalloc(sizeof(struct gateway_orb));
 		if (orb == NULL)
 			RETURN_ERROR;
 
-		orb->identifier = alloc(strlen(req->share.identifier) + 1);
+		orb->identifier = kmem_zalloc(strlen(req->share.identifier) + 1);
 		if (orb->identifier == NULL)
 			RETURN_ERROR;
 		orb->page_cnt = DIV_ROUNDUP(req->morphology.length, PAGE_SIZE);
-		orb->pages = alloc(sizeof(struct page) * orb->page_cnt);
+		orb->pages = kmem_zalloc(sizeof(struct page) * orb->page_cnt);
 		if (orb->pages == NULL)
 			RETURN_ERROR;
 
@@ -455,7 +456,7 @@ static struct portal *portal_copy_tree(struct page_table *source_table,
 		return NULL;
 
 	if (base == -1UL && limit == -1UL) {
-		struct portal *region = alloc(sizeof(struct portal));
+		struct portal *region = kmem_zalloc(sizeof(struct portal));
 		if (unlikely(region == NULL))
 			return NULL;
 
@@ -479,7 +480,7 @@ static struct portal *portal_copy_tree(struct page_table *source_table,
 		root;
 	});
 
-	struct portal *region = alloc(sizeof(struct portal));
+	struct portal *region = kmem_zalloc(sizeof(struct portal));
 	if (unlikely(region == NULL))
 		return NULL;
 	*region = *src_portal;
@@ -546,7 +547,7 @@ static int portal_handle_cow(struct portal *portal, struct portal_req *req,
 skip:
 			src_page->refcnt++;
 
-			struct page *dest_page = alloc(sizeof(struct page));
+			struct page *dest_page = kmem_zalloc(sizeof(struct page));
 			if (dest_page == NULL)
 				RETURN_ERROR;
 			*dest_page = *src_page;
@@ -590,7 +591,7 @@ skip:
 
 			src_page->refcnt++;
 skip:
-			struct page *dest_page = alloc(sizeof(struct page));
+			struct page *dest_page = kmem_zalloc(sizeof(struct page));
 			if (dest_page == NULL)
 				RETURN_ERROR;
 			*dest_page = *src_page;
@@ -635,7 +636,7 @@ int portal(struct portal_req *req, struct portal_resp *resp)
 	if (req == NULL || resp == NULL)
 		RETURN_ERROR;
 
-	struct portal *portal = alloc(sizeof(struct portal));
+	struct portal *portal = kmem_zalloc(sizeof(struct portal));
 	if (portal == NULL)
 		RETURN_ERROR;
 
@@ -687,7 +688,7 @@ failure:
 	resp->limit = 0;
 	resp->flags = PORTAL_RESP_FAILURE | portal->flags;
 
-	free(portal);
+	kmem_free(portal);
 
 	RETURN_ERROR;
 }
@@ -713,11 +714,11 @@ void portal_destroy(struct portal *portal)
 			if (--page->frame->refcnt == 0)
 				pmm_free(page->frame->paddr, 1);
 			if (--(*page->refcnt) == 0)
-				free(page);
+				kmem_free(page);
 		}
 	}
 
 	dictionary_destroy(portal->pages);
 
-	free(portal);
+	kmem_free(portal);
 }

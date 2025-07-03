@@ -5,6 +5,7 @@
 #include <core/sched.h>
 #include <aria/base.h>
 #include <mm/address.h>
+#include <mm/slab.h>
 #include <core/timer.h>
 #include <mm/physical.h>
 #include <core/debug.h>
@@ -663,7 +664,7 @@ struct process kprocess = { 0 };
 
 struct thread *make_kernel_thread(void (*fn)())
 {
-	struct thread *t = alloc(sizeof(struct thread));
+	struct thread *t = kmem_zalloc(sizeof(struct thread));
 
 	memset(t, 0, sizeof(struct thread));
 

@@ -1,9 +1,9 @@
 #include <core/object.h>
 
-#include <aria/debug.h>
-#include <aria/slab.h>
-#include <aria/base.h>
 #include <mm/slab.h>
+
+#include <aria/debug.h>
+#include <aria/base.h>
 
 static struct object_class classes[256];
 

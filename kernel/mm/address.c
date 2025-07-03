@@ -1,6 +1,8 @@
 #include <arch/amd64/smp.h>
 
 #include <mm/address.h>
+#include <mm/slab.h>
+
 #include <core/syscall.h>
 #include <core/capability.h>
 
@@ -38,11 +40,11 @@ int address_push_as(struct address_space *as)
 
 int address_space_construct(int *asid)
 {
-	struct address_space *as = alloc(sizeof(struct address_space));
+	struct address_space *as = kmem_zalloc(sizeof(struct address_space));
 	if (unlikely(as == NULL))
 		RETURN_ERROR;
 
-	as->page_table = alloc(sizeof(struct page_table));
+	as->page_table = kmem_zalloc(sizeof(struct page_table));
 	if (unlikely(as->page_table == NULL))
 		RETURN_ERROR;
 
@@ -162,7 +164,7 @@ SYSCALL_DEFINE4(
 			if (ret == -1)
 				RETURN_ERROR;
 
-			as_capability = alloc(sizeof(struct address_space_capability));
+			as_capability = kmem_zalloc(sizeof(struct address_space_capability));
 			if (unlikely(as_capability == NULL))
 				RETURN_ERROR;
 

@@ -1,7 +1,7 @@
 #include <core/resource.h>
+#include <mm/slab.h>
 
 #include <aria/compiler.h>
-#include <aria/slab.h>
 #include <aria/debug.h>
 
 static int rpool_boundary_index(struct rpool *, size_t);
@@ -29,12 +29,12 @@ int rinit(struct rpool *rpool, uintptr_t base, size_t length)
 		RETURN_ERROR;
 
 	rpool->boundary_segments =
-		alloc(sizeof(struct rboundary) * rpool->total_depth);
+		kmem_alloc(sizeof(struct rboundary) * rpool->total_depth);
 	if (unlikely(rpool->boundary_segments == NULL))
 		RETURN_ERROR;
 	rpool->boundary_table = (struct dictionary){ 0 };
 
-	struct rboundary *boundary = alloc(sizeof(struct rboundary));
+	struct rboundary *boundary = kmem_zalloc(sizeof(struct rboundary));
 	if (unlikely(boundary == NULL))
 		RETURN_ERROR;
 
@@ -66,7 +66,7 @@ int ralloc(struct rpool *rpool, uintptr_t *resource, size_t length)
 	}
 	RETURN_ERROR;
 found:
-	struct rboundary *nrboundary = alloc(sizeof(struct rboundary));
+	struct rboundary *nrboundary = kmem_zalloc(sizeof(struct rboundary));
 	if (unlikely(nrboundary == NULL))
 		RETURN_ERROR;
 
@@ -117,14 +117,14 @@ int rfree(struct rpool *rpool, uintptr_t resource)
 
 	if (rboundary_left || rboundary_right) {
 		struct rboundary *rboundary_coalesced = NULL;
-		rboundary_coalesced = alloc(sizeof(struct rboundary));
+		rboundary_coalesced = kmem_zalloc(sizeof(struct rboundary));
 		if (unlikely(rboundary_coalesced == NULL))
 			RETURN_ERROR;
 
 		if (rboundary_left &&
 			rboundary_left->base + rboundary_left->length == rboundary->base) {
 			if (!rboundary_coalesced)
-				rboundary_coalesced = alloc(sizeof(struct rboundary));
+				rboundary_coalesced = kmem_zalloc(sizeof(struct rboundary));
 			if (unlikely(rboundary_coalesced == NULL))
 				RETURN_ERROR;
 
@@ -139,13 +139,13 @@ int rfree(struct rpool *rpool, uintptr_t resource)
 			if (ret == -1)
 				RETURN_ERROR;
 
-			free(rboundary_left);
+			kmem_free(rboundary_left);
 		}
 
 		if (rboundary_right &&
 			rboundary->base + rboundary->length == rboundary_right->base) {
 			if (!rboundary_coalesced) {
-				rboundary_coalesced = alloc(sizeof(struct rboundary));
+				rboundary_coalesced = kmem_zalloc(sizeof(struct rboundary));
 				if (unlikely(rboundary_coalesced == NULL))
 					RETURN_ERROR;
 
@@ -162,7 +162,7 @@ int rfree(struct rpool *rpool, uintptr_t resource)
 			if (ret == -1)
 				RETURN_ERROR;
 
-			free(rboundary_right);
+			kmem_free(rboundary_right);
 		}
 
 		if (rboundary_coalesced) {
@@ -170,7 +170,7 @@ int rfree(struct rpool *rpool, uintptr_t resource)
 			if (ret == -1)
 				RETURN_ERROR;
 
-			free(rboundary);
+			kmem_free(rboundary);
 			rboundary = rboundary_coalesced;
 		}
 	}
@@ -199,7 +199,7 @@ int rdestroy(struct rpool *rpool)
 		struct rboundary *node = rpool->boundary_segments[i];
 		for (; node;) {
 			struct rboundary *tmp = node->next;
-			free(node);
+			kmem_free(node);
 			node = tmp;
 		}
 	}

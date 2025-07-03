@@ -13,7 +13,6 @@
 #include <acpi/madt.h>
 #include <acpi/rsdp.h>
 
-#include <aria/slab.h>
 #include <aria/debug.h>
 #include <aria/base.h>
 

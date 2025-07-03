@@ -146,7 +146,7 @@ struct process kprocess;
 
 struct thread *make_kernel_thread(void (*fn)())
 {
-	struct thread *t = alloc(sizeof(struct thread));
+	struct thread *t = kmem_zalloc(sizeof(struct thread));
 
 	memset(t, 0, sizeof(struct thread));
 

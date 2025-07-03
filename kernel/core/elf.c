@@ -2,10 +2,10 @@
 
 #include <mm/virtual.h>
 #include <mm/physical.h>
+#include <mm/slab.h>
 #include <core/elf.h>
 #include <core/debug.h>
 
-#include <aria/slab.h>
 #include <aria/compiler.h>
 #include <aria/base.h>
 #include <aria/debug.h>

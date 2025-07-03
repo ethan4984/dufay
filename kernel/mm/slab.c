@@ -486,7 +486,7 @@ void kmem_init()
 		struct kmem_cache *cache = &caches[i];
 
 		cache->cpu =
-			kmem_malloc(logical_processor_cnt * sizeof(struct kmem_cpu));
+			kmem_alloc(logical_processor_cnt * sizeof(struct kmem_cpu));
 
 		cache->magazines_enabled = true;
 
@@ -548,13 +548,24 @@ static inline void *slab_alloc(size_t size)
 	return kmem_cache_alloc(generic_caches[index]);
 }
 
-void *kmem_malloc(size_t size)
+void *kmem_alloc(size_t size)
 {
 	size_t real_size = size + sizeof(size_t);
 	void *ptr = slab_alloc(real_size);
 
 	*(size_t *)ptr = size;
 	return (void *)((uintptr_t)ptr + sizeof(size_t));
+}
+
+void *kmem_zalloc(size_t size)
+{
+	void *ptr = kmem_alloc(size);
+	if (ptr == NULL) {
+		return NULL;
+	}
+
+	memset(ptr, 0, size);
+	return ptr;
 }
 
 static void do_slab_free(void *ptr, size_t size)
@@ -575,7 +586,7 @@ void kmem_free(void *ptr)
 	do_slab_free(size_ptr, size + sizeof(size_t));
 }
 
-void kmem_malloc_dump()
+void kmem_alloc_dump()
 {
 	for (size_t i = 0; i < GENERIC_CACHES_NUM; i++) {
 		kmem_cache_dump(generic_caches[i]);

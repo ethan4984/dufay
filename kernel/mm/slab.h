@@ -152,7 +152,8 @@ void *kmem_cache_alloc(struct kmem_cache *cache);
 void kmem_cache_free(struct kmem_cache *cache, void *ptr);
 void kmem_cache_dump(struct kmem_cache *cache);
 
-void *kmem_malloc(size_t size);
+void *kmem_alloc(size_t size);
+void *kmem_zalloc(size_t size);
 void kmem_free(void *ptr);
 
 #ifdef __cplusplus

@@ -1,12 +1,14 @@
-#include "mm/address.h"
 #include <arch/amd64/smp.h>
 
 #include <core/sched.h>
 #include <core/futex.h>
-#include <mm/virtual.h>
 #include <core/debug.h>
 #include <core/syscall.h>
 #include <core/lock.h>
+
+#include <mm/virtual.h>
+#include <mm/address.h>
+#include <mm/slab.h>
 
 #include <aria/debug.h>
 #include <aria/compiler.h>
@@ -38,7 +40,7 @@ int futex(uintptr_t uaddr, int ops, int expected, int virtual)
 	int ret = dictionary_search(&futex_table, &futex_paddr, sizeof(futex_paddr),
 								(void **)&futex);
 	if (futex == NULL && (ops == FUTEX_WAIT || ops == FUTEX_WAKE)) {
-		futex = alloc(sizeof(struct futex));
+		futex = kmem_zalloc(sizeof(struct futex));
 		if (unlikely(futex == NULL))
 			RETURN_ERROR;
 

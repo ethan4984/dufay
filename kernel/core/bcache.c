@@ -4,6 +4,8 @@
 #include <core/capability.h>
 #include <core/syscall.h>
 
+#include <mm/slab.h>
+
 #include <aria/debug.h>
 #include <aria/base.h>
 #include <aria/compiler.h>
@@ -96,7 +98,7 @@ static int bcache_consult_read(capability_t handle, size_t offset, int count,
 	if (!lba_cnt)
 		RETURN_ERROR;
 
-	struct blk **blks = alloc(sizeof(struct blk *) * lba_cnt);
+	struct blk **blks = kmem_zalloc(sizeof(struct blk *) * lba_cnt);
 	if (blks == NULL)
 		RETURN_ERROR;
 
@@ -126,7 +128,7 @@ static int bcache_consult_read(capability_t handle, size_t offset, int count,
 		location += byte_cnt;
 	}
 
-	free(blks);
+	kmem_free(blks);
 
 	return count;
 }
@@ -153,7 +155,7 @@ static int bcache_consult_write(capability_t handle, size_t offset, int count,
 	size_t lba_end = DIV_ROUNDUP(offset + count, blk_handle->lba_size);
 	size_t lba_cnt = lba_end - lba_start;
 
-	struct blk **blks = alloc(sizeof(struct blk *) * lba_cnt);
+	struct blk **blks = kmem_zalloc(sizeof(struct blk *) * lba_cnt);
 	if (blks == NULL)
 		RETURN_ERROR;
 
@@ -182,7 +184,7 @@ static int bcache_consult_write(capability_t handle, size_t offset, int count,
 		location += byte_cnt;
 	}
 
-	free(blks);
+	kmem_free(blks);
 
 	return count;
 }

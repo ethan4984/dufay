@@ -187,14 +187,14 @@ int notification_queue(struct thread *sender, struct thread *target, int not,
 		RETURN_ERROR;
 
 	struct notification_queue *queue = target->notification.queue;
-	struct notification *notification = alloc(sizeof(struct notification));
+	struct notification *notification = kmem_zalloc(sizeof(struct notification));
 	if (notification == NULL)
 		RETURN_ERROR;
 
 	notification->refcnt = 1;
 	notification->notnum = not;
 	notification->weight = weight;
-	notification->info = alloc(sizeof(struct notification_info));
+	notification->info = kmem_zalloc(sizeof(struct notification_info));
 	if (notification->info == NULL)
 		RETURN_ERROR;
 	notification->queue = queue;
@@ -216,11 +216,11 @@ int notification_queue(struct thread *sender, struct thread *target, int not,
 		RETURN_ERROR;
 
 	if (weight & NOTIFY_WEIGHT_INSTANTANEOUS || weight & NOTIFY_WEIGHT_TICK) {
-		struct context *context = alloc(sizeof(struct context));
+		struct context *context = kmem_zalloc(sizeof(struct context));
 		if (context == NULL)
 			RETURN_ERROR;
 
-		context->etrigger = alloc(sizeof(struct etrigger));
+		context->etrigger = kmem_zalloc(sizeof(struct etrigger));
 		if (context->etrigger == NULL)
 			RETURN_ERROR;
 		context->etrigger->context = context;
@@ -261,7 +261,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 	if (queue == NULL)
 		RETURN_ERROR;
 
-	struct notification *notification = alloc(sizeof(struct notification));
+	struct notification *notification = kmem_zalloc(sizeof(struct notification));
 	if (notification == NULL)
 		RETURN_ERROR;
 
@@ -281,7 +281,7 @@ SYSCALL_DEFINE1(notification_build, struct comm_bridge *, bridge, {
 	notification->refcnt = 1;
 	notification->notnum = bridge->not;
 	notification->weight = bridge->weight;
-	notification->info = alloc(sizeof(struct notification_info));
+	notification->info = kmem_zalloc(sizeof(struct notification_info));
 	if (notification->info == NULL)
 		RETURN_ERROR;
 	notification->queue = queue;
@@ -417,11 +417,11 @@ int notification_dispatch(struct thread *thread)
 			continue;
 		}
 
-		struct context *context = alloc(sizeof(struct context));
+		struct context *context = kmem_zalloc(sizeof(struct context));
 		if (context == NULL)
 			RETURN_ERROR;
 
-		context->etrigger = alloc(sizeof(struct etrigger));
+		context->etrigger = kmem_zalloc(sizeof(struct etrigger));
 		if (context->etrigger == NULL)
 			RETURN_ERROR;
 		context->etrigger->context = context;
@@ -494,7 +494,7 @@ SYSCALL_DEFINE2(notification_define_stack, void *, sp, size_t, sp_size, {
 	if (unlikely(thread == NULL))
 		RETURN_ERROR;
 
-	struct ustack *new_stack = alloc(sizeof(struct ustack));
+	struct ustack *new_stack = kmem_zalloc(sizeof(struct ustack));
 	if (new_stack == NULL)
 		RETURN_ERROR;
 

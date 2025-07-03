@@ -58,7 +58,7 @@ struct thread *new_kernel_thread(uintptr_t entry)
 	if (ret == -1)
 		return NULL;
 
-	struct ustack *ustack = alloc(sizeof(struct ustack));
+	struct ustack *ustack = kmem_zalloc(sizeof(struct ustack));
 
 	ustack->kernel_stack.sp =
 		pmm_alloc(DIV_ROUNDUP(CONTEXT_DEFAULT_STACK_SIZE, PAGE_SIZE), 1) +
@@ -71,11 +71,11 @@ struct thread *new_kernel_thread(uintptr_t entry)
 		print("ERROR: unable to push ustack\n");
 	}
 
-	struct context *context = alloc(sizeof(struct context));
+	struct context *context = kmem_zalloc(sizeof(struct context));
 
 	context->stack = ustack;
 	context->thread = thread;
-	context->etrigger = alloc(sizeof(struct etrigger));
+	context->etrigger = kmem_zalloc(sizeof(struct etrigger));
 	context->etrigger->context = context;
 
 	ret = CONTEXT_PUSH(thread, context);
@@ -119,7 +119,7 @@ finish:
 	if (file == NULL)
 		RETURN_ERROR;
 
-	struct elf64_file *elf = alloc(sizeof(struct elf64_file));
+	struct elf64_file *elf = kmem_zalloc(sizeof(struct elf64_file));
 	if (unlikely(elf == NULL))
 		RETURN_ERROR;
 
@@ -150,7 +150,7 @@ finish:
 	if (ret == -1)
 		RETURN_ERROR;
 
-	struct ustack *ustack = alloc(sizeof(struct ustack));
+	struct ustack *ustack = kmem_zalloc(sizeof(struct ustack));
 	if (ustack == NULL)
 		RETURN_ERROR;
 
@@ -171,13 +171,13 @@ finish:
 		RETURN_ERROR;
 	}
 
-	struct context *context = alloc(sizeof(struct context));
+	struct context *context = kmem_zalloc(sizeof(struct context));
 	if (context == NULL)
 		RETURN_ERROR;
 
 	context->stack = ustack;
 	context->thread = thread;
-	context->etrigger = alloc(sizeof(struct etrigger));
+	context->etrigger = kmem_zalloc(sizeof(struct etrigger));
 	if (context->etrigger == NULL)
 		RETURN_ERROR;
 	context->etrigger->context = context;

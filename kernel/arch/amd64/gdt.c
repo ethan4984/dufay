@@ -2,8 +2,8 @@
 #include <arch/amd64/cpu.h>
 
 #include <mm/physical.h>
+#include <mm/slab.h>
 
-#include <aria/slab.h>
 #include <aria/debug.h>
 
 struct segment_descriptor {
@@ -64,7 +64,7 @@ struct gdt {
 
 void gdt_init(void)
 {
-	struct gdt *gdt = alloc(sizeof(struct gdt));
+	struct gdt *gdt = kmem_zalloc(sizeof(struct gdt));
 	if (gdt == NULL) {
 		REPORT_ERROR;
 		panic("");
@@ -98,7 +98,7 @@ void gdt_init(void)
 	gdt->user_code64.access = 0b11111010;
 	gdt->user_code64.granularity = 0b00100000;
 
-	struct tss *tss = alloc(sizeof(struct tss));
+	struct tss *tss = kmem_zalloc(sizeof(struct tss));
 	if (tss == NULL) {
 		REPORT_ERROR;
 		panic("");
