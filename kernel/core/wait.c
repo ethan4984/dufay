@@ -60,6 +60,8 @@ int wait_any(int count, void *objects[], nanoseconds_t timeout)
 		struct dispatch_header *obj =
 			is_timer ? &timer.hdr : (struct dispatch_header *)objects[i];
 
+		ASSERT(obj != NULL);
+
 		struct waitblock *wb = is_timer ? &timer_wb : &thread->waitblocks[i];
 
 		spinlock(&obj->lock);

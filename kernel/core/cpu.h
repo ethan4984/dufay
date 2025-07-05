@@ -44,6 +44,7 @@ struct cpu_local {
 	struct thread *next_thread; /* Thread that will run next on this CPU */
 
 	struct spinlock timers_lock;
+
 	struct pairing_heap timers; /* Timers enqueued on this CPU */
 
 	struct dpc timer_dpc; /* Timer expiry DPC */

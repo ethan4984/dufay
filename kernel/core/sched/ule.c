@@ -537,9 +537,11 @@ void idle_thread(void *)
 {
 	print("cpu%d: idling\n", CORE_LOCAL->core_id);
 
+	struct cpu_local *cpu = CORE_LOCAL;
+
 	for (;;) {
-		if (CORE_LOCAL->sched_data.steal_work) {
-			CORE_LOCAL->sched_data.steal_work = false;
+		if (cpu->sched_data.steal_work) {
+			cpu->sched_data.steal_work = false;
 
 			ipl_t ipl = ipldispatch();
 
@@ -549,7 +551,7 @@ void idle_thread(void *)
 			find_most_and_least_loaded_cpu(&most, &least);
 
 			/* Something changed, try again */
-			if (most == CORE_LOCAL) {
+			if (most == cpu) {
 				ipl_lower(ipl);
 				continue;
 			}
@@ -576,14 +578,12 @@ void idle_thread(void *)
 
 			spinlock(&td->lock);
 
-			sched_try_preempt(CORE_LOCAL, td);
+			sched_try_preempt(cpu, td);
 
 			spinrelease(&td->lock);
 
 			ipl_lower(ipl);
 		}
-
-		arch_halt();
 	}
 }
 
@@ -797,7 +797,6 @@ void sched_wait()
 
 	td->sleep_start = TICKS_TO_MS(atomic_load(&CORE_LOCAL->ticks));
 
-	//print("td %d went to sleep\n", td->id);
 	sched_yield();
 
 	spinlock_release(&td->lock, ipl);
@@ -814,7 +813,7 @@ void sched_wake(struct thread *td)
 
 	/* The thread is done sleeping, update the scheduler on whether it's interactive */
 	sched_update_interactivity(td);
-	sched_recompute_priority(CORE_LOCAL, td);
+	sched_recompute_priority(td->last_cpu, td);
 
 	spinrelease(&td->lock);
 

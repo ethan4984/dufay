@@ -16,7 +16,7 @@ static inline ipl_t spinlock_acquire(struct spinlock *spinlock)
 static inline ipl_t spinlock_acquire_at(struct spinlock *spinlock, ipl_t ipl)
 {
 	ipl_t oldipl = ipl_raise(ipl);
-	spinlock->last_acq = (uintptr_t)__builtin_return_address(0);
+	//spinlock->last_acq = (uintptr_t)__builtin_return_address(0);
 	raw_spinlock(spinlock);
 	return oldipl;
 }

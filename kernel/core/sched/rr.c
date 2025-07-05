@@ -49,6 +49,9 @@ void sched_reschedule()
 {
 	struct thread *curthread = CORE_LOCAL->current_thread;
 
+	if (!curthread)
+		return;
+
 	spinlock(&curthread->lock);
 
 	spinlock(&CORE_LOCAL->sched_data.lock);
@@ -69,7 +72,6 @@ void sched_yield()
 	struct thread *next;
 	struct thread *td = CORE_LOCAL->current_thread;
 
-	spinlock(&td->lock);
 	spinlock(&CORE_LOCAL->sched_data.lock);
 
 	/* Select a new thread to run */
@@ -97,8 +99,9 @@ void sched_wait()
 
 	td->state = WAITING;
 
-	spinlock_release(&td->lock, ipl);
 	sched_yield();
+
+	spinlock_release(&td->lock, ipl);
 }
 
 void sched_wake(struct thread *td)
@@ -148,13 +151,15 @@ struct process kprocess;
 
 struct thread *make_kernel_thread(void (*fn)(void *))
 {
-	struct thread *t = alloc(sizeof(struct thread));
+	struct thread *t = kmem_malloc(sizeof(struct thread));
+
+	ASSERT(t);
 
 	memset(t, 0, sizeof(struct thread));
 
-	t->kernel_stack_base = (uintptr_t)pmm_alloc(2, 1) + HIGH_VMA;
+	t->kernel_stack_base = (uintptr_t)pmm_alloc(4, 1) + HIGH_VMA;
 
-	arch_context_init(&t->ctx, t->kernel_stack_base + 8192, (uintptr_t)fn,
+	arch_context_init(&t->ctx, t->kernel_stack_base + 16384, (uintptr_t)fn,
 					  NULL);
 	t->process = &kprocess;
 	t->id = id++;
@@ -165,6 +170,8 @@ struct thread *make_kernel_thread(void (*fn)(void *))
 struct thread *make_kernel_thread_arg(void (*fn)(void *), void *arg)
 {
 	struct thread *t = kmem_malloc(sizeof(struct thread));
+
+	ASSERT(t);
 
 	memset(t, 0, sizeof(struct thread));
 
@@ -186,7 +193,7 @@ struct thread *make_kernel_thread_arg(void (*fn)(void *), void *arg)
 	return t;
 }
 
-static void idle(void *)
+void idle_thread(void *)
 {
 	for (;;) {
 		asm("hlt");
@@ -202,13 +209,14 @@ void sched_init()
 
 void sched_cpu_init()
 {
-	TAILQ_INIT(&CORE_LOCAL->sched_data.runq);
 	TAILQ_INIT(&CORE_LOCAL->dpc_queue);
+	//TAILQ_INIT(&CORE_LOCAL->timers);
+	TAILQ_INIT(&CORE_LOCAL->sched_data.runq);
 
 	dpc_init(&CORE_LOCAL->timer_dpc, timer_handle_expiry);
 	pairing_heap_init(&CORE_LOCAL->timers, timer_compare);
 
-	CORE_LOCAL->idle_thread = *make_kernel_thread(idle);
+	CORE_LOCAL->idle_thread = *make_kernel_thread(idle_thread);
 	CORE_LOCAL->idle_thread.state = RUNNING;
 	memcpy(CORE_LOCAL->idle_thread.name, "idle", sizeof("idle"));
 	CORE_LOCAL->current_thread = &CORE_LOCAL->idle_thread;

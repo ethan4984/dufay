@@ -1,3 +1,4 @@
+#include "arch/amd64/hpet.h"
 #include "arch/port.h"
 #include "core/clock.h"
 #include <core/sched.h>

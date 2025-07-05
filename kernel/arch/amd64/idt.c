@@ -1,3 +1,4 @@
+#include "arch/amd64/port.h"
 #include "arch/port.h"
 #include <arch/amd64/cpu.h>
 #include <arch/amd64/idt.h>
@@ -201,8 +202,15 @@ extern void isr_handler_main(struct registers *regs)
 	xapic_write(XAPIC_EOI_OFF, 0);
 
 	if (oldipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, oldipl)) {
+		//	print("cpu%d: dispatching %ld timers\n", CORE_LOCAL->core_id);
 		dispatch_software_interrupts(oldipl);
+	} else if (oldipl >= IPL_DISPATCH) {
+		// print(
+		// 	"cpu%d: skipping dispatch oldipl=%d, last raise = [%lx, %lx, %lx]\n",
+		// 	CORE_LOCAL->core_id, oldipl, CORE_LOCAL->last_raises[0],
+		// 	CORE_LOCAL->last_raises[1], CORE_LOCAL->last_raises[2]);
 	}
+
 	SWAP_TLS(regs);
 }
 

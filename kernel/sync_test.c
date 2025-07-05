@@ -185,11 +185,7 @@ static void timer_test()
 	timer_init(&other_timer, "lol");
 
 	ENQUEUE_FUNCTION(timer1);
-	ENQUEUE_FUNCTION(timer3);
-	ENQUEUE_FUNCTION(timer3);
-	ENQUEUE_FUNCTION(timer3);
-	ENQUEUE_FUNCTION(timer3);
-	/* ENQUEUE_FUNCTION(timer2); */
+	ENQUEUE_FUNCTION(timer2);
 
 	//	for (int i = 0; i < 2000; i++) {
 	//	ENQUEUE_FUNCTION(timer3);

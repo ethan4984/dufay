@@ -32,6 +32,8 @@ void dpc_enqueue(struct dpc *dpc, void *arg1, void *arg2)
 
 void dispatch_dpc_queue(struct cpu_local *cpu)
 {
+	ASSERT(cpu != NULL);
+
 	/* Go through all DPCs in the queue and call them */
 	while (true) {
 		spinlock_irqsave(&cpu->dpc_queue_lock);
@@ -60,5 +62,7 @@ void dispatch_dpc_queue(struct cpu_local *cpu)
 		ASSERT(dpc->routine != NULL);
 
 		dpc->routine(arg1, arg2);
+
+		cpu = CORE_LOCAL;
 	}
 }

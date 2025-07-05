@@ -12,6 +12,7 @@ enum timer_state {
 };
 
 struct ktimer {
+	TAILQ_ENTRY(ktimer) queue_hook;
 	struct dispatch_header hdr;
 	struct pairing_heap_node heap_node;
 

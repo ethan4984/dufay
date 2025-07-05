@@ -38,6 +38,8 @@ void timer_start(struct ktimer *timer, uint64_t nanoseconds)
 	ipl_t ipl = spinlock_acquire_at(&timer->hdr.lock, IPL_HIGH);
 	struct cpu_local *cpu = CORE_LOCAL;
 
+	ASSERT(timer != NULL);
+
 	if (!atomic_compare_exchange_weak(&timer->state, &expected,
 									  TIMER_PENDING)) {
 		spinlock_release(&timer->hdr.lock, ipl);

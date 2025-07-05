@@ -13,7 +13,7 @@ void hardclock()
 {
 	struct cpu_local *cpu = CORE_LOCAL;
 
-	//	print("hardclock() on cpu %d\n", cpu->core_id);
+	//print("hardclock() on cpu %d\n", cpu->core_id);
 
 	bool timer_expired = false;
 	nanoseconds_t nanos;
@@ -25,7 +25,7 @@ void hardclock()
 	/* Calculate that amount in nanoseconds */
 	nanos = cpu->ticks * (NANOSECONDS_PER_SECOND / HZ);
 
-	spinlock_irqsave(&cpu->timers_lock);
+	ipl_t ipl = spinlock_acquire_at(&cpu->timers_lock, IPL_HIGH);
 
 	top_timer_node = pairing_heap_top(&cpu->timers);
 
@@ -35,7 +35,7 @@ void hardclock()
 		timer_expired = true;
 	}
 
-	spinrelease_irqsave(&cpu->timers_lock);
+	spinlock_release(&cpu->timers_lock, ipl);
 
 	/* A timer has expired, enqueue the timer DPC */
 	if (timer_expired) {

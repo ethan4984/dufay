@@ -1,3 +1,4 @@
+#include "arch/amd64/port.h"
 #include <core/sched.h>
 #include <aria/debug.h>
 #include <core/ipl.h>
@@ -11,11 +12,16 @@ ipl_t ipl_raise(ipl_t ipl)
 
 	ASSERT(ipl >= old_ipl);
 
-	CORE_LOCAL->ipl = ipl;
-
-	if (ipl > IPL_DISPATCH) {
-		arch_set_hardware_ipl(ipl);
+	if (ipl >= IPL_DISPATCH) {
+		CORE_LOCAL->last_raises[0] = (uintptr_t)__builtin_return_address(0);
+		CORE_LOCAL->last_raises[1] = (uintptr_t)__builtin_return_address(1);
+		//	CORE_LOCAL->last_raises[2] = (uintptr_t)__builtin_return_address(2);
 	}
+	if (ipl > IPL_DISPATCH) {
+		arch_disable_interrupts();
+	}
+
+	CORE_LOCAL->ipl = ipl;
 
 	return old_ipl;
 }
@@ -26,11 +32,12 @@ void ipl_lower(ipl_t ipl)
 
 	ASSERT(ipl <= old_ipl);
 
-	if (old_ipl > IPL_DISPATCH) {
-		arch_set_hardware_ipl(ipl);
-	}
-
 	CORE_LOCAL->ipl = ipl;
+
+	if (ipl <= IPL_DISPATCH) {
+		arch_enable_interrupts();
+		//arch_set_hardware_ipl(ipl);
+	}
 
 	/* Dispatch software interrupts */
 	if (ipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, ipl)) {
@@ -57,7 +64,7 @@ void set_softint_pending(struct cpu_local *cpu, ipl_t ipl)
 {
 	atomic_fetch_or(&cpu->pending_softints, (1 << ipl));
 }
-
+static int cnt = 0;
 static void dispatch_dpc()
 {
 	bool int_state = arch_interrupt_state();

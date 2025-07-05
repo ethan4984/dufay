@@ -101,28 +101,6 @@ void fuga_entry(void)
 
 	arch_load_context(main_thread);
 
-	panic("Should not happen %d???\n", CORE_LOCAL->sched_data.load);
-
 	for (;;) {
-	}
-
-#if 1
-	do_sync_test();
-#else
-	ret = launch_init();
-	if (ret == -1) {
-		REPORT_ERROR;
-		panic("");
-	}
-#endif
-
-	/* Liftoff! */
-	ipl_lower(IPL_ZERO);
-	arch_enable_interrupts();
-
-	panic("Should not happen %d???\n", CORE_LOCAL->sched_data.load);
-
-	for (;;) {
-		arch_halt();
 	}
 }
