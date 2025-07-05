@@ -17,7 +17,7 @@ QEMUFLAGS_BASE = -drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).
 
 QEMUFLAGS-x86_64 = \
 	-m 8G \
-	-smp 2\
+	-smp 4\
 	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
 	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
 	-device intel-iommu,aw-bits=48 \

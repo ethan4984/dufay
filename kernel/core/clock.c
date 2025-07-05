@@ -13,7 +13,7 @@ void hardclock()
 {
 	struct cpu_local *cpu = CORE_LOCAL;
 
-	print("hardclock() on cpu %d\n", cpu->core_id);
+	//	print("hardclock() on cpu %d\n", cpu->core_id);
 
 	bool timer_expired = false;
 	nanoseconds_t nanos;
@@ -42,7 +42,7 @@ void hardclock()
 		dpc_enqueue(&CORE_LOCAL->timer_dpc, NULL, NULL);
 	}
 
-	rcu_check();
+	//	rcu_check();
 
 #if defined(CONFIG_SCHED_ULE)
 	/* Balance work on cpu0 */

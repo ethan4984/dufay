@@ -1,3 +1,4 @@
+#include "core/lock.h"
 #include <arch/port.h>
 #include <mm/physical.h>
 #include <core/debug.h>
@@ -45,7 +46,7 @@ static void pmm_init_module(struct pmm_module *module,
 static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 								 uint64_t align)
 {
-	spinlock(&module->lock);
+	spinlock_irqsave(&module->lock);
 
 	size_t alloc_base =
 		ALIGN_UP(module->mmap_entry->base + (module->last_free * PAGE_SIZE),
@@ -54,7 +55,7 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 
 	for (size_t i = bit_base; i < module->bitmap_entry_cnt; i += align) {
 		if (module->bitmap_entry_cnt < (i + cnt)) {
-			spinrelease(&module->lock);
+			spinrelease_irqsave(&module->lock);
 			return -1;
 		}
 
@@ -78,14 +79,14 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 					}
 				}
 
-				spinrelease(&module->lock);
+				spinrelease_irqsave(&module->lock);
 
 				return alloc_base;
 			}
 		}
 	}
 
-	spinrelease(&module->lock);
+	spinrelease_irqsave(&module->lock);
 
 	return -1;
 }
@@ -93,14 +94,14 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 static void pmm_module_free(struct pmm_module *module, uint64_t base,
 							uint64_t cnt)
 {
-	spinlock(&module->lock);
+	spinlock_irqsave(&module->lock);
 
 	for (size_t i = DIV_ROUNDUP(base, PAGE_SIZE);
 		 i < (DIV_ROUNDUP(base, PAGE_SIZE) + cnt); i++) {
 		BIT_CLEAR(module->bitmap, i);
 	}
 
-	spinrelease(&module->lock);
+	spinrelease_irqsave(&module->lock);
 }
 
 void pmm_init(void)

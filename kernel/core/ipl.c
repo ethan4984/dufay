@@ -12,9 +12,10 @@ ipl_t ipl_raise(ipl_t ipl)
 	ASSERT(ipl >= old_ipl);
 
 	CORE_LOCAL->ipl = ipl;
-	CORE_LOCAL->last_raises[0] = (uintptr_t)__builtin_return_address(0);
-	CORE_LOCAL->last_raises[1] = (uintptr_t)__builtin_return_address(1);
-	CORE_LOCAL->last_raises[2] = (uintptr_t)__builtin_return_address(2);
+
+	if (ipl > IPL_DISPATCH) {
+		arch_set_hardware_ipl(ipl);
+	}
 
 	return old_ipl;
 }
@@ -24,6 +25,10 @@ void ipl_lower(ipl_t ipl)
 	ipl_t old_ipl = CORE_LOCAL->ipl;
 
 	ASSERT(ipl <= old_ipl);
+
+	if (old_ipl > IPL_DISPATCH) {
+		arch_set_hardware_ipl(ipl);
+	}
 
 	CORE_LOCAL->ipl = ipl;
 
@@ -80,8 +85,6 @@ static void dispatch_dpc()
 	CORE_LOCAL->preemption_reason = PREEMPT_NONE;
 
 	if (CORE_LOCAL->next_thread) {
-		print("cpu%d: switching to %s\n", CORE_LOCAL->core_id,
-			  CORE_LOCAL->next_thread->name);
 		sched_switch(CORE_LOCAL->current_thread, CORE_LOCAL->next_thread);
 	} else {
 	}

@@ -12,7 +12,7 @@ void dpc_init(struct dpc *dpc, dpc_routine_t routine)
 
 void dpc_enqueue(struct dpc *dpc, void *arg1, void *arg2)
 {
-	ipl_t ipl = spinlock_acquire_at(&CORE_LOCAL->dpc_queue_lock, IPL_HIGH);
+	spinlock_irqsave(&CORE_LOCAL->dpc_queue_lock);
 
 	dpc->arg1 = arg1;
 	dpc->arg2 = arg2;
@@ -27,7 +27,7 @@ void dpc_enqueue(struct dpc *dpc, void *arg1, void *arg2)
 		set_softint_pending(CORE_LOCAL, IPL_DISPATCH);
 	}
 
-	spinlock_release(&CORE_LOCAL->dpc_queue_lock, ipl);
+	spinrelease_irqsave(&CORE_LOCAL->dpc_queue_lock);
 }
 
 void dispatch_dpc_queue(struct cpu_local *cpu)

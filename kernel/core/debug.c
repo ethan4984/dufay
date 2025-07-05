@@ -95,7 +95,7 @@ void stacktrace(uint64_t *rbp)
 			return;
 		}
 
-		print_unlocked("trace: [%lx]\n", return_address);
+		print("trace: [%lx]\n", return_address);
 
 		rbp = (void *)previous_rbp;
 	}

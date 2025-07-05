@@ -36,6 +36,18 @@ void do_sync_test(void);
 void sched_init();
 void sched_cpu_init();
 
+struct thread *make_kernel_thread(void (*fn)(void *));
+
+void idle_thread(void *);
+
+static void main_threaded(void *)
+{
+	do_sync_test();
+
+	idle_thread(NULL);
+	sched_wait();
+}
+
 void fuga_entry(void)
 {
 	pmm_init();
@@ -62,9 +74,13 @@ void fuga_entry(void)
 
 	vmm_init();
 
+	sched_init();
+
 	arch_devices_init();
 
 	kmem_init();
+
+	sched_cpu_init();
 
 	//init_system_tgroup();
 
@@ -74,8 +90,21 @@ void fuga_entry(void)
 		panic("message init failed!");
 	}
 
-	sched_init();
-	sched_cpu_init();
+	struct thread *main_thread = make_kernel_thread(main_threaded);
+
+	//	CORE_LOCAL->idle_thread = *main_thread;
+	CORE_LOCAL->current_thread = main_thread;
+
+	/* Liftoff! */
+	ipl_lower(IPL_ZERO);
+	arch_enable_interrupts();
+
+	arch_load_context(main_thread);
+
+	panic("Should not happen %d???\n", CORE_LOCAL->sched_data.load);
+
+	for (;;) {
+	}
 
 #if 1
 	do_sync_test();
@@ -90,6 +119,8 @@ void fuga_entry(void)
 	/* Liftoff! */
 	ipl_lower(IPL_ZERO);
 	arch_enable_interrupts();
+
+	panic("Should not happen %d???\n", CORE_LOCAL->sched_data.load);
 
 	for (;;) {
 		arch_halt();

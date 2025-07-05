@@ -48,11 +48,11 @@ void timer_start(struct ktimer *timer, uint64_t nanoseconds)
 
 	timer->cpu = cpu;
 
-	spinlock_irqsave(&cpu->timers_lock);
+	spinlock(&cpu->timers_lock);
 
 	pairing_heap_insert(&cpu->timers, &timer->heap_node);
 
-	spinrelease_irqsave(&cpu->timers_lock);
+	spinrelease(&cpu->timers_lock);
 
 	spinlock_release(&timer->hdr.lock, ipl);
 }
@@ -105,14 +105,14 @@ void timer_handle_expiry(void *, void *)
 		enum timer_state expected = TIMER_PENDING;
 		struct cpu_local *cpu = CORE_LOCAL;
 
-		spinlock_irqsave(&cpu->timers_lock);
+		ipl_t ipl = spinlock_acquire_at(&cpu->timers_lock, IPL_HIGH);
 
 		/* Get the timer that expires the soonest */
 		timer_node = pairing_heap_top(&cpu->timers);
 
 		/* No timers */
 		if (!timer_node) {
-			spinrelease_irqsave(&cpu->timers_lock);
+			spinlock_release(&cpu->timers_lock, ipl);
 			break;
 		}
 
@@ -120,14 +120,14 @@ void timer_handle_expiry(void *, void *)
 
 		/* This timer shouldn't expire yet */
 		if (timer->deadline > TICKS_TO_NS(cpu->ticks)) {
-			spinrelease_irqsave(&cpu->timers_lock);
+			spinlock_release(&cpu->timers_lock, ipl);
 			break;
 		}
 
 		/* Remove the timer from the heap */
 		pairing_heap_pop(&CORE_LOCAL->timers);
 
-		spinrelease_irqsave(&cpu->timers_lock);
+		spinlock_release(&cpu->timers_lock, ipl);
 
 		/* Timer was canceled */
 		if (!atomic_compare_exchange_weak(&timer->state, &expected,

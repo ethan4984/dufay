@@ -1,5 +1,6 @@
 #include "slab.h"
 
+#include "core/ipl.h"
 #include <aria/debug.h>
 #include <aria/base.h>
 #include <aria/dictionary.h>
@@ -231,6 +232,8 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 	void *buf = NULL;
 	struct kmem_cpu *cpu = NULL;
 
+	ipl_t ipl = ipldispatch();
+
 	if (likely(cp->magazines_enabled)) {
 		cpu = &cp->cpu[get_curr_cpu()];
 
@@ -241,6 +244,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 			if (cpu->rounds > 0) {
 				buf = cpu->loaded->rounds[--cpu->rounds];
 				spinrelease(&cpu->lock);
+				ipl_lower(ipl);
 				return buf;
 			}
 
@@ -284,6 +288,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 		slab = slab_create(cp);
 
 		if (!slab) {
+			ipl_lower(ipl);
 			return NULL;
 		}
 
@@ -310,11 +315,15 @@ void *kmem_cache_alloc(struct kmem_cache *cp)
 
 	spinrelease(&cp->lock);
 
+	ipl_lower(ipl);
+
 	return buf;
 }
 
 void kmem_cache_free(struct kmem_cache *cp, void *ptr)
 {
+	ipl_t ipl = ipldispatch();
+
 	if (likely(cp->magazines_enabled)) {
 		struct kmem_cpu *cpu = &cp->cpu[get_curr_cpu()];
 
@@ -325,6 +334,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *ptr)
 			if ((size_t)cpu->rounds < cpu->magazine_size) {
 				cpu->loaded->rounds[cpu->rounds++] = ptr;
 				spinrelease(&cpu->lock);
+				ipl_lower(ipl);
 				return;
 			}
 
@@ -388,6 +398,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *ptr)
 
 		if (r != 0) {
 			spinrelease(&cp->lock);
+			ipl_lower(ipl);
 			return;
 		}
 
@@ -417,10 +428,12 @@ void kmem_cache_free(struct kmem_cache *cp, void *ptr)
 		TAILQ_REMOVE(&cp->slabs, slab, list_hook);
 		spinrelease(&cp->lock);
 		slab_destroy(cp, slab);
+		ipl_lower(ipl);
 		return;
 	}
 
 	spinrelease(&cp->lock);
+	ipl_lower(ipl);
 }
 
 void kmem_cache_dump(struct kmem_cache *cp)

@@ -336,16 +336,12 @@ struct thread *make_kernel_thread_arg(void (*fn)(void *), void *);
 
 void SpawnParticle(PFIREWORK_DATA Data)
 {
-	ipl_t ipl = ipldispatch();
 	ENQUEUE_FUNCTION_ARG(T_Particle, Data);
-	ipl_lower(ipl);
 }
 
 void SpawnExplodeable()
 {
-	ipl_t ipl = ipldispatch();
 	ENQUEUE_FUNCTION_ARG(T_Explodeable, NULL);
-	ipl_lower(ipl);
 }
 
 void DoTheTest(void *)

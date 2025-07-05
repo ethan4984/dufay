@@ -133,7 +133,7 @@ int wait_any(int count, void *objects[], nanoseconds_t timeout)
 	 * Stop the timer if it was set
 	 */
 	if (timeout != -1UL) {
-		//	timer_stop(&timer);
+		timer_stop(&timer);
 	}
 
 	/* Find the object that satisfied us */
@@ -159,6 +159,7 @@ int wait_any(int count, void *objects[], nanoseconds_t timeout)
 		*/
 		if (wb->status == WAITBLOCK_SIGNALED) {
 			if (satisfier != -1) {
+				spinrelease(&obj->lock);
 				panic("wait_any: multiple satisfiers found");
 			}
 			satisfier = i;

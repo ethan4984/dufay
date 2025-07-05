@@ -119,7 +119,7 @@ extern void isr_handler_main(struct registers *regs)
 	/** TODO: Make this architecture-independant somewhat and support setting different priorities for different vectors */
 	ipl_t oldipl = CORE_LOCAL->ipl;
 
-	//	arch_set_hardware_ipl(IPL_DEVICE);
+	arch_set_hardware_ipl(IPL_DEVICE);
 	CORE_LOCAL->ipl = IPL_DEVICE;
 
 	if (regs->isr_number < 32) {
@@ -195,17 +195,13 @@ extern void isr_handler_main(struct registers *regs)
 		}
 	}
 
-	//	arch_set_hardware_ipl(oldipl);
+	arch_set_hardware_ipl(oldipl);
 	CORE_LOCAL->ipl = oldipl;
 
 	xapic_write(XAPIC_EOI_OFF, 0);
 
 	if (oldipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, oldipl)) {
 		dispatch_software_interrupts(oldipl);
-	} else if (oldipl >= IPL_DISPATCH) {
-		print("oldipl=%d not dispatching, raise=[%lx,%lx,%lx]\n", oldipl,
-			  CORE_LOCAL->last_raises[0], CORE_LOCAL->last_raises[1],
-			  CORE_LOCAL->last_raises[2]);
 	}
 	SWAP_TLS(regs);
 }

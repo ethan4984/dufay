@@ -113,6 +113,8 @@ static struct thread *pick_batch_thread(struct cpu_local *cpu, bool migrate)
 			/* Pick the first thread from the queue */
 			td = TAILQ_FIRST(&runq->queues[i]);
 
+			ASSERT(td != NULL);
+
 			if (migrate) {
 				/* Find the first thread that's not pinned */
 				while (td->pinned) {
@@ -531,8 +533,10 @@ static struct thread *sched_select_thread(struct thread *cur,
 */
 #define STEAL_THRESHOLD 1
 
-static void idle_thread(void *)
+void idle_thread(void *)
 {
+	print("cpu%d: idling\n", CORE_LOCAL->core_id);
+
 	for (;;) {
 		if (CORE_LOCAL->sched_data.steal_work) {
 			CORE_LOCAL->sched_data.steal_work = false;
@@ -579,8 +583,6 @@ static void idle_thread(void *)
 			ipl_lower(ipl);
 		}
 
-		arch_enable_interrupts();
-		ipl_lower(IPL_ZERO);
 		arch_halt();
 	}
 }
@@ -685,7 +687,7 @@ struct process kprocess = { 0 };
 
 static int id = 0;
 
-#define STACK_SIZE (0x8000)
+#define STACK_SIZE (0x4000)
 
 struct thread *make_kernel_thread(void (*fn)(void *))
 {
@@ -795,11 +797,10 @@ void sched_wait()
 
 	td->sleep_start = TICKS_TO_MS(atomic_load(&CORE_LOCAL->ticks));
 
+	//print("td %d went to sleep\n", td->id);
 	sched_yield();
 
-	ipl_lower(ipl);
-
-	//spinlock_release(&td->lock, ipl);
+	spinlock_release(&td->lock, ipl);
 }
 
 void sched_wake(struct thread *td)

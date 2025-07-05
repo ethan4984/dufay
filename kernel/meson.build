@@ -1,4 +1,4 @@
-project('fuga', 'c', default_options: ['c_std=gnu23', 'warning_level=2', 'werror=false', 'buildtype=debugoptimized'])
+project('fuga', 'c', default_options: ['c_std=gnu23', 'warning_level=2', 'werror=false', 'buildtype=debug'])
 
 c_args = [
     '-D__DUFAY__',
