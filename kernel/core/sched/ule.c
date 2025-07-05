@@ -6,10 +6,12 @@
 #include <core/sched.h>
 #include <aria/base.h>
 #include <mm/address.h>
+#include <mm/slab.h>
 #include <core/timer.h>
 #include <mm/physical.h>
 #include <core/debug.h>
 #include <core/thread.h>
+#include <aria/debug.h>
 
 #define SCALING_FACTOR 50
 #define INTERACTIVITY_THRESHOLD 30
@@ -50,7 +52,7 @@ static struct thread *pick_realtime_thread(struct cpu_local *cpu, int minprio,
 	}
 
 	/* Search higher priorities queues first */
-	for (int i = minprio; i <= PRIO_MAX; i++) {
+	for (int i = PRIO_MAX; i >= minprio; i--) {
 		/* Queue is not empty */
 		if (runq->status & (1UL << i)) {
 			/* Pop the first thread off the queue */
@@ -156,22 +158,22 @@ static struct thread *pick_idle_thread(struct cpu_local *cpu, bool migrate)
 	return NULL;
 }
 
+#define MAX(A, B) ((A > B) ? (A) : (B))
+
 static int interactive_score(struct thread *td)
 {
 	int penalty;
 
-	if (!td->sleeptime) {
-		return 100;
-	} else if (!td->runtime) {
-		return 0;
-	}
-
 	/* Calculate the interactivity penalty */
 	if (td->sleeptime > td->runtime) {
-		penalty = SCALING_FACTOR / (td->sleeptime / td->runtime);
+		penalty = SCALING_FACTOR / (td->sleeptime / MAX(td->runtime, 1));
+	} else if (td->runtime > td->sleeptime) {
+		penalty = (SCALING_FACTOR + (td->runtime / MAX(td->sleeptime, 1))) +
+				  SCALING_FACTOR;
+	} else if (td->runtime) {
+		return SCALING_FACTOR;
 	} else {
-		penalty =
-			(SCALING_FACTOR / (td->runtime / td->sleeptime)) + SCALING_FACTOR;
+		return 0;
 	}
 
 	/*
@@ -365,19 +367,22 @@ static inline bool should_preempt(struct thread *td, struct cpu_local *cpu)
 	bool interact = status & 1;
 
 	/* Always preempt idle threads */
-	if (prio == PRIO_IDLE)
+	if (prio == PRIO_IDLE) {
 		return true;
+	}
 
 	if (PRIO_IS_BATCH(prio) && !interact && td->interactive) {
-		/* Interactive threads always preempt timeshared ones */
+		/* Interactive threads always preempt timeshared non-interactive ones */
 		return true;
 	}
 
 	/*
-	 * Preempt if the priority exceeds the preemption threshold.
+	 * Preempt if the priority exceeds the preemption threshold (that is the thread is realtime) or if the thread is interactive.
 	 * The default value forbids timeshared (batch) threads to preempt each other.
+	 * Interactive threads may still preempt each other based on interactivity.
 	 */
-	if (td->priority >= PREEMPT_THRESHOLD && td->priority > prio)
+	if ((td->priority >= PREEMPT_THRESHOLD || td->interactive) &&
+		td->priority > prio)
 		return true;
 
 	return false;
@@ -526,49 +531,57 @@ static struct thread *sched_select_thread(struct thread *cur,
 */
 #define STEAL_THRESHOLD 1
 
-static void idle_thread()
+static void idle_thread(void *)
 {
 	for (;;) {
-		ipl_t ipl = ipldispatch();
+		if (CORE_LOCAL->sched_data.steal_work) {
+			CORE_LOCAL->sched_data.steal_work = false;
 
-		/* Find the most loaded CPU and steal a thread from it */
-		struct cpu_local *most, *least;
+			ipl_t ipl = ipldispatch();
 
-		find_most_and_least_loaded_cpu(&most, &least);
+			/* Find the most loaded CPU and steal a thread from it */
+			struct cpu_local *most, *least;
 
-		/* Something changed, try again */
-		if (most == CORE_LOCAL) {
-			ipl_lower(ipl);
-			continue;
-		}
+			find_most_and_least_loaded_cpu(&most, &least);
 
-		spinlock(&most->sched_data.thread_queues_lock);
+			/* Something changed, try again */
+			if (most == CORE_LOCAL) {
+				ipl_lower(ipl);
+				continue;
+			}
 
-		/* Don't bother. */
-		if (most->sched_data.load < STEAL_THRESHOLD) {
+			spinlock(&most->sched_data.thread_queues_lock);
+
+			/* Don't bother. */
+			if (most->sched_data.load < STEAL_THRESHOLD) {
+				spinrelease(&most->sched_data.thread_queues_lock);
+				ipl_lower(ipl);
+				continue;
+			}
+
+			/* Find a thread to steal. Anything is fine */
+			struct thread *td = sched_select_thread(NULL, most, true);
+
+			if (!td) {
+				spinrelease(&most->sched_data.thread_queues_lock);
+				ipl_lower(ipl);
+				continue;
+			}
+
 			spinrelease(&most->sched_data.thread_queues_lock);
+
+			spinlock(&td->lock);
+
+			sched_try_preempt(CORE_LOCAL, td);
+
+			spinrelease(&td->lock);
+
 			ipl_lower(ipl);
-			continue;
 		}
 
-		/* Find a thread to steal. Anything is fine */
-		struct thread *td = sched_select_thread(NULL, most, true);
-
-		if (!td) {
-			spinrelease(&most->sched_data.thread_queues_lock);
-			ipl_lower(ipl);
-			continue;
-		}
-
-		spinrelease(&most->sched_data.thread_queues_lock);
-
-		spinlock(&td->lock);
-
-		sched_try_preempt(CORE_LOCAL, td);
-
-		spinrelease(&td->lock);
-
-		ipl_lower(ipl);
+		arch_enable_interrupts();
+		ipl_lower(IPL_ZERO);
+		arch_halt();
 	}
 }
 
@@ -628,6 +641,12 @@ void sched_reschedule()
 {
 	struct thread *td = CORE_LOCAL->current_thread;
 
+	if (!td) {
+		return;
+	}
+
+	ASSERT(td != NULL);
+
 	spinlock(&td->lock);
 	spinlock(&CORE_LOCAL->sched_data.thread_queues_lock);
 
@@ -664,18 +683,49 @@ void sched_reschedule()
 
 struct process kprocess = { 0 };
 
-struct thread *make_kernel_thread(void (*fn)())
+static int id = 0;
+
+#define STACK_SIZE (0x8000)
+
+struct thread *make_kernel_thread(void (*fn)(void *))
 {
-	struct thread *t = alloc(sizeof(struct thread));
+	struct thread *t = kmem_malloc(sizeof(struct thread));
 
 	memset(t, 0, sizeof(struct thread));
 
-	t->kernel_stack_base = (uintptr_t)pmm_alloc(2, 1) + HIGH_VMA;
+	t->kernel_stack_base =
+		(uintptr_t)pmm_alloc(STACK_SIZE / PAGE_SIZE, 1) + HIGH_VMA;
 
-	arch_context_init(&t->ctx, t->kernel_stack_base + 8192, (uintptr_t)fn);
+	arch_context_init(&t->ctx, t->kernel_stack_base + STACK_SIZE, (uintptr_t)fn,
+					  NULL);
 	t->process = &kprocess;
 	t->priority_class = PRIO_LOW_BATCH;
 	t->priority = PRIO_DEFAULT;
+	t->id = id++;
+
+	return t;
+}
+
+struct thread *make_kernel_thread_arg(void (*fn)(void *), void *arg)
+{
+	struct thread *t = kmem_malloc(sizeof(struct thread));
+
+	memset(t, 0, sizeof(struct thread));
+
+	uintptr_t stack = pmm_alloc(STACK_SIZE / PAGE_SIZE, 1);
+
+	if (!stack)
+		panic("OUT OF MEMORY\n");
+
+	t->kernel_stack_base = (uintptr_t)stack + HIGH_VMA;
+
+	arch_context_init(&t->ctx, t->kernel_stack_base + STACK_SIZE, (uintptr_t)fn,
+					  arg);
+	t->process = &kprocess;
+	t->priority_class = PRIO_LOW_BATCH;
+	t->priority = PRIO_DEFAULT;
+
+	t->id = id++;
 
 	return t;
 }
@@ -700,6 +750,7 @@ void sched_cpu_init()
 	CORE_LOCAL->sched_data.calendar_queue.status = 0;
 	CORE_LOCAL->sched_data.realtime_runq.status = 0;
 	CORE_LOCAL->sched_data.thread_queues_lock.lock = 0;
+	CORE_LOCAL->sched_data.steal_work = true;
 
 	TAILQ_INIT(&CORE_LOCAL->sched_data.idle_queue);
 
@@ -744,8 +795,11 @@ void sched_wait()
 
 	td->sleep_start = TICKS_TO_MS(atomic_load(&CORE_LOCAL->ticks));
 
-	spinlock_release(&td->lock, ipl);
 	sched_yield();
+
+	ipl_lower(ipl);
+
+	//spinlock_release(&td->lock, ipl);
 }
 
 void sched_wake(struct thread *td)
@@ -768,20 +822,21 @@ void sched_wake(struct thread *td)
 	ipl_lower(ipl);
 }
 
-void sched_yield_locked(struct thread *td)
+void sched_yield_locked(struct thread *td, struct cpu_local *cpu)
 {
 	struct thread *next;
 
-	spinlock(&CORE_LOCAL->sched_data.thread_queues_lock);
+	spinlock(&cpu->sched_data.thread_queues_lock);
 
 	/* Select a new thread to run */
-	next = sched_select_thread(td, CORE_LOCAL, false);
+	next = sched_select_thread(NULL, cpu, false);
 
-	spinrelease(&CORE_LOCAL->sched_data.thread_queues_lock);
+	spinrelease(&cpu->sched_data.thread_queues_lock);
 
 	/* Nothing to run, go idle */
 	if (!next) {
-		next = &CORE_LOCAL->idle_thread;
+		cpu->sched_data.steal_work = true;
+		next = &cpu->idle_thread;
 	}
 
 	/* Switch into the thread */
@@ -793,17 +848,15 @@ void sched_yield_locked(struct thread *td)
 void sched_yield()
 {
 	struct thread *td = CORE_LOCAL->current_thread;
-	ipl_t ipl = spinlock_acquire(&td->lock);
+	struct cpu_local *cpu = CORE_LOCAL;
 
-	sched_yield_locked(td);
-
-	spinlock_release(&td->lock, ipl);
+	sched_yield_locked(td, cpu);
 }
 
 static void yield_on_cpu(struct cpu_local *cpu)
 {
 	if (cpu == CORE_LOCAL) {
-		sched_yield_locked(cpu->current_thread);
+		sched_yield_locked(cpu->current_thread, cpu);
 		return;
 	}
 

@@ -89,6 +89,7 @@ void fuga_entry(void)
 
 	/* Liftoff! */
 	ipl_lower(IPL_ZERO);
+	arch_enable_interrupts();
 
 	for (;;) {
 		arch_halt();

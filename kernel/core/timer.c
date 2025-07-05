@@ -1,9 +1,12 @@
+#include "arch/amd64/port.h"
 #include <aria/pairing_heap.h>
 #include <core/timer.h>
 #include <core/lock.h>
 #include <aria/base.h>
 #include <core/cpu.h>
 #include <stdatomic.h>
+#include <core/debug.h>
+#include <aria/debug.h>
 
 bool timer_compare(struct pairing_heap_node *a, struct pairing_heap_node *b)
 {
@@ -32,7 +35,8 @@ void timer_start(struct ktimer *timer, uint64_t nanoseconds)
 {
 	enum timer_state expected = TIMER_STOPPED;
 
-	ipl_t ipl = spinlock_acquire(&timer->hdr.lock);
+	ipl_t ipl = spinlock_acquire_at(&timer->hdr.lock, IPL_HIGH);
+	struct cpu_local *cpu = CORE_LOCAL;
 
 	if (!atomic_compare_exchange_weak(&timer->state, &expected,
 									  TIMER_PENDING)) {
@@ -40,16 +44,15 @@ void timer_start(struct ktimer *timer, uint64_t nanoseconds)
 		return;
 	}
 
-	timer->deadline =
-		TICKS_TO_NS(atomic_load(&CORE_LOCAL->ticks)) + nanoseconds;
+	timer->deadline = TICKS_TO_NS(atomic_load(&cpu->ticks)) + nanoseconds;
 
-	timer->cpu = CORE_LOCAL;
+	timer->cpu = cpu;
 
-	spinlock(&CORE_LOCAL->timers_lock);
+	spinlock_irqsave(&cpu->timers_lock);
 
-	pairing_heap_insert(&CORE_LOCAL->timers, &timer->heap_node);
+	pairing_heap_insert(&cpu->timers, &timer->heap_node);
 
-	spinrelease(&CORE_LOCAL->timers_lock);
+	spinrelease_irqsave(&cpu->timers_lock);
 
 	spinlock_release(&timer->hdr.lock, ipl);
 }
@@ -58,11 +61,11 @@ static void dequeue_timer(struct ktimer *timer)
 {
 	struct cpu_local *cpu = timer->cpu;
 
-	spinlock(&cpu->timers_lock);
+	spinlock_irqsave(&cpu->timers_lock);
 
 	pairing_heap_remove(&cpu->timers, &timer->heap_node);
 
-	spinrelease(&cpu->timers_lock);
+	spinrelease_irqsave(&cpu->timers_lock);
 }
 
 void timer_stop(struct ktimer *timer)
@@ -94,34 +97,37 @@ void timer_stop(struct ktimer *timer)
 /* We ignore the arguments, they are irrelevant */
 void timer_handle_expiry(void *, void *)
 {
+	ASSERT(ipl_get() == IPL_DISPATCH);
+
 	while (true) {
 		struct pairing_heap_node *timer_node;
 		struct ktimer *timer;
 		enum timer_state expected = TIMER_PENDING;
+		struct cpu_local *cpu = CORE_LOCAL;
 
-		ipl_t ipl = spinlock_acquire_at(&CORE_LOCAL->timers_lock, IPL_HIGH);
+		spinlock_irqsave(&cpu->timers_lock);
 
 		/* Get the timer that expires the soonest */
-		timer_node = pairing_heap_top(&CORE_LOCAL->timers);
+		timer_node = pairing_heap_top(&cpu->timers);
 
 		/* No timers */
 		if (!timer_node) {
-			spinlock_release(&CORE_LOCAL->timers_lock, ipl);
+			spinrelease_irqsave(&cpu->timers_lock);
 			break;
 		}
 
 		timer = CONTAINER_OF(timer_node, struct ktimer, heap_node);
 
 		/* This timer shouldn't expire yet */
-		if (timer->deadline > TICKS_TO_NS(CORE_LOCAL->ticks)) {
-			spinlock_release(&CORE_LOCAL->timers_lock, ipl);
+		if (timer->deadline > TICKS_TO_NS(cpu->ticks)) {
+			spinrelease_irqsave(&cpu->timers_lock);
 			break;
 		}
 
 		/* Remove the timer from the heap */
 		pairing_heap_pop(&CORE_LOCAL->timers);
 
-		spinlock_release(&CORE_LOCAL->timers_lock, ipl);
+		spinrelease_irqsave(&cpu->timers_lock);
 
 		/* Timer was canceled */
 		if (!atomic_compare_exchange_weak(&timer->state, &expected,
@@ -135,6 +141,8 @@ void timer_handle_expiry(void *, void *)
 		timer->hdr.signaled_count = 1;
 
 		try_satisfy_dispatch_object(&timer->hdr);
+
+		timer->hdr.signaled_count = 0;
 
 		atomic_store(&timer->state, TIMER_STOPPED);
 

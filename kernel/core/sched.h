@@ -54,6 +54,7 @@ struct thread {
 	uint64_t ticks; /* Overall ticks of runtime */
 	bool interactive; /* Whether the thread is interactive or not */
 	bool pinned; /* Whether the thread is pinned to this CPU */
+	int id;
 
 	enum thread_state state; /* Current state of the thread */
 

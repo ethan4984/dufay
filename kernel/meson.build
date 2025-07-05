@@ -15,7 +15,7 @@ add_global_arguments(c_args, language : 'c')
 
 inc = [include_directories('.', 'external')]
 
-src = files('main.c', 'sync_test.c')
+src = files('main.c', 'sync_test.c', 'fireworks.c')
 
 dep = dependency('aria', fallback: ['aria', 'aria_dep'])
 

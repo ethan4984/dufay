@@ -12,18 +12,22 @@ void dpc_init(struct dpc *dpc, dpc_routine_t routine)
 
 void dpc_enqueue(struct dpc *dpc, void *arg1, void *arg2)
 {
-	spinlock_irqsave(&CORE_LOCAL->dpc_queue_lock);
+	ipl_t ipl = spinlock_acquire_at(&CORE_LOCAL->dpc_queue_lock, IPL_HIGH);
 
 	dpc->arg1 = arg1;
 	dpc->arg2 = arg2;
 
-	/* Insert the DPC on this CPU's dpc queue */
-	TAILQ_INSERT_TAIL(&CORE_LOCAL->dpc_queue, dpc, queue_hook);
+	if (!dpc->cpu) {
+		dpc->cpu = CORE_LOCAL;
 
-	/* Set a DPC pending on this CPU */
-	set_softint_pending(CORE_LOCAL, IPL_DISPATCH);
+		/* Insert the DPC on this CPU's dpc queue */
+		TAILQ_INSERT_TAIL(&CORE_LOCAL->dpc_queue, dpc, queue_hook);
 
-	spinrelease_irqsave(&CORE_LOCAL->dpc_queue_lock);
+		/* Set a DPC pending on this CPU */
+		set_softint_pending(CORE_LOCAL, IPL_DISPATCH);
+	}
+
+	spinlock_release(&CORE_LOCAL->dpc_queue_lock, ipl);
 }
 
 void dispatch_dpc_queue(struct cpu_local *cpu)
@@ -36,6 +40,7 @@ void dispatch_dpc_queue(struct cpu_local *cpu)
 
 		if (dpc) {
 			TAILQ_REMOVE(&cpu->dpc_queue, dpc, queue_hook);
+			dpc->cpu = NULL;
 		} else {
 			spinrelease_irqsave(&cpu->dpc_queue_lock);
 			break;

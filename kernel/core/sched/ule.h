@@ -56,6 +56,8 @@ struct sched_percpu {
    * calendar queues are exhausted.
    */
 	TAILQ_HEAD(, thread) idle_queue;
+
+	bool steal_work;
 };
 
 #endif

@@ -1,3 +1,4 @@
+#include "core/clock.h"
 #include "core/rcu.h"
 #include <core/ipl.h>
 #include <core/mutex.h>
@@ -14,13 +15,14 @@
  * ------------ Mutex Test ------------
  */
 
-struct thread *make_kernel_thread(void (*fn)());
+struct thread *make_kernel_thread(void (*fn)(void *));
+struct thread *make_kernel_thread_arg(void (*fn)(void *), void *);
 
 static struct mutex mtx;
 static int val = 0;
 
 #define MUTEX_TEST(N)                                         \
-	static void mtx##N()                                      \
+	static void mtx##N(void *)                                \
 	{                                                         \
 		for (;;) {                                            \
 			mutex_lock(&mtx, -1);                             \
@@ -63,6 +65,17 @@ MUTEX_TEST(8)
 		sched_ready(nthread);                            \
 	})
 
+#define ENQUEUE_FUNCTION_ARG(fn, arg)                             \
+	({                                                            \
+		struct thread *nthread = make_kernel_thread_arg(fn, arg); \
+		if (nthread == NULL) {                                    \
+			REPORT_ERROR;                                         \
+			panic("Failed to create thread for " #fn);            \
+		}                                                         \
+		memcpy(nthread->name, #fn, sizeof(#fn));                  \
+		sched_ready(nthread);                                     \
+	})
+
 struct thread *new_kernel_thread(uintptr_t entry);
 
 static void mutex_test()
@@ -84,7 +97,7 @@ static void mutex_test()
 static struct semaphore sem;
 
 #define SEM_TEST(N)                                               \
-	static void sem##N()                                          \
+	static void sem##N(void *)                                    \
 	{                                                             \
 		for (;;) {                                                \
 			semaphore_acquire(&sem);                              \
@@ -110,7 +123,7 @@ static void sem_test()
 static struct ktimer timer;
 static struct ktimer other_timer;
 
-static void timer2()
+static void timer2(void *)
 {
 	print("2: Waiting 1 second...\n");
 
@@ -124,7 +137,7 @@ static void timer2()
 	}
 }
 
-static void timer1()
+static void timer1(void *)
 {
 	print("1: Waiting 4 seconds...\n");
 
@@ -137,21 +150,49 @@ static void timer1()
 	}
 }
 
+static void perform_delay(int ms)
+{
+	struct ktimer timer;
+	timer_init(&timer, "");
+	timer_start(&timer, (NANOSECONDS_PER_SECOND / 1000) * ms);
+	wait_one(&timer.hdr, -1);
+}
+
+static void timer3(void *)
+{
+	//print("td%d: I'm back\n", CORE_LOCAL->current_thread->id);
+
+	for (;;) {
+		//print("td%d: waiting\n", CORE_LOCAL->current_thread->id);
+
+		perform_delay(16);
+
+		//	print("td%d: im back\n", CORE_LOCAL->current_thread->id);
+	}
+}
+
 static void timer_test()
 {
 	timer_init(&timer, "lol");
 	timer_init(&other_timer, "lol");
 
-	ENQUEUE_FUNCTION(timer1);
-	ENQUEUE_FUNCTION(timer2);
+	/* ENQUEUE_FUNCTION(timer1); */
+	/* ENQUEUE_FUNCTION(timer2); */
+
+	for (int i = 0; i < 2000; i++) {
+		ENQUEUE_FUNCTION(timer3);
+	}
 }
 
-#define THREAD_TEST(N)                                             \
-	static void td##N()                                            \
-	{                                                              \
-		for (;;) {                                                 \
-			print("thread%d: on cpu%d\n", N, CORE_LOCAL->core_id); \
-		}                                                          \
+#define THREAD_TEST(N)                                                \
+	static void td##N(void *)                                         \
+	{                                                                 \
+		print("thread%d: on cpu%d\n", CORE_LOCAL->current_thread->id, \
+			  CORE_LOCAL->core_id);                                   \
+                                                                      \
+		for (;;) {                                                    \
+			perform_delay(1000);                                      \
+		}                                                             \
 	}
 
 THREAD_TEST(1);
@@ -163,7 +204,7 @@ THREAD_TEST(6);
 THREAD_TEST(7);
 THREAD_TEST(8);
 
-static void thread_test()
+static void thread_starter(void *)
 {
 	ENQUEUE_FUNCTION(td1);
 	ENQUEUE_FUNCTION(td2);
@@ -173,6 +214,15 @@ static void thread_test()
 	ENQUEUE_FUNCTION(td6);
 	ENQUEUE_FUNCTION(td7);
 	ENQUEUE_FUNCTION(td8);
+
+	ENQUEUE_FUNCTION(thread_starter);
+
+	sched_wait();
+}
+
+static void thread_test()
+{
+	ENQUEUE_FUNCTION(thread_starter);
 }
 
 struct my_data {
@@ -182,7 +232,7 @@ struct my_data {
 
 static struct my_data *global_data;
 
-static void rcu_reader()
+static void rcu_reader(void *)
 {
 	struct ktimer timer;
 
@@ -202,7 +252,7 @@ static void rcu_reader()
 
 static int lol = 0;
 
-static void rcu_writer()
+static void rcu_writer(void *)
 {
 	struct ktimer timer;
 	for (;;) {
@@ -242,7 +292,7 @@ static void rcu_test()
 	}
 }
 
-#define DO_RCU_TEST 1
+#define DO_FW_TEST 1
 
 void do_sync_test()
 {
@@ -263,6 +313,10 @@ void do_sync_test()
 	thread_test();
 #elif defined(DO_RCU_TEST)
 	rcu_test();
+#elif defined(DO_FW_TEST)
+	//ENQUEUE_FUNCTION_ARG(myfn, (void*)0x69);
+	void PerformFireworksTest();
+	PerformFireworksTest();
 #endif
 	ipl_lower(ipl);
 }

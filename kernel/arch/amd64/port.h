@@ -29,11 +29,12 @@ struct __attribute__((packed)) arch_cpu_cb {
 	struct cpu_local *self;
 };
 
-struct arch_thread_context {
+struct __attribute__((packed)) arch_thread_context {
+	uint64_t rsp;
+
 	struct arch_thread_regs {
 		uint64_t rbp, rbx, r12, r13, r14, r15, rip;
 	} regs;
-	uint64_t rsp;
 	void *fpu_thread;
 };
 

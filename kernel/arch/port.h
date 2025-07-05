@@ -17,7 +17,7 @@ void arch_set_hardware_ipl(ipl_t ipl);
 void arch_halt(void);
 
 void arch_context_init(struct arch_thread_context *context,
-					   uintptr_t kernel_stack, uintptr_t entry);
+					   uintptr_t kernel_stack, uintptr_t entry, void *arg);
 
 struct thread;
 

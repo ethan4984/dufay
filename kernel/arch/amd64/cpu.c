@@ -159,13 +159,13 @@ extern void amd64_load_context(struct thread *td);
 
 extern void _amd64_thread_entry(void);
 
-void amd64_thread_entry(void (*fn)(void), struct thread *prev)
+void amd64_thread_entry(void (*fn)(void *), struct thread *prev, void *arg)
 {
 	if (prev)
 		spinrelease(&prev->lock);
 	ipl_lower(IPL_ZERO);
 
-	fn();
+	fn(arg);
 	panic("thread shouldn't return!");
 }
 
@@ -181,7 +181,7 @@ void arch_load_context(struct thread *td)
 }
 
 void arch_context_init(struct arch_thread_context *context,
-					   uintptr_t kernel_stack, uintptr_t entry)
+					   uintptr_t kernel_stack, uintptr_t entry, void *arg)
 {
 	struct arch_thread_regs *sp =
 		(struct arch_thread_regs *)(kernel_stack -
@@ -192,4 +192,5 @@ void arch_context_init(struct arch_thread_context *context,
 	context->rsp = (uintptr_t)sp;
 	sp->rip = (uintptr_t)_amd64_thread_entry;
 	sp->r12 = (uintptr_t)entry;
+	sp->r13 = (uintptr_t)arg;
 }

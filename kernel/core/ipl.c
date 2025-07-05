@@ -12,11 +12,9 @@ ipl_t ipl_raise(ipl_t ipl)
 	ASSERT(ipl >= old_ipl);
 
 	CORE_LOCAL->ipl = ipl;
-
-	/* Hardware interrupts disabled */
-	if (ipl > IPL_DISPATCH) {
-		arch_disable_interrupts();
-	}
+	CORE_LOCAL->last_raises[0] = (uintptr_t)__builtin_return_address(0);
+	CORE_LOCAL->last_raises[1] = (uintptr_t)__builtin_return_address(1);
+	CORE_LOCAL->last_raises[2] = (uintptr_t)__builtin_return_address(2);
 
 	return old_ipl;
 }
@@ -28,11 +26,6 @@ void ipl_lower(ipl_t ipl)
 	ASSERT(ipl <= old_ipl);
 
 	CORE_LOCAL->ipl = ipl;
-
-	/* Re-enable hardware interrupts */
-	if (ipl <= IPL_DISPATCH) {
-		arch_enable_interrupts();
-	}
 
 	/* Dispatch software interrupts */
 	if (ipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, ipl)) {
@@ -74,15 +67,23 @@ static void dispatch_dpc()
 
 	dispatch_dpc_queue(CORE_LOCAL);
 
-	if (preempt_reason == PREEMPT_QUANTUM_END ||
-		preempt_reason == PREEMPT_MIGRATION) {
+	/*
+	 * We only try rescheduling on quantum ends and migrations.
+	 * If a next thread already exist (set via a preemption), then choose it instead.
+	 */
+	if ((preempt_reason == PREEMPT_QUANTUM_END ||
+		 preempt_reason == PREEMPT_MIGRATION) &&
+		!CORE_LOCAL->next_thread) {
 		sched_reschedule();
 	}
 
 	CORE_LOCAL->preemption_reason = PREEMPT_NONE;
 
 	if (CORE_LOCAL->next_thread) {
+		print("cpu%d: switching to %s\n", CORE_LOCAL->core_id,
+			  CORE_LOCAL->next_thread->name);
 		sched_switch(CORE_LOCAL->current_thread, CORE_LOCAL->next_thread);
+	} else {
 	}
 
 	if (!int_state) {
@@ -94,8 +95,14 @@ static void dispatch_dpc()
 
 void dispatch_software_interrupts(ipl_t ipl)
 {
+	bool state = arch_interrupt_state();
+	arch_disable_interrupts();
+
 	if (is_softint_pending(CORE_LOCAL, ipl)) {
 		clear_softint_pending(CORE_LOCAL, ipl);
 		dispatch_dpc();
 	}
+
+	if (state)
+		arch_enable_interrupts();
 }

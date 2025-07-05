@@ -139,8 +139,8 @@ void boot_aps(void)
 	pmap_map(kernel_mappings.page_table->pmap, 0, 0,
 			 VM_PROT_PRESENT | VM_PROT_WRITE | VM_PROT_EXECUTE, VM_LARGE_PAGE);
 
-	memcpy8((void *)0x80000, (void *)(uintptr_t)smp_init_begin,
-			(uintptr_t)smp_init_end - (uintptr_t)smp_init_begin);
+	memcpy((void *)0x80000, (void *)(uintptr_t)smp_init_begin,
+		   (uintptr_t)smp_init_end - (uintptr_t)smp_init_begin);
 
 	bootable_processor_cnt = madt_ent0_list.length;
 	logical_processor_locales =
@@ -165,5 +165,5 @@ void boot_aps(void)
 	while (atomic_load(&cpus_up) != bootable_processor_cnt) {
 	}
 
-	print("All %d logical processors are up\n", logical_processor_cnt);
+	print("All %d logical processors are up\n", bootable_processor_cnt);
 }

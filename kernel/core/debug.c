@@ -57,13 +57,15 @@ void print(const char *str, ...)
 
 void panic(const char *str, ...)
 {
-	print("KERNEL PANIC: < ");
+	print("\033[1;31mKERNEL PANIC: < ");
 
 	va_list arg;
 	va_start(arg, str);
 
+	spinlock_irqsave(&print_lock);
 	npf_vpprintf(&putc, NULL, str, arg);
 
+	spinrelease_irqsave(&print_lock);
 	va_end(arg);
 
 	print_unlocked(" > HALTING\n");
@@ -93,7 +95,7 @@ void stacktrace(uint64_t *rbp)
 			return;
 		}
 
-		print_unlocked("trace: [%x]\n", return_address);
+		print_unlocked("trace: [%lx]\n", return_address);
 
 		rbp = (void *)previous_rbp;
 	}

@@ -9,8 +9,8 @@ amd64_context_switch:
     push rbx
     push rbp
 
-    mov [rdi+56], rsp ; Save stack
-    mov rsp, [rsi+56] ; Load next thread's stack
+    mov [rdi], rsp ; Save stack
+    mov rsp, [rsi] ; Load next thread's stack
     mov rax, rdi   ; Save prev thread in rax
 
     xor rbx, rbx            
@@ -29,7 +29,7 @@ amd64_context_switch:
 
 global amd64_load_context
 amd64_load_context:
-    mov rsp, [rdi+56] ; Load thread's stack
+    mov rsp, [rdi] ; Load thread's stack
     xor rax, rax
 
     ; Restore next thread's registers
@@ -45,7 +45,8 @@ amd64_load_context:
 
 global _amd64_thread_entry
 _amd64_thread_entry:
-mov rdi, r12
-mov rsi, rax
-extern amd64_thread_entry
-call amd64_thread_entry
+	mov rdi, r12
+	mov rsi, rax
+	mov rdx, r13		
+	extern amd64_thread_entry
+	call amd64_thread_entry

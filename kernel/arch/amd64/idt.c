@@ -119,7 +119,7 @@ extern void isr_handler_main(struct registers *regs)
 	/** TODO: Make this architecture-independant somewhat and support setting different priorities for different vectors */
 	ipl_t oldipl = CORE_LOCAL->ipl;
 
-	arch_set_hardware_ipl(IPL_DEVICE);
+	//	arch_set_hardware_ipl(IPL_DEVICE);
 	CORE_LOCAL->ipl = IPL_DEVICE;
 
 	if (regs->isr_number < 32) {
@@ -146,25 +146,32 @@ extern void isr_handler_main(struct registers *regs)
 #endif
 		}
 
-		spinlock(&exception_lock);
+		spinlock_irqsave(&exception_lock);
 
-		print_unlocked(
-			"DEBUG: on CPU%d Kowalski analysis: \"%s\" with error code: %x\n",
+		print(
+			"\033[1;31mDEBUG: on CPU%d Kowalski analysis: \"%s\" with error code: %x\n",
 			CORE_LOCAL->core_id, exception_messages[regs->isr_number],
 			regs->error_code);
-		print_unlocked("DEBUG: rax: %x | rbx: %x | rcx: %x | rdx: %x\n",
-					   regs->rax, regs->rbx, regs->rcx, regs->rdx);
-		print_unlocked("DEBUG: rsi: %x | rdi: %x | rbp: %x | rsp: %x\n",
-					   regs->rsi, regs->rdi, regs->rbp, regs->rsp);
-		print_unlocked("DEBUG: r8: %x | r9: %x | r10: %x | r11: %x\n", regs->r8,
-					   regs->r9, regs->r10, regs->r11);
-		print_unlocked("DEBUG: r12: %x | r13: %x | r14: %x | r15: %x\n",
-					   regs->r12, regs->r13, regs->r14, regs->r15);
-		print_unlocked("DEBUG: cs: %x | ss: %x | cr2: %x | rip: %x\n", regs->cs,
-					   regs->ss, cr2, regs->rip);
-		print_unlocked("DEBUG: cr3: %x\n", cr3);
+		print("DEBUG: rax: %lx | rbx: %lx | rcx: %lx | rdx: %lx\n", regs->rax,
+			  regs->rbx, regs->rcx, regs->rdx);
+		print("DEBUG: rsi: %lx | rdi: %lx | rbp: %lx | rsp: %lx\n", regs->rsi,
+			  regs->rdi, regs->rbp, regs->rsp);
+		print("DEBUG: r8: %lx | r9: %lx | r10: %lx | r11: %lx\n", regs->r8,
+			  regs->r9, regs->r10, regs->r11);
+		print("DEBUG: r12: %lx | r13: %lx | r14: %lx | r15: %lx\n", regs->r12,
+			  regs->r13, regs->r14, regs->r15);
+		print("DEBUG: cs: %lx | ss: %lx | cr2: %lx | rip: %lx\n", regs->cs,
+			  regs->ss, cr2, regs->rip);
+		print("DEBUG: cr3: %lx\n", cr3);
 
-		spinrelease(&exception_lock);
+		print("DEBUG: current thread was %s (tid %d)\n",
+			  CORE_LOCAL->current_thread ? CORE_LOCAL->current_thread->name :
+										   "(None)",
+			  CORE_LOCAL->current_thread ? CORE_LOCAL->current_thread->id : -1);
+
+		stacktrace((uint64_t *)regs->rbp);
+
+		spinrelease_irqsave(&exception_lock);
 
 		for (;;) {
 			__asm__("hlt");
@@ -188,15 +195,18 @@ extern void isr_handler_main(struct registers *regs)
 		}
 	}
 
-	xapic_write(XAPIC_EOI_OFF, 0);
-
-	arch_set_hardware_ipl(oldipl);
+	//	arch_set_hardware_ipl(oldipl);
 	CORE_LOCAL->ipl = oldipl;
+
+	xapic_write(XAPIC_EOI_OFF, 0);
 
 	if (oldipl < IPL_DISPATCH && is_softint_pending(CORE_LOCAL, oldipl)) {
 		dispatch_software_interrupts(oldipl);
+	} else if (oldipl >= IPL_DISPATCH) {
+		print("oldipl=%d not dispatching, raise=[%lx,%lx,%lx]\n", oldipl,
+			  CORE_LOCAL->last_raises[0], CORE_LOCAL->last_raises[1],
+			  CORE_LOCAL->last_raises[2]);
 	}
-
 	SWAP_TLS(regs);
 }
 

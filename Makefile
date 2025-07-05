@@ -16,14 +16,13 @@ QEMUFLAGS_BASE = -drive if=pflash,unit=0,format=raw,file=ovmf/ovmf-code-$(ARCH).
 -no-shutdown 
 
 QEMUFLAGS-x86_64 = \
-	-m 2G \
+	-m 8G \
 	-smp 2\
 	-drive file=$(DISK_IMAGE),if=none,id=nvme0,format=raw \
 	-device nvme,drive=nvme0,serial=nvme,bus=pcie.0 \
 	-device intel-iommu,aw-bits=48 \
 	-machine type=q35 \
 	-enable-kvm \
-	-serial stdio \
 	-cpu host,migratable=no,+invtsc
 
 QEMUFLAGS-aarch64 = \
@@ -38,7 +37,11 @@ QEMUFLAGS-aarch64 = \
 
 .PHONY: run
 run: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
-	qemu-system-$(ARCH) $(QEMUFLAGS-$(ARCH)) $(QEMUFLAGS_BASE)
+	qemu-system-$(ARCH) $(QEMUFLAGS-$(ARCH)) $(QEMUFLAGS_BASE) -serial stdio
+
+.PHONY: run-gdb
+run-gdb: ovmf/ovmf-code-$(ARCH).fd $(DISK_IMAGE)
+	qemu-system-$(ARCH) $(QEMUFLAGS-$(ARCH)) $(QEMUFLAGS_BASE) -serial stdio -s -S
 
 .PHONY: console
 console: $(DISK_IMAGE)

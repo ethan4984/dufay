@@ -55,7 +55,7 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 	for (size_t i = bit_base; i < module->bitmap_entry_cnt; i += align) {
 		if (module->bitmap_entry_cnt < (i + cnt)) {
 			spinrelease(&module->lock);
-			RETURN_ERROR;
+			return -1;
 		}
 
 		for (size_t j = i, count = 0; j < (i + cnt); j++) {
@@ -87,7 +87,7 @@ static uint64_t pmm_module_alloc(struct pmm_module *module, uint64_t cnt,
 
 	spinrelease(&module->lock);
 
-	RETURN_ERROR;
+	return -1;
 }
 
 static void pmm_module_free(struct pmm_module *module, uint64_t base,
@@ -201,7 +201,7 @@ uint64_t pmm_alloc(uint64_t cnt, uint64_t align)
 		return alloc;
 	} while (module);
 
-	RETURN_ERROR;
+	return 0;
 }
 
 void pmm_free(uint64_t base, uint64_t cnt)

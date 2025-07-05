@@ -53,8 +53,9 @@ static uint64_t vm_prot_to_x86(enum vm_prot prot, enum vm_flags flags)
 		ret |= X86_FLAGS_US;
 	if (flags & VM_GLOBAL)
 		ret |= X86_FLAGS_G;
-	if ((flags & VM_LARGE_PAGE) | (flags & VM_HUGE_PAGE))
+	if ((flags & VM_LARGE_PAGE) || (flags & VM_HUGE_PAGE)) {
 		ret |= X86_FLAGS_PS;
+	}
 
 	return ret;
 }

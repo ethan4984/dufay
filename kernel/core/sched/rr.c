@@ -135,6 +135,8 @@ static void sched_enqueue_locked(struct thread *thread)
 	spinlock_release(&cpu->sched_data.lock, ipl);
 }
 
+static int id = 0;
+
 void sched_ready(struct thread *thread)
 {
 	ipl_t ipl = spinlock_acquire(&thread->lock);
@@ -144,7 +146,7 @@ void sched_ready(struct thread *thread)
 
 struct process kprocess;
 
-struct thread *make_kernel_thread(void (*fn)())
+struct thread *make_kernel_thread(void (*fn)(void *))
 {
 	struct thread *t = alloc(sizeof(struct thread));
 
@@ -152,13 +154,39 @@ struct thread *make_kernel_thread(void (*fn)())
 
 	t->kernel_stack_base = (uintptr_t)pmm_alloc(2, 1) + HIGH_VMA;
 
-	arch_context_init(&t->ctx, t->kernel_stack_base + 8192, (uintptr_t)fn);
+	arch_context_init(&t->ctx, t->kernel_stack_base + 8192, (uintptr_t)fn,
+					  NULL);
 	t->process = &kprocess;
+	t->id = id++;
 
 	return t;
 }
 
-static void idle()
+struct thread *make_kernel_thread_arg(void (*fn)(void *), void *arg)
+{
+	struct thread *t = kmem_malloc(sizeof(struct thread));
+
+	memset(t, 0, sizeof(struct thread));
+
+	uintptr_t stack = pmm_alloc(4, 1);
+
+	if (!stack)
+		panic("OUT OF MEMORY\n");
+
+	t->kernel_stack_base = (uintptr_t)stack + HIGH_VMA;
+
+	arch_context_init(&t->ctx, t->kernel_stack_base + 16384, (uintptr_t)fn,
+					  arg);
+	t->process = &kprocess;
+	t->priority_class = PRIO_LOW_BATCH;
+	t->priority = PRIO_DEFAULT;
+
+	t->id = id++;
+
+	return t;
+}
+
+static void idle(void *)
 {
 	for (;;) {
 		asm("hlt");

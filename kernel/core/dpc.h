@@ -9,6 +9,7 @@ struct dpc {
 	dpc_routine_t routine; /* Routine to be called */
 	void *arg1; /* First argument passed to the routine */
 	void *arg2; /* Second argument passed to the routine */
+	struct cpu_local *cpu; /* CPU this DPC is enqueued on  */
 };
 
 void dpc_init(struct dpc *dpc, dpc_routine_t routine);

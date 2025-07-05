@@ -78,7 +78,8 @@ void pmap_activate(struct pmap *pmap)
 	(void)pmap;
 }
 
-void arch_context_init(struct arch_thread_context *ctx, uintptr_t, uintptr_t)
+void arch_context_init(struct arch_thread_context *ctx, uintptr_t, uintptr_t,
+					   void *)
 {
 }
 

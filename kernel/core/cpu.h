@@ -61,6 +61,9 @@ struct cpu_local {
 	struct spinlock dpc_queue_lock;
 
 	struct rcu_cpu rcu; /* RCU data for this CPU */
+
+	uintptr_t last_raises[3];
+	uintptr_t last_lower[3];
 };
 
 extern size_t logical_processor_cnt;
