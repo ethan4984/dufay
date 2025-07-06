@@ -12,11 +12,6 @@ ipl_t ipl_raise(ipl_t ipl)
 
 	ASSERT(ipl >= old_ipl);
 
-	if (ipl >= IPL_DISPATCH) {
-		CORE_LOCAL->last_raises[0] = (uintptr_t)__builtin_return_address(0);
-		CORE_LOCAL->last_raises[1] = (uintptr_t)__builtin_return_address(1);
-		//	CORE_LOCAL->last_raises[2] = (uintptr_t)__builtin_return_address(2);
-	}
 	if (ipl > IPL_DISPATCH) {
 		arch_disable_interrupts();
 	}

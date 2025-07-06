@@ -96,7 +96,6 @@ void timer_stop(struct ktimer *timer)
 	spinlock_release(&timer->hdr.lock, ipl);
 }
 
-/* We ignore the arguments, they are irrelevant */
 void timer_handle_expiry(void *, void *)
 {
 	ASSERT(ipl_get() == IPL_DISPATCH);

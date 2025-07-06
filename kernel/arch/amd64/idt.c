@@ -170,6 +170,12 @@ extern void isr_handler_main(struct registers *regs)
 										   "(None)",
 			  CORE_LOCAL->current_thread ? CORE_LOCAL->current_thread->id : -1);
 
+		if (CORE_LOCAL->current_thread) {
+			print("Thread info:\n");
+			print("Stack base: %p\n",
+				  CORE_LOCAL->current_thread->kernel_stack_base);
+		}
+
 		stacktrace((uint64_t *)regs->rbp);
 
 		spinrelease_irqsave(&exception_lock);

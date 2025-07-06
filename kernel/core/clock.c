@@ -39,7 +39,7 @@ void hardclock()
 
 	/* A timer has expired, enqueue the timer DPC */
 	if (timer_expired) {
-		dpc_enqueue(&CORE_LOCAL->timer_dpc, NULL, NULL);
+		dpc_enqueue(&CORE_LOCAL->timer_dpc, cpu, NULL);
 	}
 
 	//	rcu_check();

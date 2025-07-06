@@ -699,8 +699,7 @@ struct thread *make_kernel_thread(void (*fn)(void *))
 
 	memset(t, 0, sizeof(struct thread));
 
-	t->kernel_stack_base =
-		(uintptr_t)pmm_alloc(STACK_SIZE / PAGE_SIZE, 1) + HIGH_VMA;
+	t->kernel_stack_base = P2V(pmm_alloc(STACK_SIZE / PAGE_SIZE, 1));
 
 	arch_context_init(&t->ctx, t->kernel_stack_base + STACK_SIZE, (uintptr_t)fn,
 					  NULL);
@@ -718,12 +717,9 @@ struct thread *make_kernel_thread_arg(void (*fn)(void *), void *arg)
 
 	memset(t, 0, sizeof(struct thread));
 
-	uintptr_t stack = pmm_alloc(STACK_SIZE / PAGE_SIZE, 1);
+	uintptr_t stack = P2V(pmm_alloc(STACK_SIZE / PAGE_SIZE, 1));
 
-	if (!stack)
-		panic("OUT OF MEMORY\n");
-
-	t->kernel_stack_base = (uintptr_t)stack + HIGH_VMA;
+	t->kernel_stack_base = (uintptr_t)stack;
 
 	arch_context_init(&t->ctx, t->kernel_stack_base + STACK_SIZE, (uintptr_t)fn,
 					  arg);

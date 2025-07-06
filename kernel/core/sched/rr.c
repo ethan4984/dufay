@@ -52,7 +52,7 @@ void sched_reschedule()
 	if (!curthread)
 		return;
 
-	spinlock(&curthread->lock);
+	ipl_t ipl = spinlock_acquire(&curthread->lock);
 
 	spinlock(&CORE_LOCAL->sched_data.lock);
 
@@ -64,7 +64,7 @@ void sched_reschedule()
 	}
 
 	spinrelease(&CORE_LOCAL->sched_data.lock);
-	spinrelease(&curthread->lock);
+	spinlock_release(&curthread->lock, ipl);
 }
 
 void sched_yield()
@@ -118,10 +118,16 @@ static void sched_enqueue_locked(struct thread *thread)
 	thread->last_cpu = cpu;
 	thread->state = READY;
 
-	if (cpu->current_thread == &cpu->idle_thread && !cpu->next_thread) {
+	if (cpu->current_thread == &cpu->idle_thread) {
+		struct thread *next = cpu->next_thread;
+
 		/* Cause a preemption */
 		cpu->next_thread = thread;
 		cpu->preemption_reason = PREEMPT_HIGHER_PRIORITY;
+
+		if (next) {
+			TAILQ_INSERT_HEAD(&cpu->sched_data.runq, next, runqueue_hook);
+		}
 
 		set_softint_pending(cpu, IPL_DISPATCH);
 
@@ -133,7 +139,15 @@ static void sched_enqueue_locked(struct thread *thread)
 		return;
 	}
 
-	TAILQ_INSERT_TAIL(&cpu->sched_data.runq, thread, runqueue_hook);
+	if ((uintptr_t)cpu->sched_data.runq.tqh_last < 0x1000) {
+		print("wtf? cpu: %p, failed enqueuing tid=%d %s\n", cpu, thread->id,
+			  thread->name);
+	}
+
+	(thread)->runqueue_hook.tqe_next = (((void *)0));
+	(thread)->runqueue_hook.tqe_prev = (&cpu->sched_data.runq)->tqh_last;
+	*(&cpu->sched_data.runq)->tqh_last = (thread);
+	(&cpu->sched_data.runq)->tqh_last = &(thread)->runqueue_hook.tqe_next;
 
 	spinlock_release(&cpu->sched_data.lock, ipl);
 }
@@ -210,7 +224,6 @@ void sched_init()
 void sched_cpu_init()
 {
 	TAILQ_INIT(&CORE_LOCAL->dpc_queue);
-	//TAILQ_INIT(&CORE_LOCAL->timers);
 	TAILQ_INIT(&CORE_LOCAL->sched_data.runq);
 
 	dpc_init(&CORE_LOCAL->timer_dpc, timer_handle_expiry);
