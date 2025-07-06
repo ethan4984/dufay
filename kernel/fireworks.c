@@ -193,12 +193,14 @@ uint32_t GetRandomColor()
 
 static void PerformDelay(int ms)
 {
-	struct ktimer timer;
-	timer_init(&timer, "delay");
+	struct ktimer *timer = kmem_malloc(sizeof(struct ktimer));
+	timer_init(timer, "delay");
 
-	timer_start(&timer, (NANOSECONDS_PER_SECOND / 1000) * ms);
+	timer_start(timer, (NANOSECONDS_PER_SECOND / 1000) * ms);
 
-	wait_one(&timer.hdr, -1);
+	wait_one(&timer->hdr, -1);
+
+	kmem_free(timer);
 }
 
 void SpawnParticle(PFIREWORK_DATA Data);

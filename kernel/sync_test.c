@@ -141,16 +141,11 @@ static void timer1(void *)
 {
 	print("%d: Waiting 4 seconds...\n", CORE_LOCAL->current_thread->id);
 
-	timer_start(&timer, NANOSECONDS_PER_SECOND);
-	wait_one(&timer.hdr, -1);
-
-	print("1: I'm back! (cpu%d)\n", CORE_LOCAL->core_id);
-
 	timer_init(&timer, "");
 	timer_start(&timer, NANOSECONDS_PER_SECOND * 4);
 	wait_one(&timer.hdr, -1);
 
-	print("1: I'm back again (cpu%d)\n", CORE_LOCAL->core_id);
+	print("1: I'm back (cpu%d)\n", CORE_LOCAL->core_id);
 
 	for (;;) {
 	}
@@ -169,13 +164,25 @@ static void timer3(void *)
 	//print("td%d: I'm back\n", CORE_LOCAL->current_thread->id);
 
 	for (;;) {
-		print("td%d: running on cpu%d (ipl=%d)\n",
-			  CORE_LOCAL->current_thread->id, CORE_LOCAL->core_id,
-			  CORE_LOCAL->ipl);
+		//		print("td%d: running on cpu%d (ipl=%d)\n",
+		//	  CORE_LOCAL->current_thread->id, CORE_LOCAL->core_id,
+		// CORE_LOCAL->ipl);
 
-		//	perform_delay(16);
+		perform_delay(16);
 
-		//	print("td%d: im back\n", CORE_LOCAL->current_thread->id);
+		//print("td%d: im back\n", CORE_LOCAL->current_thread->id);
+	}
+}
+
+static void timer4(void *)
+{
+	for (;;) {
+		for (int i = 0; i < 5000; i++) {
+			ENQUEUE_FUNCTION(timer3);
+		}
+
+		print("\033[1;31mMAIN THREAD!!\033[0m\n");
+		perform_delay(2000);
 	}
 }
 
@@ -184,12 +191,10 @@ static void timer_test()
 	timer_init(&timer, "lol");
 	timer_init(&other_timer, "lol");
 
-	ENQUEUE_FUNCTION(timer1);
-	ENQUEUE_FUNCTION(timer2);
+	//ENQUEUE_FUNCTION(timer1);
+	//ENQUEUE_FUNCTION(timer2);
 
-	//	for (int i = 0; i < 2000; i++) {
-	//	ENQUEUE_FUNCTION(timer3);
-	//}
+	ENQUEUE_FUNCTION(timer4);
 }
 
 #define THREAD_TEST(N)                                                \
@@ -300,7 +305,7 @@ static void rcu_test()
 	}
 }
 
-#define DO_FW_TEST 1
+#define DO_TIMER_TEST 1
 
 void do_sync_test()
 {

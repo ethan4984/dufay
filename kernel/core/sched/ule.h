@@ -57,6 +57,8 @@ struct sched_percpu {
    */
 	TAILQ_HEAD(, thread) idle_queue;
 
+	TAILQ_HEAD(, thread) blocked_queue;
+
 	bool steal_work;
 };
 

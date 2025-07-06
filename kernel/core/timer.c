@@ -144,7 +144,7 @@ void timer_handle_expiry(void *, void *)
 
 		try_satisfy_dispatch_object(&timer->hdr);
 
-		timer->hdr.signaled_count = 0;
+		//	timer->hdr.signaled_count = 0;
 
 		atomic_store(&timer->state, TIMER_STOPPED);
 

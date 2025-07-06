@@ -470,6 +470,10 @@ void sched_switch(struct thread *cur, struct thread *next)
 		sched_insert_in_queue(cpu, cur);
 	}
 
+	if (cur->state == WAITING) {
+		TAILQ_INSERT_HEAD(&cpu->sched_data.blocked_queue, cur, runqueue_hook);
+	}
+
 	next->state = RUNNING;
 	cpu->current_thread = next;
 	cpu->next_thread = NULL;
@@ -742,6 +746,7 @@ void sched_init()
 void sched_cpu_init()
 {
 	TAILQ_INIT(&CORE_LOCAL->dpc_queue);
+	TAILQ_INIT(&CORE_LOCAL->sched_data.blocked_queue);
 	pairing_heap_init(&CORE_LOCAL->timers, timer_compare);
 
 	dpc_init(&CORE_LOCAL->timer_dpc, timer_handle_expiry);
@@ -804,6 +809,7 @@ void sched_wait()
 
 void sched_wake(struct thread *td)
 {
+	//print("sched_wake(tid=%d)\n", td->id)
 	ipl_t ipl = ipldispatch();
 	spinlock(&td->lock);
 
@@ -814,6 +820,8 @@ void sched_wake(struct thread *td)
 	/* The thread is done sleeping, update the scheduler on whether it's interactive */
 	sched_update_interactivity(td);
 	sched_recompute_priority(td->last_cpu, td);
+
+	TAILQ_REMOVE(&CORE_LOCAL->sched_data.blocked_queue, td, runqueue_hook);
 
 	spinrelease(&td->lock);
 
